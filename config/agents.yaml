@@ -1,0 +1,25 @@
+# responder.skills via a JSON protocol (guarded by the approval/permission hooks).
+tools_enabled: false
+max_tool_iterations: 3
+
+supervisor:
+  enabled: true
+  model: null
+  description: Routes requests to specialist agents
+
+responder:
+  enabled: true
+  model: null
+  description: General conversation, Q&A, brainstorming
+  skills:
+    - file_ops
+    - terminal
+    - tasks
+
+system:
+  enabled: true
+  model: null
+  description: "Device actions: open/close apps, volume, running processes"
+  skills:
+    - terminal
+    - file_ops

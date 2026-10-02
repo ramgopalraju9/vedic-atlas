@@ -1,12 +1,12 @@
-"""PorcupineWakeWord – implements WakeWordPort via `pvporcupine`.
+"""PorcupineWakeWord — implements WakeWordPort via `pvporcupine`.
 
 Donor: veda/voice/wakeword.py's WakeWordDetector, read in full (Batch 3
 grounding). `frame_length`/`sample_rate` properties ported verbatim.
-`process()` is new – the donor's class exposed the raw porcupine object
+`process()` is new — the donor's class exposed the raw porcupine object
 but no per-frame method was found in the file itself (it's presumably
 called directly on `_porcupine` from the daemon, which wasn't read in
 this migration); this method wraps porcupine's real `process(pcm) -> int`
-(returns a keyword index, -1 if none) into the WakeWordPort's `bool`
+API (returns a keyword index, -1 if none) into the WakeWordPort's `bool`
 contract.
 """
 
@@ -39,3 +39,16 @@ class PorcupineWakeWord:
 
         pcm = struct.unpack_from("h" * self._porcupine.frame_length, frame)
         return self._porcupine.process(pcm) >= 0
+
+    def start(self) -> None:
+        # Frame-driven; no background thread. Present so the voice loop can drive
+        # every wake engine through the same start/stop pair.
+        pass
+
+    def stop(self) -> None:
+        delete = getattr(self._porcupine, "delete", None)
+        if callable(delete):
+            try:
+                delete()
+            except Exception:
+                pass

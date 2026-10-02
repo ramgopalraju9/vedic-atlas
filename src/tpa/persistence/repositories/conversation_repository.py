@@ -1,23 +1,23 @@
-"""ConversationRepository – SQLAlchemy implementation of ConversationRepositoryPort.
+"""ConversationRepository — SQLAlchemy implementation of ConversationRepositoryPort.
 
 Donor: veda/db/conversation_repo.py, read in full (this batch, completing
 grounding that started in Batch 3/5). Ported closely:
-  - `current_session_id` – the real 30-minute gap logic. Note: the pure
+  - `current_session_id` — the real 30-minute gap logic. Note: the pure
     gap DECISION is domain.policies.session_boundary_policy.is_same_session
     (Batch 4); this method still needs to query "when was the last turn"
     (I/O), so it calls that pure function rather than re-implementing the
-    comparison inline – the donor inlined the comparison, this repo
+    comparison inline — the donor inlined the comparison, this repo
     delegates the decision to keep the rule in exactly one place.
   - `add_turn` takes a `Turn` entity directly (per the corrected Port
-    signature) rather than resolving session_id itself – the donor's
+    signature) rather than resolving session_id itself — the donor's
     version took `(role, content)` and resolved the session internally;
     that resolution now happens one layer up, in
     service/conversation/conversation_manager.py.
-  - `recent_turns` has NO session filter – matches the real donor
+  - `recent_turns` has NO session filter — matches the real donor
     behaviour (see the Batch 7 correction note in the ledger), not the
     session-scoped version I incorrectly designed in Batch 3.
   - All ORM rows are converted via tpa/persistence/mappers.py before
-    returning – no `Mapped` type crosses this module's boundary.
+    returning — no `Mapped` type crosses this module's boundary.
 """
 
 from __future__ import annotations
@@ -44,11 +44,10 @@ class ConversationRepository:
     @staticmethod
     def _mint_session_id() -> str:
         import uuid
-
         return uuid.uuid4().hex[:8]
 
     def current_session_id(self, *, now: datetime | None = None) -> str:
-        """Lazy: does NOT insert a placeholder row. Empty DB -> freshly minted id."""
+        """Lazy: does NOT insert a placeholder row. Empty DB → freshly minted id."""
         now = now or datetime.now()
         with self._session() as s:
             last = s.scalar(
@@ -56,11 +55,11 @@ class ConversationRepository:
                     ConversationTurnRow.created_at.desc(), ConversationTurnRow.id.desc()
                 )
             )
-        if last is None:
+            if last is None:
+                return self._mint_session_id()
+            if is_same_session(last.created_at, now, self.session_gap_min):
+                return last.session_id
             return self._mint_session_id()
-        if is_same_session(last.created_at, now, self.session_gap_min):
-            return last.session_id
-        return self._mint_session_id()
 
     def add_turn(self, turn: Turn) -> int:
         if not turn.role or not turn.content:
@@ -78,7 +77,7 @@ class ConversationRepository:
             return row.id
 
     def recent_turns(self, limit: int = 10, only_unsummarized: bool = True) -> list[Turn]:
-        """Most recent turns GLOBALLY (no session filter) – matches the donor."""
+        """Most recent turns GLOBALLY (no session filter) — matches the donor."""
         with self._session() as s:
             stmt = select(ConversationTurnRow)
             if only_unsummarized:

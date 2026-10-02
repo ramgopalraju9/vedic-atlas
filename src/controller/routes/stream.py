@@ -1,6 +1,3 @@
-
-
-
 """SSE streaming route — streams Supervisor/sub-agent responses in real-time.
 
 Donor: veda/routes/stream.py, read in full. Vision dropped (see chat.py's

@@ -1,12 +1,12 @@
-"""WindowsSystemAdapter – implements SystemControlPort via psutil/pycaw/win32.
+"""WindowsSystemAdapter — implements SystemControlPort via psutil/pycaw/win32.
 
 Donor: veda/system/actions.py, read in full and ported closely:
-  - `open_teams_chat` DROPPED – Teams-specific deep-link, out of scope.
+  - `open_teams_chat` DROPPED — Teams-specific deep-link, out of scope.
   - App alias table trimmed of `"teams"`/`"microsoft teams"` entries for
     the same reason; every other alias kept.
   - `pywinauto`/`pycaw`/`win32*` imports are lazy (inside methods, not at
     module top) so this file can be imported on non-Windows dev machines
-    without those libraries installed – only actually calling a method
+    without those libraries installed — only actually calling a method
     requires them, matching the pattern already used for llama_cpp/fastembed.
 """
 
@@ -43,9 +43,8 @@ _APP_ALIASES: dict[str, str] = {
 
 _APP_LAUNCH: dict[str, str] = {
     "Code.exe": "code", "Cursor.exe": "cursor", "pycharm64.exe": "pycharm",
-    "idea64.exe": "idea", "webstorm64.exe": "webstorm",
-    "msedge.exe": "msedge", "firefox.exe": "firefox", "chrome.exe": "chrome",
-    "slack.exe": "slack",
+    "idea64.exe": "idea", "webstorm64.exe": "webstorm", "chrome.exe": "chrome",
+    "msedge.exe": "msedge", "firefox.exe": "firefox", "slack.exe": "slack",
     "outlook.exe": "outlook", "Spotify.exe": "spotify", "Notion.exe": "notion",
     "explorer.exe": "explorer", "WindowsTerminal.exe": "wt", "cmd.exe": "cmd",
     "pwsh.exe": "pwsh", "Zoom.exe": "zoom", "notepad.exe": "notepad",
@@ -113,7 +112,7 @@ class WindowsSystemAdapter:
         running = self._find_running(exe)
         if running:
             if self._focus_pid(running[0].pid):
-                return True, f"{name} is already open – brought it to the front."
+                return True, f"{name} is already open — brought it to the front."
             return True, f"{name} is already running."
 
         cmd = _APP_LAUNCH.get(exe, exe.rsplit(".", 1)[0])
@@ -170,7 +169,6 @@ class WindowsSystemAdapter:
 
     def _endpoint_volume(self):
         from pycaw.pycaw import AudioUtilities
-
         return AudioUtilities.GetSpeakers().EndpointVolume
 
     def get_volume(self) -> int | None:

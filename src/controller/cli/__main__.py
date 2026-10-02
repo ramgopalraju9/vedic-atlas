@@ -29,7 +29,7 @@ from rich.console import Console
 
 from controller.cli.client import CliError, open_client
 from controller.cli.logo import render_banner
-from controller.cli.commands import cmd_approve, cmd_config, cmd_status
+from controller.cli.commands import cmd_approve, cmd_config, cmd_listen, cmd_mute, cmd_status, cmd_task, cmd_unmute
 from controller.cli.persona import cmd_persona
 from controller.cli.render import stream_to_terminal
 from controller.cli.repl import Repl
@@ -76,6 +76,20 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_status = sub.add_parser("status", help="One-line snapshot of governance/approval state.")
     p_status.set_defaults(func=_handle_status)
+
+    p_mute = sub.add_parser("mute", help="Close the microphone (mute).")
+    p_mute.set_defaults(func=_handle_mute)
+
+    p_unmute = sub.add_parser("unmute", help="Open the microphone (unmute).")
+    p_unmute.set_defaults(func=_handle_unmute)
+
+    p_listen = sub.add_parser("listen", help="Show microphone state (muted / listening / turns).")
+    p_listen.set_defaults(func=_handle_listen)
+
+    p_task = sub.add_parser("task", help="Manage tasks: add <title> | list | done <id>.")
+    p_task.add_argument("action", nargs="?", default="list", help="add | list | done")
+    p_task.add_argument("rest", nargs="*", help="title (for add) or id (for done)")
+    p_task.set_defaults(func=_handle_task)
 
     return p
 
@@ -145,6 +159,44 @@ def _handle_status(args: argparse.Namespace) -> int:
         return cmd_status(client)
 
 
+def _handle_mute(args: argparse.Namespace) -> int:
+    with open_client(server_url=args.server_url) as client:
+        try:
+            client.ensure_up(allow_spawn=not args.no_spawn)
+        except CliError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        return cmd_mute(client)
+
+
+def _handle_unmute(args: argparse.Namespace) -> int:
+    with open_client(server_url=args.server_url) as client:
+        try:
+            client.ensure_up(allow_spawn=not args.no_spawn)
+        except CliError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        return cmd_unmute(client)
+
+
+def _handle_listen(args: argparse.Namespace) -> int:
+    with open_client(server_url=args.server_url) as client:
+        if not client.is_up():
+            Console().print("[dim]server not reachable \u2014 `veda server` to start it[/dim]")
+            return 0
+        return cmd_listen(client)
+
+
+def _handle_task(args: argparse.Namespace) -> int:
+    with open_client(server_url=args.server_url) as client:
+        try:
+            client.ensure_up(allow_spawn=not args.no_spawn)
+        except CliError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        return cmd_task(client, args.action, args.rest)
+
+
 def _handle_default_chat(args: argparse.Namespace, prompt: str) -> int:
     """One-shot streaming chat — what you get when you type `veda "..."`."""
     console = Console()
@@ -182,7 +234,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
 
     raw = list(argv if argv is not None else sys.argv[1:])
-    known_subs = {"hello", "server", "persona", "approve", "config", "status", "-h", "--help"}
+    known_subs = {"hello", "server", "persona", "approve", "config", "status", "mute", "unmute", "listen", "task", "-h", "--help"}
 
     first_pos = next((a for a in raw if not a.startswith("-")), None)
     is_subcommand = first_pos in known_subs if first_pos else False

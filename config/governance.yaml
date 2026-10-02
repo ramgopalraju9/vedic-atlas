@@ -1,0 +1,8 @@
+enabled: false
+provider: builtin
+policies_dir: tpa/governance/policies
+audit:
+  backend: sqlite
+  db_path: data/governance_audit.db
+circuit_breaker_threshold: 3
+circuit_breaker_timeout: 60

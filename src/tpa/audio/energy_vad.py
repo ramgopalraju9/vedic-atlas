@@ -1,12 +1,12 @@
-"""EnergyVadDetector – implements VoiceActivityPort with RMS energy only.
+"""EnergyVadDetector — implements VoiceActivityPort with RMS energy only.
 
-* New, and the DEFAULT adapter. Chosen over `webrtcvad` for a concrete
+★ New, and the DEFAULT adapter. Chosen over `webrtcvad` for a concrete
 reason: webrtcvad ships no wheel for Python 3.13+ and needs a C compiler
 to build, which a locked-down corp laptop and a fresh Raspberry Pi image
 both typically lack. This adapter needs numpy and nothing else, so the
 always-on loop works on any machine that can run the rest of the stack.
 
-It is also what the donor actually used – veda/voice/stt.py carried
+It is also what the donor actually used — veda/voice/stt.py carried
 `rms()` and `SILENCE_RMS_THRESHOLD` helpers, which the STT adapter's
 docstring correctly flags as "VAD logic, not STT".
 
@@ -66,7 +66,7 @@ class EnergyVadDetector:
 
     @property
     def noise_floor(self) -> float:
-        """Current adaptive ambient level – useful for tuning and diagnostics."""
+        """Current adaptive ambient level — useful for tuning and diagnostics."""
         return self._noise_floor
 
     @staticmethod

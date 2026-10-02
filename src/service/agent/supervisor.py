@@ -1,3 +1,31 @@
+"""SupervisorAgent — routes user messages to a specialist sub-agent.
+
+Donor: veda/agents/supervisor.py, read in full and adapted:
+  - DROPPED the code-agent-specific instant intercepts entirely (cancel
+    word, yolo-toggle, voice yes/no via `veda.code.approval.broker` /
+    `veda.code.runner.tasks`) — the code agent is out of scope.
+  - Routing itself now tries RouterPolicy (keyword/description match)
+    FIRST, falling back to an LLM call only when that returns None — the
+    reverse of the donor's LLM-first design. This is the ★ PROVISIONAL
+    decision flagged in domain/policies/routing_policy.py; swap the
+    strategy there if a different approach is chosen later.
+  - Governance check replaced with an injected GovernanceProvider (Batch 3
+    Port) instead of a module-level `from veda.governance import ...`.
+  - Memory-based fallback (`last_specialist`) kept — it's a real,
+    evidenced feature of the donor's routing and doesn't depend on the
+    code agent.
+
+Correction (2026-09-22): `dispatch_ambient` was missing from this port
+entirely — the first read of veda/agents/supervisor.py (270 of the real
+308 lines) never reached it. Added below, read in full this batch. The
+donor's summary-mirroring branch (folding a NOTIFICATION event's
+`is_summary` payload into conversation history) existed specifically for
+the code-runner's task summaries — the code agent is out of scope, so
+that payload shape will never actually occur in this build, but the
+mechanism is harmless to keep (it simply never fires) and removing it
+buys nothing.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +49,7 @@ from service.sensing.event_bus import EventBus
 from service.sensing.rate_limiter import Debouncer, RateLimiter
 from core.logging_config import logger
 
-_JSON_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.MULTILINE)
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 _ROUTER_SYSTEM_TEMPLATE = """You are a router for a personal assistant named Veda.
 You never answer the user directly. Your only job is to pick the best specialist.
 
@@ -60,7 +88,7 @@ class SupervisorAgent(BaseAgent):
         self.memory = memory
         self.governance = governance
         self.router = router or RouterPolicy()
-        self.conversation = conversation  # ConversationManager, optional - used only to mirror ambient summaries into history
+        self.conversation = conversation  # ConversationManager, optional — used only to mirror ambient summaries into history
         self.routing_num_predict = routing_num_predict
         self._rate_limit_max = rate_limit_max
         self._rate_limit_window_sec = rate_limit_window_sec
@@ -81,7 +109,7 @@ class SupervisorAgent(BaseAgent):
         logger.info(f"supervisor proactivity -> {level}")
         return level
 
-    # -- Routing --------------------------------------------------------
+    # -- Routing ---------------------------------------------------------
 
     def _router_system_prompt(self) -> str:
         lines = [f"- {a.name}: {a.description}" for a in self.agent_registry.list_routable(exclude={self.name})]
@@ -114,7 +142,7 @@ class SupervisorAgent(BaseAgent):
             )
             parsed = self._parse_agent_choice(raw)
             if parsed and self.agent_registry.is_registered(parsed):
-                logger.info(f"Supervisor LLM-routed to '{parsed}' (raw={raw[:120]!r})")
+                logger.info(f"Supervisor LLM-routed to '{parsed}' (raw={raw[:120]})")
                 return self.agent_registry.get(parsed)
             logger.warning(f"Supervisor LLM routing failed or unknown agent (chosen={parsed!r}); falling back")
         except Exception as e:
@@ -192,7 +220,7 @@ class SupervisorAgent(BaseAgent):
                 break
             yield chunk
 
-    # -- Ambient path ----------------------------------------------------
+    # -- Ambient path ------------------------------------------------------
 
     async def dispatch_ambient(self, event: AmbientEvent) -> str | None:
         """Decide how to narrate an ambient event, or None to suppress.
@@ -202,30 +230,24 @@ class SupervisorAgent(BaseAgent):
         """
         if event.kind == EventKind.HEARTBEAT:
             return None
-
         # Proactivity gate for LOW events.
         if event.urgency == Urgency.LOW and self.proactivity != "chatty":
             return None
-
         # Conservative mode also drops NORMAL observations that aren't clearly notifications.
         if self.proactivity == "conservative" and event.urgency == Urgency.NORMAL and event.kind == EventKind.OBSERVATION:
             return None
-
         if not self._debouncer.should_emit(event.dedupe_key):
             logger.info(f"ambient dedup: suppressed {event.source}/{event.dedupe_key}")
             return None
-
         if event.urgency != Urgency.HIGH and not self._rate_limiter.allow():
             logger.info(f"ambient rate-limited: {event.source}/{event.event_id}")
             return None
-
         # Mirror summary-flagged notifications into dialog history so the next
         # user turn can resolve pronouns against what Veda just said in an
-        # ambient bubble. Other ambient sources stay out of history - too noisy.
+        # ambient bubble. Other ambient sources stay out of history — too noisy.
         if self.conversation is not None and event.kind == EventKind.NOTIFICATION and event.payload.get("is_summary"):
             try:
                 self.conversation.add_turn("assistant", event.description)
             except Exception as e:
                 logger.warning(f"supervisor: failed to record summary in history: {e}")
-
         return event.description

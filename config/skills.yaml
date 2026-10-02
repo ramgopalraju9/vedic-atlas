@@ -1,0 +1,3 @@
+enabled: true
+skills_dir: src/service/skills
+auto_discover: true

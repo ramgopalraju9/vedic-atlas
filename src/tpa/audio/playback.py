@@ -1,4 +1,4 @@
-"""SpeakerPlayback – plays PCM chunks through the default output device.
+"""SpeakerPlayback — plays PCM chunks through the default output device.
 
 Donor: veda/voice/audio_io.py's SpeakerPlayer, read in full (Batch 3
 grounding). A worker thread serializes playback so sentence-by-sentence
@@ -8,7 +8,7 @@ TTS output queues cleanly instead of overlapping.
 *estimating* playback duration from PCM length and re-opening the mic when
 that estimate expired. Playback actually starts late (queue hand-off plus
 `sd.play` startup latency), so the mic re-opened while the speaker was
-still talking – Veda transcribed its own voice and answered itself in a
+still talking — Veda transcribed its own voice and answered itself in a
 loop. Callers now wait for real completion instead of guessing.
 """
 

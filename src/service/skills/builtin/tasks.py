@@ -1,3 +1,9 @@
+"""TasksSkill — agent-callable task management (Feature D + Feature C).
+
+New. Exposes add/list/complete/delete so the responder's tool loop can act
+on the user's tasks. Runs through SkillRunner like any skill (guardrails apply).
+"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -71,15 +77,13 @@ class TasksSkill(BaseSkill):
             if action == "complete":
                 ok = self._service.complete(tid)
                 return SkillResult(
-                    skill_name=self.name,
-                    success=ok,
+                    skill_name=self.name, success=ok,
                     output=f"Completed task #{tid}" if ok else None,
                     error=None if ok else f"No task #{tid}",
                 )
             ok = self._service.delete(tid)
             return SkillResult(
-                skill_name=self.name,
-                success=ok,
+                skill_name=self.name, success=ok,
                 output=f"Deleted task #{tid}" if ok else None,
                 error=None if ok else f"No task #{tid}",
             )

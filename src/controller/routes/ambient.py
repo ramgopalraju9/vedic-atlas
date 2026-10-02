@@ -1,6 +1,3 @@
-
-
-
 """Ambient-event API: SSE stream out, test publish in.
 
 Donor: veda/routes/ambient.py, read in full. The RUNNER_OUTPUT bypass
@@ -92,4 +89,3 @@ async def ambient_stream(request: Request, bus=Depends(get_event_bus), superviso
             bus.unsubscribe(q)
 
     return sse_response(gen())
-

@@ -1,5 +1,3 @@
-
-
 """Persona REST surface — backs both the CLI and the Angular UI.
 
 Donor: veda/routes/persona.py, read in full and copied near-verbatim.
@@ -82,4 +80,3 @@ async def set_persona(
         "state": state.model_dump(),
         "catalog": [p.model_dump() for p in PERSONA_CATALOG],
     }
-

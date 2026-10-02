@@ -2,8 +2,8 @@
 
 Donor: veda/db/engine.py, read in full and ported near-verbatim. The
 donor's `check_same_thread=False` comment referenced the background
-CAMERA thread specifically – vision is out of scope, reworded to the
-general reason (any background thread – e.g. audio capture – sharing
+CAMERA thread specifically — vision is out of scope, reworded to the
+general reason (any background thread — e.g. audio capture — sharing
 the same SQLite connection).
 """
 

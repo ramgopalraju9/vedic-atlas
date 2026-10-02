@@ -1,3 +1,12 @@
+"""BaseAgent — abstract base class for all agents.
+
+Donor: veda/meta/agent.py's BaseAgent ABC, read in full during Batch 2
+grounding (AgentResult, the sibling class in this donor file, already
+landed at domain/entities/agent_result.py). Ported verbatim — this is a
+service-layer base class (has behaviour: `execute`/`execute_stream` are
+abstract methods agents implement), not a Port.
+"""
+
 import asyncio
 from abc import ABC, abstractmethod
 from typing import AsyncIterator

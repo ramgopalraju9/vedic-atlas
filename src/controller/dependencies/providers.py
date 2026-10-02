@@ -59,3 +59,12 @@ def get_lookup_service(request: Request) -> "LookupService":
 def get_governance(request: Request) -> "GovernanceProvider | None":
     """Governance is optional — routes must handle `None` (disabled) themselves."""
     return getattr(request.app.state, "governance", None)
+
+
+def get_semantic_recall(request: Request):
+    """Optional — None when embeddings are unavailable; routes handle that."""
+    return getattr(request.app.state, "semantic_recall", None)
+
+
+def get_task_service(request: Request):
+    return _require(request, "task_service", "task service")

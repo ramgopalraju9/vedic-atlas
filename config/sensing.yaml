@@ -1,0 +1,4 @@
+proactivity: medium
+debounce_window_sec: 30.0
+rate_limit_max: 6
+rate_limit_window_sec: 60.0

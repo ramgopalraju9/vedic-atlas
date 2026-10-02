@@ -1,3 +1,9 @@
+"""TerminalSkill — execute shell commands with guardrail enforcement.
+
+Donor: veda/skills/builtin/terminal.py, read in full and ported verbatim
+except exception/context import paths.
+"""
+
 import asyncio
 import re
 from pathlib import Path

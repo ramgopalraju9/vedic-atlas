@@ -1,3 +1,9 @@
+"""AgentRegistry — name-based registry for agents, parallel to SkillRegistry.
+
+Donor: veda/agents/registry.py, read in full and ported verbatim except
+the exception import path.
+"""
+
 from core.enums import ErrorMessage, ExceptionCode
 from exceptions.exception import AppException
 from core.logging_config import logger
@@ -22,7 +28,7 @@ class AgentRegistry:
                 class_name="AgentRegistry",
                 code=ExceptionCode.AGENT_ROUTING_ERROR,
                 error_message=ErrorMessage.AGENT_ROUTING_FAILED,
-                detail=f"Agent '{name}' is not registered",
+                detail=f"agent '{name}' is not registered",
             )
         return self._agents[name]
 

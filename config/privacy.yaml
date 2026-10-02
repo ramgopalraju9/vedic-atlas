@@ -1,0 +1,15 @@
+# Mute switch adapter: software | keyboard | hid | gpio.
+# 'keyboard' uses the global hotkey from config/audio.yaml (hotkey:).
+# Falls back to 'software' if the chosen adapter cannot start.
+mute_switch: software
+
+# Privacy by default: boot muted. An explicit opt-in is required to listen.
+start_muted: true
+
+mute_gpio_pin: 17
+indicator_gpio_pin: 27
+online:
+  allowlist:
+    - api.open-meteo.com
+    - api.duckduckgo.com
+    - api.frankfurter.app

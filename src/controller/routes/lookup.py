@@ -1,5 +1,3 @@
-
-
 """Lookup API — surfaces the current-public-fact provider registry.
 
 ★ new (REQ-M-09). No donor equivalent — VEDA had no online-fact concept.

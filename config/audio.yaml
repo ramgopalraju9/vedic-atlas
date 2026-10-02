@@ -1,0 +1,53 @@
+wake_word_enabled: true
+# Wake trigger: none (transcribe while unmuted) | hotkey (press a key to arm a
+# listening window) | porcupine (spoken wake word; needs PORCUPINE_ACCESS_KEY + .ppn).
+wake_engine: hotkey
+wake_hotkey: <f9>
+wake_window_sec: 8.0
+wake_keyword_path: null
+daemon_trigger: auto
+hotkey: <f8>
+
+# Local faster-whisper model directory. Staged manually - this build never
+# auto-downloads models (REQ-M-02).
+stt_model: base.en
+stt_model_path: data/models/whisper-base.en
+
+tts_engine: pyttsx3       # pyttsx3 (Windows SAPI) | piper (cross-platform, needs .onnx)
+tts_voice: zira
+tts_model_path: null
+
+mic_device_index: null     # null = system default
+speaker_device_index: null
+
+# Always-on listening. The capture gate still decides if the mic opens,
+# so this being true does not mean the device is listening.
+voice_enabled: true
+speak_replies: true
+min_transcript_chars: 2
+
+# Echo/feedback protection. Without these Veda hears its own reply and
+# answers itself in a loop.
+speak_timeout_sec: 60.0
+post_speak_settle_sec: 0.4
+echo_guard: true
+
+vad:
+  # energy = numpy only, works everywhere (default).
+  # webrtc = more precise, but needs a C toolchain on Python 3.13+.
+  engine: energy
+
+  frame_duration_ms: 30     # webrtc accepts 10 | 20 | 30 only
+
+  # energy engine tuning
+  min_rms: 300.0            # absolute floor; raise in a noisy room
+  speech_ratio: 3.0         # how far above ambient counts as speech
+  noise_adapt: 0.05         # how fast the noise floor tracks the room
+
+  # webrtc engine tuning
+  aggressiveness: 2         # 0-3, higher = stricter
+
+  start_frames: 3
+  silence_ms: 700
+  max_utterance_sec: 15.0
+  pre_roll_frames: 5

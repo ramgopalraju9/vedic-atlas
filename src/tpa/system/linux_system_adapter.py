@@ -1,13 +1,13 @@
-"""LinuxSystemAdapter – implements SystemControlPort for Raspberry Pi OS.
+"""LinuxSystemAdapter — implements SystemControlPort for Raspberry Pi OS.
 
-* New – the donor has no Linux path at all (`pywinauto`/`pycaw` don't
+★ New — the donor has no Linux path at all (`pywinauto`/`pycaw` don't
 exist there). Built to satisfy the same `SystemControlPort` contract as
 `WindowsSystemAdapter`, using Linux-native equivalents: `xdg-open`/`wmctrl`
 for app launch/focus, `amixer` for volume, `psutil` for everything
 process-related (already cross-platform, no change needed from the
 Windows adapter's psutil usage).
 
-Narrower than the Windows adapter by necessity – window focusing on
+Narrower than the Windows adapter by necessity — window focusing on
 Linux depends on the desktop environment (or lack of one, on a headless
 Pi); `focus_app` degrades to "already running" rather than failing.
 """

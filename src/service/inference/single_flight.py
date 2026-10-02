@@ -1,3 +1,20 @@
+"""SingleFlight — serialises inference so one model runs one call at a time.
+
+★ New. `LlamaCppClient`'s docstring already *assumed* this existed ("the
+inference_orchestrator lock already ensures only one call at a time") but
+no such lock was ever built — this closes that gap.
+
+Why it matters, measured: the target runs a multi-GB quantized model on
+CPU with no GPU offload (`ollama ps` reports `100% CPU`). Two concurrent
+requests don't run twice as fast — they contend for the same cores and
+the same weights, and on a memory-constrained box (Raspberry Pi) a second
+concurrent load can push the process into swap. Serialising is strictly
+faster than thrashing.
+
+Wraps any InferencePort and is itself an InferencePort, so it composes
+with GracefulDegradation without either knowing about the other.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -46,7 +63,7 @@ class SingleFlight:
         cancel_event: asyncio.Event | None = None,
         **kwargs,
     ) -> AsyncIterator[str]:
-        # Held for the whole stream; releasing early would let a second
+        # Held for the whole stream: releasing early would let a second
         # request start decoding while this one is still producing tokens,
         # which is exactly the contention this class exists to prevent.
         async with self._lock:

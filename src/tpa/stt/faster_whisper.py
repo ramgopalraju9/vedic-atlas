@@ -1,18 +1,18 @@
-"""FasterWhisperProvider – implements STTPort via `faster-whisper`.
+"""FasterWhisperProvider — implements STTPort via `faster-whisper`.
 
 Donor: veda/voice/stt.py's WhisperSTT, read in full and adapted:
   - **Behaviour change, deliberate**: the donor's docstring says "First
-    call downloads the model (~50-150MB depending on size)" – that's a
+    call downloads the model (~50-150MB depending on size)" — that's a
     silent runtime download, which violates the no-auto-download rule
     (REQ-M-02 spirit: nothing should reach the network to make the
     device work). This adapter requires the model to already be present
     in the local cache directory and raises clearly if it isn't, instead
     of silently fetching it.
   - Takes a domain AudioWindow (PCM bytes) instead of a bare numpy array,
-    converting internally – callers never need to know this adapter
+    converting internally — callers never need to know this adapter
     wants float32 normalized samples.
   - The donor's separate silence/RMS utterance-detection helpers
-    (`rms`, `SILENCE_RMS_THRESHOLD`, etc.) are VAD logic, not STT –
+    (`rms`, `SILENCE_RMS_THRESHOLD`, etc.) are VAD logic, not STT —
     they belong with the ambient-loop / VAD work, not this file.
 """
 
@@ -41,7 +41,7 @@ class FasterWhisperProvider:
                 kwargs["download_root"] = self._cache_dir
                 if not Path(self._cache_dir).exists():
                     raise FileNotFoundError(
-                        f"whisper model cache not found at {self._cache_dir} – this build does "
+                        f"whisper model cache not found at {self._cache_dir} — this build does "
                         "not auto-download models. Run the installer's model-fetch step first."
                     )
             self._model = WhisperModel(self._model_size, **kwargs)

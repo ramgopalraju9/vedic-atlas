@@ -1,4 +1,4 @@
-# Prompt Safety Policy – blocks sensitive patterns in LLM input/output
+# Prompt Safety Policy — blocks sensitive patterns in LLM input/output
 name: prompt-safety
 version: "1.0"
 description: "Prevents sensitive data from being sent to or received from LLMs"

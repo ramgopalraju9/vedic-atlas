@@ -1,11 +1,11 @@
-"""InferenceFactory – picks the local inference backend from config.
+"""InferenceFactory — picks the local inference backend from config.
 
-* New. Rewritten from veda/brain/factory.py's build_llm_client shape
+★ New. Rewritten from veda/brain/factory.py's build_llm_client shape
 (PATH-probing between claude/copilot CLIs), per ADR-001: no CLI
-probing – the backend is an explicit config choice between "ollama" and
+probing — the backend is an explicit config choice between "ollama" and
 "llama_cpp", never a cloud backend. Fails loudly (ConfigError-equivalent)
 if a cloud backend is requested at all, rather than silently ignoring
-the setting – this is the enforcement point for REQ-M-03 at the
+the setting — this is the enforcement point for REQ-M-03 at the
 composition boundary.
 """
 
@@ -26,6 +26,7 @@ def build_inference_client(
     llama_cpp_model_path: str | None = None,
     n_ctx: int = 4096,
     n_threads: int | None = None,
+    num_batch: int | None = None,
     num_predict: int = 512,
     temperature: float = 0.7,
     keep_alive: str = "30m",
@@ -50,6 +51,8 @@ def build_inference_client(
             keep_alive=keep_alive,
             num_ctx=n_ctx,
             num_predict=num_predict,
+            num_thread=n_threads,
+            num_batch=num_batch,
             temperature=temperature,
             think=think,
         )
@@ -59,6 +62,12 @@ def build_inference_client(
             raise UnsupportedBackendError("backend 'llama_cpp' requires llama_cpp_model_path to be set")
         from tpa.inference.llama_cpp_client import LlamaCppClient
 
-        return LlamaCppClient(model_path=llama_cpp_model_path, n_ctx=n_ctx, n_threads=n_threads, timeout=timeout)
+        return LlamaCppClient(
+            model_path=llama_cpp_model_path,
+            n_ctx=n_ctx,
+            n_threads=n_threads,
+            timeout=timeout,
+            num_predict=num_predict,
+        )
 
-    raise UnsupportedBackendError(f"unknown backend '{backend}' – expected 'ollama' or 'llama_cpp'")
+    raise UnsupportedBackendError(f"unknown backend '{backend}' — expected 'ollama' or 'llama_cpp'")

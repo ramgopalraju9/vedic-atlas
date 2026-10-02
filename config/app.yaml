@@ -1,0 +1,4 @@
+name: Veda
+port: 8000
+max_history: 30
+log_level: INFO

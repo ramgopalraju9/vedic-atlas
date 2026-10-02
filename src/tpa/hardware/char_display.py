@@ -1,7 +1,7 @@
-"""CharDisplay - implements StatusDisplayPort via a 16x4 I2C character LCD.
+"""CharDisplay — implements StatusDisplayPort via a 16x4 I2C character LCD.
 
-* New. Introduced in ADR-008's revision once the Pi target was confirmed
-headless (no Chromium kiosk) - this is the device's only visual output
+★ New. Introduced in ADR-008's revision once the Pi target was confirmed
+headless (no Chromium kiosk) — this is the device's only visual output
 besides the mute LED. Uses RPLCD, a standard I2C character-LCD driver.
 """
 

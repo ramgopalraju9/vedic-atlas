@@ -1,3 +1,9 @@
+"""MemoryIndexer — embeds text and upserts it into the vector store.
+
+New (Feature B). No-op when no embedding provider is available (e.g.
+fastembed not installed), so the rest of the system is unaffected.
+"""
+
 from __future__ import annotations
 
 from core.logging_config import logger
@@ -16,20 +22,20 @@ class MemoryIndexer:
     def enabled(self) -> bool:
         return self._embedding is not None
 
-    async def index(self, self_source: str, ref_id: str, text: str, *, skip_existing: bool = False) -> bool:
+    async def index(self, source: str, ref_id: str, text: str, *, skip_existing: bool = False) -> bool:
         if self._embedding is None or not (text or "").strip():
             return False
         try:
             model_id = self._embedding.model_id
-            if skip_existing and self._store.has(source=self_source, ref_id=str(ref_id), model_id=model_id):
+            if skip_existing and self._store.has(source=source, ref_id=str(ref_id), model_id=model_id):
                 return False
             emb = await self._embedding.embed(text)
             self._store.upsert(
-                source=self_source, ref_id=str(ref_id), model_id=model_id, vector=emb.vector, text=text
+                source=source, ref_id=str(ref_id), model_id=model_id, vector=emb.vector, text=text
             )
             return True
         except Exception as e:
-            logger.warning(f"[memory-index] failed to index {self_source}:{ref_id}: {e}")
+            logger.warning(f"[memory-index] failed to index {source}:{ref_id}: {e}")
             return False
 
     def remove(self, source: str, ref_id: str) -> None:

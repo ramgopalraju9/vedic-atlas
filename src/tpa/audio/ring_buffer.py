@@ -1,6 +1,6 @@
-"""RingBuffer – small, bounded, in-memory-only audio buffer.
+"""RingBuffer — small, bounded, in-memory-only audio buffer.
 
-* New. Explicit implementation of the "audio stays in memory only" rule
+★ New. Explicit implementation of the "audio stays in memory only" rule
 (REQ-M-06). Used by the ambient loop / barge-in logic to hold the last
 N seconds of PCM for VAD lookback without ever growing unbounded or
 touching disk.

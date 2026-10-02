@@ -1,3 +1,15 @@
+"""Governance REST API — dashboard data endpoints.
+
+Donor: veda/routes/governance.py, read in full. The donor read a
+module-level `get_provider()` singleton; here the provider is
+constructor-injected (`Depends(get_governance)`) and may legitimately be
+`None` if governance is disabled for this deployment — every endpoint
+below treats that as "disabled", not an error. The `hasattr` probes for
+`rules_count`/`breaker_states`/`audit_backend`/`_rules` are kept as-is:
+the concrete governance provider (`tpa/governance/`) lands in a later
+batch, and different provider implementations may not expose all of them.
+"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

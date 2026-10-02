@@ -34,6 +34,9 @@ _HELP = """
   /yolo on \u00b7 /yolo off
                      toggle approval-mode (auto vs ask)
   /approve           list pending approvals (resolve interactively)
+  /mute \u00b7 /unmute    close / open the microphone
+  /listen            show mic state (muted / listening / turns)
+  /task              list tasks · /task add <title> · /task done <id>
 """
 
 
@@ -96,6 +99,15 @@ class Repl:
         if cmd == "approve":
             self._cmd_approve()
             return True
+        if cmd in ("mute", "unmute"):
+            self._cmd_mute(cmd == "mute")
+            return True
+        if cmd == "listen":
+            self._cmd_listen()
+            return True
+        if cmd == "task":
+            self._cmd_task(rest)
+            return True
         self.console.print(f"[red]unknown command :{cmd}[/red] \u2014 try :help")
         return True
 
@@ -152,6 +164,66 @@ class Repl:
             elif ans.strip().lower() == "n":
                 self.client.deny(p["request_id"])
                 self.console.print("[red]denied[/red]")
+
+    def _cmd_mute(self, muted: bool) -> None:
+        try:
+            priv = self.client.set_mute(muted)
+        except Exception as e:
+            self.console.print(f"[red]{'mute' if muted else 'unmute'} failed:[/red] {e}")
+            return
+        if priv.get("muted", True):
+            self.console.print("[bold red]MIC CLOSED[/bold red] (muted)")
+        else:
+            self.console.print("[bold green]MIC OPEN[/bold green] (listening)")
+
+    def _cmd_listen(self) -> None:
+        try:
+            priv = self.client.privacy_status()
+        except Exception as e:
+            self.console.print(f"[red]status failed:[/red] {e}")
+            return
+        try:
+            voice = self.client.voice_status()
+        except Exception:
+            voice = None
+        state = (
+            "[bold red]MIC CLOSED[/bold red] (muted)" if priv.get("muted", True)
+            else "[bold green]MIC OPEN[/bold green] (listening)"
+        )
+        self.console.print(state)
+        detail = f"[dim]source={priv.get('source', '?')}"
+        if voice and voice.get("available"):
+            detail += f" \u00b7 running={str(voice.get('running', False)).lower()} \u00b7 turns={voice.get('turns', 0)}"
+        self.console.print(detail + "[/dim]")
+
+    def _cmd_task(self, rest: str) -> None:
+        parts = rest.split()
+        action = parts[0].lower() if parts else "list"
+        args = parts[1:]
+        try:
+            if action == "add":
+                title = " ".join(args).strip()
+                if not title:
+                    self.console.print("[red]usage: /task add <title>[/red]")
+                    return
+                t = self.client.add_task(title)
+                self.console.print(f"[green]added[/green] #{t.get('id')}: {t.get('title')}")
+            elif action == "done":
+                if not args:
+                    self.console.print("[red]usage: /task done <id>[/red]")
+                    return
+                self.client.complete_task(int(args[0]))
+                self.console.print(f"[green]completed[/green] #{args[0]}")
+            else:
+                tasks = self.client.list_tasks()
+                if not tasks:
+                    self.console.print("[dim]no pending tasks[/dim]")
+                    return
+                for t in tasks:
+                    mark = "[x]" if t.get("done") else "[ ]"
+                    self.console.print(f"#{t.get('id')} {mark} {t.get('title')}")
+        except Exception as e:
+            self.console.print(f"[red]task failed:[/red] {e}")
 
     # ---------- chat ----------
 

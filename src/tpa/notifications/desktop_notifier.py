@@ -1,10 +1,10 @@
-"""DesktopNotifier – Windows toast notifications via PowerShell.
+"""DesktopNotifier — Windows toast notifications via PowerShell.
 
 Donor: veda/notifications/desktop.py, read in full. Teams-specific
 `show_teams_notification` dropped (Teams is out of scope); the generic
 `show_notification(title, message, source, urgency, play_sound)` is kept
 and adapted to the single-method `NotificationPort.notify()` contract
-(domain/ports/notification_port.py) – `source` fixed to "Veda", play_sound
+(domain/ports/notification_port.py) — `source` fixed to "Veda", play_sound
 always on (the toast balloon's own default sound).
 """
 
@@ -42,7 +42,7 @@ class DesktopNotifier:
                 await asyncio.wait_for(process.wait(), timeout=2.0)
                 return process.returncode == 0
             except asyncio.TimeoutError:
-                return True  # still running – assume success
+                return True  # still running — assume success
         except Exception as e:
             logger.warning(f"Failed to show desktop notification: {e}")
             return False

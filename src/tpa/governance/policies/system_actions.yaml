@@ -1,4 +1,4 @@
-# System Actions Policy – gates dangerous OS operations
+# System Actions Policy — gates dangerous OS operations
 name: system-actions
 version: "1.0"
 description: "Controls which system actions are allowed or blocked"
@@ -21,7 +21,7 @@ rules:
     condition:
       field: target
       operator: matches
-      value: "^(C:\\Windows|C:\\Program Files|/etc|/usr|/boot)"
+      value: "^(C:\\\\Windows|C:\\\\Program Files|/etc|/usr|/boot)"
     action: deny
     priority: 150
 

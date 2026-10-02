@@ -1,6 +1,3 @@
-
-
-
 """Privacy API — mute state (read + control) and the network egress allow-list.
 
 ★ new (REQ-M-04/M-05/M-06/M-09 visibility). Reads and drives

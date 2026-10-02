@@ -1,3 +1,9 @@
+"""SkillRegistry — discovers, registers, and manages skills.
+
+Donor: veda/skills/registry.py, read in full and ported near-verbatim,
+only the exception/logger import paths changed.
+"""
+
 from core.enums import ErrorMessage, ExceptionCode
 from exceptions.exception import AppException
 from core.logging_config import logger

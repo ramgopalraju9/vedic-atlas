@@ -185,6 +185,45 @@ class VedaClient:
         r = self._http.post(f"{self.server_url}/api/config/proactivity", json={"level": level})
         r.raise_for_status()
 
+    # ---------- privacy / mic ----------
+
+    def privacy_status(self) -> dict[str, Any]:
+        r = self._http.get(f"{self.server_url}/api/privacy/status")
+        r.raise_for_status()
+        return r.json()
+
+    def voice_status(self) -> dict[str, Any]:
+        r = self._http.get(f"{self.server_url}/api/voice/status")
+        r.raise_for_status()
+        return r.json()
+
+    def set_mute(self, muted: bool) -> dict[str, Any]:
+        r = self._http.post(f"{self.server_url}/api/privacy/mute", json={"muted": muted})
+        r.raise_for_status()
+        return r.json()
+
+    def toggle_mute(self) -> dict[str, Any]:
+        r = self._http.post(f"{self.server_url}/api/privacy/mute/toggle")
+        r.raise_for_status()
+        return r.json()
+
+    # ---------- tasks ----------
+
+    def list_tasks(self, include_done: bool = False) -> list[dict[str, Any]]:
+        r = self._http.get(f"{self.server_url}/api/tasks", params={"include_done": include_done})
+        r.raise_for_status()
+        return r.json().get("tasks", []) or []
+
+    def add_task(self, title: str, notes: str = "") -> dict[str, Any]:
+        r = self._http.post(f"{self.server_url}/api/tasks", json={"title": title, "notes": notes})
+        r.raise_for_status()
+        return r.json()
+
+    def complete_task(self, task_id: int) -> dict[str, Any]:
+        r = self._http.post(f"{self.server_url}/api/tasks/{task_id}/complete")
+        r.raise_for_status()
+        return r.json()
+
     # ---------- status snapshot ----------
 
     def status_snapshot(self) -> dict[str, Any]:

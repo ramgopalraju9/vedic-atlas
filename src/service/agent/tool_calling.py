@@ -1,3 +1,11 @@
+"""ToolCallingLoop — lets an agent call skills via a JSON action protocol.
+
+New (Feature C). Opt-in. Every skill call goes through SkillRunner, so the
+existing permission/approval/rate-limit/validator/audit hooks apply; a
+blocked or failed call is fed back to the model as an observation rather
+than bypassing a guardrail. A hard iteration cap bounds latency.
+"""
+
 from __future__ import annotations
 
 import json
@@ -9,8 +17,7 @@ from domain.value_objects.tool_call import ToolCall
 from service.skills.registry import SkillRegistry
 from service.skills.skill_runner import SkillRunner
 
-
-_JSON_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.MULTILINE)
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 _TOOL_INSTRUCTIONS = """You can use tools to answer. Available tools:
 {tools}
@@ -27,6 +34,7 @@ class ToolCallingLoop:
 
     def __init__(
         self,
+        *,
         client,
         skill_runner: SkillRunner,
         skill_registry: SkillRegistry,
@@ -67,7 +75,7 @@ class ToolCallingLoop:
                 'Continue: call another tool, or reply with {"final": "..."}.'
             )
         logger.info("[tool-loop] max iterations reached")
-        return "I couldn't finish that within my tool budget - could you narrow it down?"
+        return "I couldn't finish that within my tool budget — could you narrow it down?"
 
     async def _invoke(self, ctx: AgentContext, call: ToolCall) -> str:
         if call.name not in self._tool_names:

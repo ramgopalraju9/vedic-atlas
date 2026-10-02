@@ -1,7 +1,7 @@
-"""WeatherProvider – implements FactProviderPort via Open-Meteo (free, no API key).
+"""WeatherProvider — implements FactProviderPort via Open-Meteo (free, no API key).
 
-* New, PS-mandatory (REQ-M-09). Reference implementation for the
-pluggable fact-lookup registry – adding a new category means writing one
+★ New, PS-mandatory (REQ-M-09). Reference implementation for the
+pluggable fact-lookup registry — adding a new category means writing one
 file shaped exactly like this one, per the invariant established in
 service/lookup/registry.py.
 """
