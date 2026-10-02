@@ -1,4 +1,14 @@
+"""StatusDisplayPort — the 16x4 character display on the headless Pi build.
+
+New. Introduced during ADR-008's revision once the Pi target was confirmed
+headless (no Chromium kiosk) — see docs/roadmap/adr/ADR-008-model-class.md.
+Deliberately NOT a substitute for IndicatorPort: this shows state text
+("LISTENING", "THINKING", the active fact-lookup provider), the indicator
+LED is the trust signal for mute state specifically. Ship both.
+"""
+
 from typing import Protocol, runtime_checkable
+
 
 @runtime_checkable
 class StatusDisplayPort(Protocol):

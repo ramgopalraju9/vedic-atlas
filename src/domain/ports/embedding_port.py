@@ -1,9 +1,18 @@
+"""EmbeddingPort — turns text into a fixed-length vector for memory retrieval.
+
+New — the donor had no embedding concept (Memory & Recall is a new
+domain, see roadmap Epic 4). Per ADR-005: fastembed-backed adapters
+(BGE-small on laptop, MiniLM on Pi), never a cloud embedding API.
+"""
+
 from typing import Protocol, runtime_checkable
+
 from domain.value_objects.embedding import Embedding
+
 
 @runtime_checkable
 class EmbeddingPort(Protocol):
-    """Turns text into a fixed-length vector for memory retrieval."""
+    """Produces embeddings for storage and similarity search."""
 
     @property
     def model_id(self) -> str:
