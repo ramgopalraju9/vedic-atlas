@@ -1,0 +1,52 @@
+# System Actions Policy – gates dangerous OS operations
+name: system-actions
+version: "1.0"
+description: "Controls which system actions are allowed or blocked"
+
+rules:
+  - name: block-dangerous-commands
+    condition:
+      field: tool
+      operator: in
+      value:
+        - format_disk
+        - delete_system_files
+        - modify_registry
+        - disable_firewall
+        - shutdown_forced
+    action: deny
+    priority: 200
+
+  - name: block-dangerous-paths
+    condition:
+      field: target
+      operator: matches
+      value: "^(C:\\Windows|C:\\Program Files|/etc|/usr|/boot)"
+    action: deny
+    priority: 150
+
+  - name: audit-process-kill
+    condition:
+      field: tool
+      operator: eq
+      value: kill_process
+    action: audit
+    priority: 100
+
+  # Adapted from donor: "take_screenshot" dropped (vision is out of scope).
+  - name: allow-safe-actions
+    condition:
+      field: tool
+      operator: in
+      value:
+        - open_app
+        - set_volume
+        - get_battery
+        - list_processes
+    action: allow
+    priority: 50
+
+blocked_patterns:
+  - "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+  - "\\b\\d{16}\\b"
+  - "(?i)(password|secret|api.key|token)\\s*[=:]\\s*\\S+"

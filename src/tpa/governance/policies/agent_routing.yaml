@@ -1,0 +1,27 @@
+# Agent Routing Policy – controls which agents the supervisor may dispatch to
+name: agent-routing
+version: "1.0"
+description: "Controls which agents the supervisor may route requests to"
+
+rules:
+  # Adapted from donor: dropped "code" and "communicator" – neither agent
+  # exists in this build (code-runner and Teams are both out of scope).
+  - name: allow-known-agents
+    condition:
+      field: agent
+      operator: in
+      value:
+        - responder
+        - system
+        - supervisor
+    action: allow
+    priority: 100
+
+  # Default deny for any agent not matched above (catch-all)
+  - name: deny-unknown-agents
+    condition:
+      field: agent
+      operator: ne
+      value: ""
+    action: deny
+    priority: 10
