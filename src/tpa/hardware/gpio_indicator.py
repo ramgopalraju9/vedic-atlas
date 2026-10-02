@@ -1,7 +1,7 @@
-"""GpioIndicator - implements IndicatorPort via a GPIO LED (Raspberry Pi).
+"""GpioIndicator — implements IndicatorPort via a GPIO LED (Raspberry Pi).
 
-* New, PS-mandatory (REQ-M-05). Driven only by capture_gate reacting to
-the CaptureEvent - never by UI state directly (ADR-003).
+★ New, PS-mandatory (REQ-M-05). Driven only by capture_gate reacting to
+the CaptureEvent — never by UI state directly (ADR-003).
 """
 
 from __future__ import annotations

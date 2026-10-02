@@ -1,8 +1,8 @@
-"""WebRtcVadDetector – implements VoiceActivityPort via `webrtcvad`.
+"""WebRtcVadDetector — implements VoiceActivityPort via `webrtcvad`.
 
-* New. WebRTC's VAD is a pure-C GMM classifier: no model file, no
+★ New. WebRTC's VAD is a pure-C GMM classifier: no model file, no
 network, sub-millisecond per frame. That combination is why it's the
-reference adapter here – a neural VAD (Silero) would be more accurate
+reference adapter here — a neural VAD (Silero) would be more accurate
 but needs a model file on disk and ~10x the CPU, which the Pi profile
 can't spare on a loop that runs continuously.
 

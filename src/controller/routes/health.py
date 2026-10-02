@@ -1,4 +1,3 @@
-
 """Health API — reports which core services are wired and reachable.
 
 ★ new. Deliberately duck-typed against `app.state` (unlike every other

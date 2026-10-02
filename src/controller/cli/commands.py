@@ -188,3 +188,91 @@ def cmd_status(client: VedaClient) -> int:
 
     console.print(tbl)
     return 0
+
+
+# ---------- mic / privacy ----------
+
+def _render_mic(console: Console, priv: dict, voice: dict | None = None) -> None:
+    if bool(priv.get("muted", True)):
+        console.print("[bold red]MIC CLOSED[/bold red] (muted)")
+    else:
+        console.print("[bold green]MIC OPEN[/bold green] (listening)")
+    line = f"[dim]source={priv.get('source', '?')} \u00b7 hardware_switch={str(priv.get('hardware_switch', False)).lower()}"
+    if voice and voice.get("available"):
+        line += f" \u00b7 running={str(voice.get('running', False)).lower()} \u00b7 turns={voice.get('turns', 0)}"
+    console.print(line + "[/dim]")
+
+
+def cmd_mute(client: VedaClient) -> int:
+    console = Console()
+    try:
+        priv = client.set_mute(True)
+    except Exception as e:
+        console.print(f"[red]mute failed:[/red] {e}")
+        return 1
+    _render_mic(console, priv)
+    return 0
+
+
+def cmd_unmute(client: VedaClient) -> int:
+    console = Console()
+    try:
+        priv = client.set_mute(False)
+    except Exception as e:
+        console.print(f"[red]unmute failed:[/red] {e}")
+        return 1
+    _render_mic(console, priv)
+    return 0
+
+
+def cmd_listen(client: VedaClient) -> int:
+    console = Console()
+    try:
+        priv = client.privacy_status()
+    except Exception as e:
+        console.print(f"[red]status failed:[/red] {e}")
+        return 1
+    try:
+        voice = client.voice_status()
+    except Exception:
+        voice = None
+    _render_mic(console, priv, voice)
+    return 0
+
+
+# ---------- tasks ----------
+
+def cmd_task(client: VedaClient, action: str, args: list[str]) -> int:
+    console = Console()
+    action = (action or "list").lower()
+    try:
+        if action == "add":
+            title = " ".join(args).strip()
+            if not title:
+                console.print("[red]usage: veda task add <title>[/red]")
+                return 2
+            t = client.add_task(title)
+            console.print(f"[green]added[/green] #{t.get('id')}: {t.get('title')}")
+            return 0
+        if action == "list":
+            tasks = client.list_tasks()
+            if not tasks:
+                console.print("[dim]no pending tasks[/dim]")
+                return 0
+            for t in tasks:
+                mark = "[x]" if t.get("done") else "[ ]"
+                due = f" (due {t['due_at']})" if t.get("due_at") else ""
+                console.print(f"#{t.get('id')} {mark} {t.get('title')}{due}")
+            return 0
+        if action == "done":
+            if not args:
+                console.print("[red]usage: veda task done <id>[/red]")
+                return 2
+            client.complete_task(int(args[0]))
+            console.print(f"[green]completed[/green] #{args[0]}")
+            return 0
+        console.print(f"[red]unknown task action '{action}'[/red] — add | list | done")
+        return 2
+    except Exception as e:
+        console.print(f"[red]task failed:[/red] {e}")
+        return 1

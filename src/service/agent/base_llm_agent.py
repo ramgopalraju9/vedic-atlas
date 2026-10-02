@@ -1,14 +1,14 @@
-"""LLMAgent - concrete agent backed by an InferencePort.
+"""LLMAgent — concrete agent backed by an InferencePort.
 
 Donor: veda/agents/llm_agent.py, read in full and adapted:
-- Depends on InferencePort (domain.ports) instead of the donor's
-  concrete `LLMClient`.
-- Depends on MemoryRepositoryPort instead of a concrete
-  `AgentMemoryRepository` - the memory-context helpers
-  (`_memory_context`, `_record_to_memory`) call the port's real methods
-  (`recent_cross_agent`, `record`) exactly as the donor did.
-- `execute()` no longer passes `image_paths` to the inference call -
-  vision is out of scope; InferencePort has no such parameter.
+  - Depends on InferencePort (domain.ports) instead of the donor's
+    concrete `LLMClient`.
+  - Depends on MemoryRepositoryPort instead of a concrete
+    `AgentMemoryRepository` — the memory-context helpers
+    (`_memory_context`, `_record_to_memory`) call the port's real methods
+    (`recent_cross_agent`, `record`) exactly as the donor did.
+  - `execute()` no longer passes `image_paths` to the inference call —
+    vision is out of scope; InferencePort has no such parameter.
 """
 
 from __future__ import annotations
@@ -28,9 +28,9 @@ class LLMAgent(BaseAgent):
     """Agent that assembles a prompt, calls the local inference backend, and returns text.
 
     Shape:
-        build_system_prompt(ctx) -> str      persona + persistent context
-        build_prompt(ctx)        -> str      history + current user turn
-        on_completion(ctx, text) -> None     subclass persistence hook
+      build_system_prompt(ctx) -> str         persona + persistent context
+      build_prompt(ctx)        -> str         history + current user turn
+      on_completion(ctx, text) -> None        subclass persistence hook
     """
 
     def __init__(
@@ -49,7 +49,7 @@ class LLMAgent(BaseAgent):
         self.memory = memory
         self.voice_num_predict = voice_num_predict
 
-    # -- Memory helpers ---------------------------------------------------
+    # -- Memory helpers --------------------------------------------------
 
     def _memory_context(self, *, exclude_self: bool = True) -> str:
         """Format recent cross-agent activity as a prompt section.
@@ -93,7 +93,7 @@ class LLMAgent(BaseAgent):
         except Exception as e:
             logger.debug(f"[{self.name}] memory record failed: {e}")
 
-    # -- Subclass extension points -----------------------------------------
+    # -- Subclass extension points ---------------------------------------
 
     def build_system_prompt(self, ctx: AgentContext) -> str:
         return self.system_prompt
@@ -108,7 +108,7 @@ class LLMAgent(BaseAgent):
         """Hook called once after a successful execute. Default: records to memory."""
         self._record_to_memory(action="complete", context={}, user_message=ctx.user_message)
 
-    # -- Execute -----------------------------------------------------------
+    # -- Execute ---------------------------------------------------------
 
     def _budget(self, ctx: AgentContext) -> dict:
         """Generation cap for this turn.

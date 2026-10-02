@@ -1,1 +1,0 @@
-"""Vedic Atlas source package."""

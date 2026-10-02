@@ -1,4 +1,4 @@
-"""Tasks API - local to-do management (Feature D, Productivity focus area)."""
+"""Tasks API — local to-do management (Feature D, Productivity focus area)."""
 
 from __future__ import annotations
 
@@ -32,7 +32,6 @@ async def complete_task(task_id: int, service: TaskService = Depends(get_task_se
     return {"status": "completed", "id": task_id}
 
 
-@router.post("/tasks/{task_id}/uncomplete")
 @router.delete("/tasks/{task_id}")
 async def delete_task(task_id: int, service: TaskService = Depends(get_task_service)) -> dict:
     if not service.delete(task_id):

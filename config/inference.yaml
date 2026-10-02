@@ -1,0 +1,29 @@
+# ollama create qwen3-4b -f data/models/Modelfile.qwen3-4b
+backend: ollama
+ollama_host: http://127.0.0.1:11434
+
+model_alias: qwen3-4b
+
+# llama_cpp backend only (unused while backend=ollama)
+model_path: data/Qwen3-4B-Q4_K_M.gguf
+
+n_ctx: 4096
+n_threads: null
+# Prompt-eval batch size (Ollama default 512). Prompt eval dominates CPU
+# latency; raising this can improve throughput. Measure before/after.
+num_batch: 512
+timeout: 300
+
+# Replies are usually short (15-30 tokens); a lower cap bounds tail latency.
+num_predict: 150
+temperature: 0.7
+keep_alive: 30m
+
+# Reasoning models burn ~20x tokens on hidden thinking blocks.
+think: false
+
+routing_num_predict: 64
+summary_num_predict: 256
+
+verify_on_boot: true
+warmup_on_boot: true

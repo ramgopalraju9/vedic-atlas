@@ -1,3 +1,23 @@
+"""SystemAgent — executes device-level actions (open apps, volume, processes).
+
+Donor: veda/agents/system_agent.py, read in full and adapted:
+  - The donor's system prompt said "Windows PC" and hardcoded Windows app
+    names. Genericised to "the user's device" — SystemControlPort has
+    both a Windows and a Linux/Pi adapter (see FILE_MAP.md), so this
+    agent must not assume one platform in its own text.
+  - Dispatch (`_dispatch`) now calls the FULL `SystemControlPort` surface
+    (`open_app`, `close_app`, `focus_app`, `battery_info`, `get_volume`,
+    `set_volume`, `mute`, `top_processes`) — Batch 6 had only wired three
+    actions because the Port itself was under-specified at the time;
+    Batch 8's full read of `veda/system/actions.py` confirmed the richer
+    donor action set and the Port was extended to match. This closes that
+    gap rather than leaving it as a permanent "not yet ported" note.
+  - `open_teams_chat` DROPPED — Teams-specific, out of scope.
+  - Governance check (`from veda.governance import check_action,
+    audit_event`) replaced with an injected GovernanceProvider (Batch 3
+    Port) rather than a module-level import.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -13,35 +33,34 @@ from domain.ports.system_control_port import SystemControlPort
 from service.agent.base_llm_agent import LLMAgent
 from core.logging_config import logger
 
-SYSTEM_PROMPT = """You are Veda's system-control planner. The user wants something done on their device.
-Pick exactly ONE action and respond with EXACTLY one line of JSON, no markdown.
+_SYSTEM_PROMPT = """You are Veda's system-control planner. The user wants something done on their device. Pick exactly ONE action and respond with EXACTLY one line of JSON, no markdown.
 
 Shape:
   {"action": "<name>", "args": {...}, "reason": "<one short sentence of what you're doing>"}
 
 Available actions (use these action names verbatim):
-  - open_app        args: {"name": "<app>"}     - launch the app (or focus if already open)
-  - close_app       args: {"name": "<app>"}     - close the app
-  - focus_app       args: {"name": "<app>"}     - switch to the app if running
-  - battery_info    args: {}                    - report battery level + charging state
-  - get_volume      args: {}                    - report current volume
-  - set_volume      args: {"level": 0..100}     - set volume
-  - mute            args: {"on": true|false}    - mute or unmute
-  - top_processes   args: {}                    - list the busiest apps right now
-  - none            args: {}                    - if it isn't a system-control ask, pick this
+  - open_app        args: {"name": "<app>"}    — launch the app (or focus if already open)
+  - close_app       args: {"name": "<app>"}    — close the app
+  - focus_app       args: {"name": "<app>"}    — switch to the app if running
+  - battery_info    args: {}                   — report battery level + charging state
+  - get_volume      args: {}                   — report current volume
+  - set_volume      args: {"level": 0..100}    — set volume
+  - mute            args: {"on": true|false}   — mute or unmute
+  - top_processes   args: {}                   — list the busiest apps right now
+  - none            args: {}                   — if it isn't a system-control ask, pick this
 
 Examples:
-  "open VS Code"               -> {"action":"open_app","args":{"name":"vs code"},"reason":"Opening VS Code."}
-  "please close spotify"       -> {"action":"close_app","args":{"name":"spotify"},"reason":"Closing Spotify."}
-  "bring chrome to front"      -> {"action":"focus_app","args":{"name":"chrome"},"reason":"Switching to Chrome."}
-  "battery?"                   -> {"action":"battery_info","args":{},"reason":"Checking battery."}
-  "turn volume to 30"          -> {"action":"set_volume","args":{"level":30},"reason":"Setting volume to 30."}
-  "mute"                       -> {"action":"mute","args":{"on":true},"reason":"Muting audio."}
-  "what's running"             -> {"action":"top_processes","args":{},"reason":"Checking busiest apps."}
-  "tell me a joke"             -> {"action":"none","args":{},"reason":"Not a system action."}
+  "open VS Code"                 -> {"action":"open_app","args":{"name":"vs code"},"reason":"Opening VS Code."}
+  "please close Spotify"         -> {"action":"close_app","args":{"name":"spotify"},"reason":"Closing Spotify."}
+  "bring chrome to front"        -> {"action":"focus_app","args":{"name":"chrome"},"reason":"Switching to Chrome."}
+  "battery?"                     -> {"action":"battery_info","args":{},"reason":"Checking battery."}
+  "turn volume to 30"            -> {"action":"set_volume","args":{"level":30},"reason":"Setting volume to 30."}
+  "mute"                         -> {"action":"mute","args":{"on":true},"reason":"Muting audio."}
+  "what's running"               -> {"action":"top_processes","args":{},"reason":"Checking busiest apps."}
+  "tell me a joke"               -> {"action":"none","args":{},"reason":"Not a system action."}
 """
 
-_JSON_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.MULTILINE)
+_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 # A single-line JSON action is short; cap generation so a stray ramble can't
 # run to the full default budget. See docs/PERF_BRIEF.md §5.1.
@@ -63,9 +82,9 @@ class SystemAgent(LLMAgent):
             name="system",
             description=(
                 "Device actions: opening apps, volume control, listing running apps. "
-                'Use for "open VS Code", "set volume to 30", "what\'s running".'
+                "Use for 'open VS Code', 'set volume to 30', 'what's running'."
             ),
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=_SYSTEM_PROMPT,
             client=client,
             model=model,
             **kwargs,
@@ -77,22 +96,20 @@ class SystemAgent(LLMAgent):
         self._mark_active(ctx)
         try:
             raw = await self.client.complete(
-                prompt=ctx.user_message,
-                system=SYSTEM_PROMPT,
-                model=self.model,
+                prompt=ctx.user_message, system=_SYSTEM_PROMPT, model=self.model,
                 num_predict=_PLANNER_NUM_PREDICT,
             )
         except Exception as e:
             logger.error(f"[system-agent] planner call failed: {e}")
-            reply = "Something went wrong planning that action - try again?"
-            await self._on_completion(ctx, reply)
+            reply = "Something went wrong planning that action — try again?"
+            await self.on_completion(ctx, reply)
             return AgentResult(agent_name=self.name, response=reply)
 
         plan = self._parse(raw)
         if plan is None:
             logger.warning(f"[system-agent] couldn't parse: {raw[:200]!r}")
             reply = "I wasn't sure what to do there. Try again a bit more specifically?"
-            await self._on_completion(ctx, reply)
+            await self.on_completion(ctx, reply)
             return AgentResult(agent_name=self.name, response=reply)
 
         action = plan.get("action", "")
@@ -103,13 +120,13 @@ class SystemAgent(LLMAgent):
             decision = self.governance.check_action("system_action", {"tool": action, "target": str(args)})
             if not decision.allowed:
                 logger.warning(f"[system-agent][governance] action '{action}' denied: {decision.reason}")
-                reply = f"I can't do that - governance policy: {decision.reason}"
-                await self._on_completion(ctx, reply)
+                reply = f"I can't do that — governance policy: {decision.reason}"
+                await self.on_completion(ctx, reply)
                 return AgentResult(agent_name=self.name, response=reply)
 
         reply = await asyncio.to_thread(self._dispatch, action, args)
         self._record_to_memory(action=action, context={"args": args}, user_message=ctx.user_message)
-        await self._on_completion(ctx, reply)
+        await self.on_completion(ctx, reply)
         return AgentResult(agent_name=self.name, response=reply)
 
     async def execute_stream(self, ctx: AgentContext, cancel_event=None) -> AsyncIterator[str]:
@@ -133,14 +150,14 @@ class SystemAgent(LLMAgent):
     def _dispatch(self, action: str, args: dict) -> str:
         try:
             if action == "open_app":
-                _msg = self.system_control.open_app(args.get("name", ""))
-                return _msg
+                _, msg = self.system_control.open_app(args.get("name", ""))
+                return msg
             if action == "close_app":
-                _msg = self.system_control.close_app(args.get("name", ""))
-                return _msg
+                _, msg = self.system_control.close_app(args.get("name", ""))
+                return msg
             if action == "focus_app":
-                _msg = self.system_control.focus_app(args.get("name", ""))
-                return _msg
+                _, msg = self.system_control.focus_app(args.get("name", ""))
+                return msg
             if action == "battery_info":
                 b = self.system_control.battery_info()
                 if not b.get("has_battery"):
@@ -159,8 +176,8 @@ class SystemAgent(LLMAgent):
                 muted = self.system_control.is_muted()
                 return f"Volume is at {v}%{' (muted)' if muted else ''}."
             if action == "set_volume":
-                _msg = self.system_control.set_volume(int(args.get("level", 50)))
-                return _msg
+                _, msg = self.system_control.set_volume(int(args.get("level", 50)))
+                return msg
             if action == "mute":
                 ok = self.system_control.mute(bool(args.get("on", True)))
                 return "Muted." if ok and args.get("on", True) else ("Unmuted." if ok else "Couldn't change mute state.")
@@ -172,4 +189,4 @@ class SystemAgent(LLMAgent):
             return "I'm not sure what to do with that."
         except Exception as e:
             logger.error(f"[system-agent] dispatch failed for action={action}: {e}")
-            return "That didn't work - something went wrong on the device side."
+            return "That didn't work — something went wrong on the device side."

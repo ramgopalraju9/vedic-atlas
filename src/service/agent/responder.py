@@ -1,3 +1,19 @@
+"""ResponderAgent — default conversational agent (persona + history + knowledge).
+
+Donor: veda/agents/responder.py, read in full and adapted:
+  - DROPPED the `ctx.recognized_user` branch entirely — that's face
+    recognition, out of scope. The donor's greeting-by-name behaviour
+    only existed because vision could identify who was talking.
+  - DROPPED the "AGENT_BOUNDARY" paragraph about the code agent handling
+    project/file changes — the code agent is out of scope.
+  - `ctx.metadata.get("from_voice")` replaced with `ctx.from_voice` — the
+    donor stashed this in an untyped metadata dict; Batch 2 promoted it
+    to an explicit field on AgentContext specifically so this check
+    doesn't rely on a magic string key.
+  - Depends on ConversationManager (service layer) and KnowledgeStorePort
+    (domain layer) rather than concrete donor classes.
+"""
+
 from datetime import datetime
 from typing import AsyncIterator
 
@@ -24,8 +40,8 @@ class ResponderAgent(LLMAgent):
         model: str | None = None,
         max_history_turns: int = 20,
         memory: MemoryRepositoryPort | None = None,
-        recall: SemanticRecall | None = None,
-        tool_loop: ToolCallingLoop | None = None,
+        recall: "SemanticRecall | None" = None,
+        tool_loop: "ToolCallingLoop | None" = None,
     ):
         super().__init__(
             name="responder",
@@ -46,7 +62,7 @@ class ResponderAgent(LLMAgent):
 
     def build_system_prompt(self, ctx: AgentContext) -> str:
         # Persona only: byte-identical every turn so the backend's KV prefix
-        # cache is reused. Volatile context lives in build_prompt - PERF_BRIEF §5.2.
+        # cache is reused. Volatile context lives in build_prompt — PERF_BRIEF §5.2.
         return VEDA_SYSTEM_PROMPT
 
     @staticmethod
@@ -83,7 +99,7 @@ class ResponderAgent(LLMAgent):
         parts.append(self._time_context())
         if ctx.from_voice:
             parts.append(
-                "DELIVERY: this request arrived via voice - keep the reply to one or two "
+                "DELIVERY: this request arrived via voice — keep the reply to one or two "
                 "short sentences, zero lists, nothing the user wouldn't hear in one breath."
             )
         parts.append(f"USER: {ctx.user_message}")

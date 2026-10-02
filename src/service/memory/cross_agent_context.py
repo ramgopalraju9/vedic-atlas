@@ -1,3 +1,17 @@
+"""CrossAgentContext — read-side use cases over the memory mesh.
+
+Donor: veda/db/agent_memory_repo.py, read in full (Batch 3 grounding).
+Only the read-side helpers land here; `record`/`prune` are on the
+MemoryRepositoryPort itself (the repository IS the write side — there's
+no extra use-case logic layered over `record()`). `last_specialist` and
+`last_project` are donor-specific supervisor helpers built on the port's
+primitives; `last_specialist`'s intent is now inlined directly into
+service/agent/supervisor.py's fallback (simpler: `last_action(agent_name="supervisor")`
+does the same job with less bespoke logic). `last_project` had no
+confirmed caller found during this migration — omitted rather than
+invented a use for it.
+"""
+
 from domain.entities.memory_record import MemoryRecord
 from domain.ports.memory_repository_port import MemoryRepositoryPort
 

@@ -1,9 +1,9 @@
-"""SoundDeviceCapture – implements AudioCapturePort via `sounddevice`.
+"""SoundDeviceCapture — implements AudioCapturePort via `sounddevice`.
 
 Donor: veda/voice/audio_io.py's MicStream, read in full (Batch 3
 grounding). Ported closely: `start()`/`stop()`/`read()` map directly to
 MicStream's real methods. `read()` now wraps the returned int16 numpy
-array in a domain AudioWindow rather than returning a bare array – so
+array in a domain AudioWindow rather than returning a bare array — so
 nothing above this adapter ever sees a vendor-specific buffer type,
 per REQ-M-06 (audio stays behind one well-defined boundary).
 """

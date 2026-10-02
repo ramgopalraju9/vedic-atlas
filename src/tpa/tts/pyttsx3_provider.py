@@ -1,7 +1,7 @@
-"""Pyttsx3Provider – implements TTSPort via local Windows/eSpeak SAPI voices.
+"""Pyttsx3Provider — implements TTSPort via local Windows/eSpeak SAPI voices.
 
 Donor: veda/voice/tts.py's `_synth_pyttsx3_sync`, read in full and
-adapted. This is the ONLY TTS path ported from the donor – the other
+adapted. This is the ONLY TTS path ported from the donor — the other
 half (`_synth_edge`, using `edge_tts`/`miniaudio` to hit Microsoft's Bing
 Speech backend) is a hard-reject signal (network TTS, violates REQ-M-06's
 spirit) and is not ported at all. Piper (tpa/tts/piper.py) is the new

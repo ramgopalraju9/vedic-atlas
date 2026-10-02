@@ -1,12 +1,23 @@
+"""KnowledgeBase — standalone facts about the user.
+
+Donor: veda/brain/knowledge.py, read in full. The donor mixed the fact
+list (a plain in-memory list of dicts) with its own JSON persistence
+(load/save to KNOWLEDGE_FILE) in one class. Split per migration rule 3:
+this class holds only the use-case logic against a KnowledgeStorePort;
+the JSON file I/O itself is staged at
+tpa/filestore/json_knowledge_store.py (a later batch), which implements
+that Port.
+"""
+
 from typing import Callable
 
 from domain.ports.knowledge_store_port import KnowledgeStorePort
 
 
 class KnowledgeBase:
-    """Use-case facade over a KnowledgeStorePort - add/remove/list/render facts."""
+    """Use-case facade over a KnowledgeStorePort — add/remove/list/render facts."""
 
-    def __init__(self, store: KnowledgeStorePort, on_change: Callable[[], None] | None = None):
+    def __init__(self, store: KnowledgeStorePort, on_change: "Callable[[], None] | None" = None):
         self.store = store
         self._on_change = on_change
 

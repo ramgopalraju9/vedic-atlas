@@ -1,3 +1,10 @@
+"""SemanticRecall — meaning-based retrieval over indexed memory.
+
+New (Feature B). Embeds the query once, ranks stored facts/summaries by
+cosine via the vector store, and filters by a minimum score. No-op when no
+embedding provider is available, so callers fall back to recency recall.
+"""
+
 from __future__ import annotations
 
 from core.logging_config import logger
@@ -29,12 +36,12 @@ class SemanticRecall:
         return self._embedding is not None
 
     async def recall(
-        self, self_query: str, *, top_k: int | None = None, sources: tuple[str, ...] | None = None
+        self, query: str, *, top_k: int | None = None, sources: tuple[str, ...] | None = None
     ) -> list[MemoryHit]:
-        if self._embedding is None or not (self_query or "").strip():
+        if self._embedding is None or not (query or "").strip():
             return []
         try:
-            emb = await self._embedding.embed(self_query)
+            emb = await self._embedding.embed(query)
             hits = self._store.search(
                 vector=emb.vector,
                 model_id=self._embedding.model_id,

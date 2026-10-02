@@ -1,0 +1,18 @@
+permissions:
+  default_level: notify
+  approval_timeout: 60
+validators:
+  block_pii_in_output: true
+  block_credentials_in_output: true
+  max_input_length: 10000
+  max_output_length: 50000
+rate_limiting:
+  enabled: true
+  global_rpm: 30
+  per_skill_rpm: 10
+audit:
+  enabled: true
+  log_dir: data/audit
+  log_inputs: true
+  log_outputs: true
+  retention_days: 30

@@ -1,3 +1,14 @@
+"""LookupService — single entry point for current-public-fact lookups.
+
+★ NEW, PS-mandatory (REQ-M-09). Calls the egress allow/deny decision
+BEFORE dispatching to any provider. The full service/privacy/egress_guard.py
+(with audit/event publishing) is a later batch; this calls
+domain.policies.egress_policy directly for now — a real, working
+enforcement point, just without the audit trail wiring yet. When the
+privacy batch lands, egress_guard.py can wrap this same call without
+requiring lookup_service.py to change.
+"""
+
 from domain.entities.fact_answer import FactAnswer
 from domain.entities.fact_query import FactQuery
 from domain.policies.egress_policy import is_allowed

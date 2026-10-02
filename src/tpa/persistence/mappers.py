@@ -1,11 +1,11 @@
-"""Explicit mappers – SQLAlchemy ORM rows <-> domain entities.
+"""Explicit mappers — SQLAlchemy ORM rows <-> domain entities.
 
-* New file, no donor equivalent (the donor read ORM rows directly into
-dicts inline inside the repository methods – `_turn_to_dict`,
+★ New file, no donor equivalent (the donor read ORM rows directly into
+dicts inline inside the repository methods — `_turn_to_dict`,
 `_summary_to_dict` in veda/db/conversation_repo.py). Split out per
-migration rule 7: "no SQLAlchemy type may cross into service/" – these
+migration rule 7: "no SQLAlchemy type may cross into service/" — these
 functions are the one place that translation happens, so every
-repository method can return domain entities without leaking a Mapped
+repository method can return domain entities without leaking a `Mapped`
 type anywhere near the service layer.
 """
 

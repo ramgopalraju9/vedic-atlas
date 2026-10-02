@@ -1,7 +1,7 @@
-"""AllowListedHttpClient – the ONLY module in this codebase allowed to make
+"""AllowListedHttpClient — the ONLY module in this codebase allowed to make
 outbound internet HTTP calls.
 
-* New, PS-mandatory (REQ-M-06/M-09). Enforces domain.policies.egress_policy
+★ New, PS-mandatory (REQ-M-06/M-09). Enforces domain.policies.egress_policy
 on every single request before it leaves the process. `localhost`/`127.0.0.1`
 (the local inference server) bypass the check entirely, matching
 egress_policy's own `_ALWAYS_ALLOWED_HOSTS` rule.
@@ -30,7 +30,7 @@ class AllowListedHttpClient:
         host = urlparse(url).hostname or ""
         target = EgressTarget(host=host, category=category)
         if not is_allowed(target, self._allow_list):
-            raise EgressDeniedError(f"outbound request to '{host}' (category={category!r}) denied – not on the allow-list")
+            raise EgressDeniedError(f"outbound request to '{host}' (category={category!r}) denied — not on the allow-list")
 
     async def get(self, url: str, *, category: str, params: dict | None = None) -> dict:
         self._check(url, category)

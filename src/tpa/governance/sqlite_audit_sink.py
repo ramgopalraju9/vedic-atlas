@@ -1,20 +1,17 @@
-"""SqliteAuditSink – tamper-evident, hash-chained audit trail on local SQLite.
+"""SqliteAuditSink — tamper-evident, hash-chained audit trail on local SQLite.
 
 Donor: veda/governance/audit.py's SQLiteAuditBackend, read in full and
 adapted to the `AuditSinkPort` contract (Batch 3, extended Batch 10):
   - `append()` (async, but internally pure sqlite3 sync calls) renamed to
-    `record()` and made an honest sync method – matches the Port's
+    `record()` and made an honest sync method — matches the Port's
     `def record(self, entry: AuditEntry) -> AuditEntry` signature and
     stops pretending a blocking sqlite3 call is async.
   - Reads/writes `domain.entities.audit_entry.AuditEntry` /
     `domain.entities.policy_decision.PolicyDecision` objects directly
     instead of the donor's dataclass-with-the-same-shape-but-different-
-    import-path – same fields, one source of truth.
+    import-path — same fields, one source of truth.
   - Adds `recent()` (Port-required, donor had no equivalent) by mapping
     stored rows back into AuditEntry objects.
-
-Each row's hash = SHA-256(previous_hash + row_data), forming an
-append-only chain. Any tampering breaks the chain (see verify_chain()).
 """
 
 from __future__ import annotations
@@ -166,7 +163,7 @@ class SqliteAuditSink:
 
 
 class NullAuditSink:
-    """No-op audit sink – entries are discarded. Used when governance audit is off."""
+    """No-op audit sink — entries are discarded. Used when governance audit is off."""
 
     def record(self, entry: AuditEntry) -> AuditEntry:
         return entry

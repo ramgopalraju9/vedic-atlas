@@ -1,6 +1,3 @@
-
-
-
 """Voice API — status and control for the always-on listen/think/speak loop.
 
 Donor: veda/routes/voice_config.py (the browser wake-word config endpoint),

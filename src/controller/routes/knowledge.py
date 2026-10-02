@@ -1,6 +1,3 @@
-
-
-
 """Knowledge base API — save and retrieve facts about the user.
 
 Donor: veda/routes/knowledge.py, read in full. The donor's module-level

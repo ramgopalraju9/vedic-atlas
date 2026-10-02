@@ -1,4 +1,4 @@
-"""SoundPlayer – Windows system sound alerts.
+"""SoundPlayer — Windows system sound alerts.
 
 Donor: veda/notifications/sound.py, read in full. Teams-specific sound
 lookup (`_get_teams_sound`, `play_teams_sound`) dropped; kept the

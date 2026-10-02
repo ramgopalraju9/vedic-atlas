@@ -1,10 +1,10 @@
-"""PiperProvider – implements TTSPort via the local Piper neural TTS engine.
+"""PiperProvider — implements TTSPort via the local Piper neural TTS engine.
 
-* New – no donor equivalent. Piper wasn't in the donor at all (it used
+★ New — no donor equivalent. Piper wasn't in the donor at all (it used
 edge-tts + pyttsx3); this is the new default per the roadmap's privacy
 plan (docs/roadmap/09-privacy-compliance.md): a fully local neural voice,
 replacing edge-tts's network dependency without pyttsx3's robotic
-quality. Requires a pre-downloaded `.onnx` voice model – no auto-download,
+quality. Requires a pre-downloaded `.onnx` voice model — no auto-download,
 consistent with every other model-loading adapter in this codebase.
 """
 
@@ -21,7 +21,7 @@ class PiperProvider:
         path = Path(model_path)
         if not path.exists():
             raise FileNotFoundError(
-                f"Piper voice model not found at {path} – this build does not auto-download "
+                f"Piper voice model not found at {path} — this build does not auto-download "
                 "voice models. Run the installer's model-fetch step first."
             )
         self._model_path = path

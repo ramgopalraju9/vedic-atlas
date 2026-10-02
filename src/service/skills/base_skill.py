@@ -1,3 +1,22 @@
+"""BaseSkill — abstract base + @skill decorator for function-based skills.
+
+Donor: veda/meta/skill.py, read in full during Batch 2 grounding
+(SkillResult, the sibling entity in this donor file, already landed at
+domain/entities/skill_result.py). Ported verbatim except:
+  - `to_anthropic_tool()` dropped — Claude-CLI tool-schema shaping, not
+    needed once skill invocation goes through SkillService rather than
+    vendor tool-call plumbing.
+  - Uses SkillDefinition (domain/entities, Batch 4) for the declarative
+    shape rather than duplicating name/description/permission_level as
+    loose constructor args.
+
+Correction (2026-09-22): the `skill()` decorator originally read
+`func.__doc__` for `params_description` — not what the donor does. The
+real donor introspects `inspect.signature(func)`, skipping the `ctx`
+param and noting required-vs-optional-with-default for each remaining
+parameter. Fixed to match.
+"""
+
 import inspect
 from abc import ABC, abstractmethod
 from typing import Any, Callable
@@ -10,7 +29,7 @@ from domain.value_objects.permission_level import PermissionLevel
 class BaseSkill(ABC):
     """Abstract base class for all skills.
 
-    Skills are tools agents can invoke - terminal commands, file ops, web
+    Skills are tools agents can invoke — terminal commands, file ops, web
     lookups, etc. Each skill has a permission level determining whether
     execution is auto, notify, or requires approval.
     """

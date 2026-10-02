@@ -44,4 +44,3 @@ async def watch_disconnect(request: Request, cancel_event: asyncio.Event) -> Non
             await asyncio.sleep(_DISCONNECT_POLL_SEC)
     except Exception as e:
         logger.warning(f"disconnect watcher error: {e}")
-

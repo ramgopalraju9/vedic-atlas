@@ -1,6 +1,6 @@
-"""GpioMuteSwitch - implements MuteSwitchPort via a GPIO button (Raspberry Pi).
+"""GpioMuteSwitch — implements MuteSwitchPort via a GPIO button (Raspberry Pi).
 
-* New, PS-mandatory (REQ-M-04). No donor equivalent - VEDA had no
+★ New, PS-mandatory (REQ-M-04). No donor equivalent — VEDA had no
 hardware privacy controls at all. Grounded in docs/roadmap/09-privacy-compliance.md
 and ADR-003 (hardware mute is the sole source of truth). Debounced in
 software (20ms) per the wiring notes in docs/roadmap/10-edge-readiness.md.

@@ -1,8 +1,8 @@
-"""LlamaCppClient – InferencePort implementation via llama-cpp-python.
+"""LlamaCppClient — InferencePort implementation via llama-cpp-python.
 
-* New, no donor equivalent. Grounded in ADR-001 (llama.cpp as the
+★ New, no donor equivalent. Grounded in ADR-001 (llama.cpp as the
 advanced/Pi fallback backend) and ADR-008 (single quantized SLM, Q5_K_M
-preferred). Loads a local GGUF file directly – no server process. Fails
+preferred). Loads a local GGUF file directly — no server process. Fails
 loudly at construction if the model file is missing rather than
 attempting any network fetch, per the "no runtime auto-download when
 offline_mode is enforced" rule (REQ-M-02).
@@ -31,7 +31,7 @@ class LlamaCppClient:
         path = Path(model_path)
         if not path.exists():
             raise FileNotFoundError(
-                f"GGUF model not found at {path} – this build does not auto-download models. "
+                f"GGUF model not found at {path} — this build does not auto-download models. "
                 "Run the installer's model-fetch step first."
             )
         import llama_cpp  # imported lazily so this module can be inspected without the dependency installed
@@ -60,7 +60,7 @@ class LlamaCppClient:
         *,
         num_predict: int | None = None,
     ) -> str:
-        # llama-cpp-python's create_chat_completion is synchronous/blocking –
+        # llama-cpp-python's create_chat_completion is synchronous/blocking —
         # run it off the event loop so it doesn't stall other coroutines.
         # service/inference/single_flight.py is what guarantees only one call
         # runs at a time (it did not exist when this file was first written).

@@ -1,0 +1,397 @@
+"""VoiceSession — the always-on listen -> think -> speak loop.
+
+★ New, PS-mandatory (REQ-M-01). This is the orchestrator the migration
+never built: every adapter it needs already existed in tpa/, but nothing
+connected them. It owns no I/O itself — every capability arrives as a
+Port, so the Pi profile swaps adapters (whisper.cpp, Piper, GPIO mute)
+with zero changes here.
+
+    mic ──frames──> CaptureGate (muted?) ──> VAD ──> UtteranceCollector
+      └──> STT ──> SupervisorAgent ──> TTS ──> speaker
+
+Three properties that matter more than the happy path:
+
+  * **Mute is checked every single frame**, and a mute mid-sentence
+    discards the in-progress utterance rather than transcribing it. The
+    gate is consulted, never cached — see service/privacy/capture_gate.py.
+
+  * **Echo suppression.** While Veda speaks, its own voice reaches the
+    mic. Capture is drained and ignored for the duration of playback,
+    otherwise the assistant transcribes itself and talks in a loop. This
+    is the single most common way an always-on voice demo fails.
+
+  * **`from_voice=True`** flows into AgentContext so the responder keeps
+    replies to one or two sentences — a paragraph that reads fine on
+    screen is unbearable spoken aloud.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import re
+import time
+from datetime import datetime
+from typing import Any, Callable
+
+from core.logging_config import logger
+from domain.entities.agent_context import AgentContext
+from domain.entities.utterance import Utterance
+from domain.ports.audio_capture_port import AudioCapturePort
+from domain.ports.stt_port import STTPort
+from domain.ports.tts_port import TTSPort
+from service.voice.utterance_collector import UtteranceCollector
+
+_WORD_RE = re.compile(r"[a-z0-9']+")
+_SENTENCE_END_RE = re.compile(r"[.!?]+(?=\s)")
+
+
+class VoiceSession:
+    """Continuous listen/think/speak loop, gated by the mute switch."""
+
+    def __init__(
+        self,
+        audio: AudioCapturePort,
+        collector: UtteranceCollector,
+        stt: STTPort,
+        tts: TTSPort,
+        speaker: Any,
+        supervisor: Any,
+        capture_gate: Any,
+        *,
+        min_chars: int = 2,
+        speak_replies: bool = True,
+        speak_timeout_sec: float = 60.0,
+        post_speak_settle_sec: float = 0.4,
+        echo_guard: bool = True,
+        wake_word: Any | None = None,
+        wake_engine: str = "none",
+        wake_window_sec: float = 8.0,
+        on_event: Callable[[dict], None] | None = None,
+    ):
+        self._audio = audio
+        self._collector = collector
+        self._stt = stt
+        self._tts = tts
+        self._speaker = speaker
+        self._supervisor = supervisor
+        self._gate = capture_gate
+        self._min_chars = min_chars
+        self._speak_replies = speak_replies
+        self._speak_timeout_sec = speak_timeout_sec
+        self._post_speak_settle_sec = post_speak_settle_sec
+        self._echo_guard = echo_guard
+        self._on_event = on_event or (lambda _e: None)
+
+        # Wake-word gating. When _wake is None the loop transcribes while
+        # unmuted (original behaviour); otherwise it stays PASSIVE until the
+        # trigger arms a listening window.
+        self._wake = wake_word
+        self._wake_engine = wake_engine
+        self._wake_window_sec = wake_window_sec
+        self._wake_frame_bytes = (getattr(wake_word, "frame_length", 0) or 0) * 2
+        self._wake_buffer = b""
+        self._armed_until = 0.0
+
+        self._task: asyncio.Task | None = None
+        self._stop = asyncio.Event()
+        self._speaking = False
+        self._turns = 0
+        self._last_transcript = ""
+        self._last_reply = ""
+
+    # -- Lifecycle --------------------------------------------------------
+
+    def start(self) -> None:
+        if self._task is not None and not self._task.done():
+            return
+        self._stop.clear()
+        self._speaker.start()
+        self._task = asyncio.create_task(self._run(), name="VoiceSession")
+        logger.info("[voice] session started")
+
+    async def stop(self) -> None:
+        self._stop.set()
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._task = None
+        self._collector.reset()
+        try:
+            self._speaker.stop()
+        except Exception:
+            pass
+        wake_stop = getattr(self._wake, "stop", None)
+        if callable(wake_stop):
+            try:
+                wake_stop()
+            except Exception:
+                pass
+        logger.info("[voice] session stopped")
+
+    @property
+    def is_running(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    def status(self) -> dict:
+        return {
+            "running": self.is_running,
+            "muted": self._gate.is_muted(),
+            "speaking": self._speaking,
+            "listening": self.is_running and not self._gate.is_muted() and not self._speaking and (self._wake is None or self._is_armed()),
+            "collecting_utterance": self._collector.is_speaking,
+            "turns": self._turns,
+            "last_transcript": self._last_transcript,
+            "last_reply": self._last_reply,
+            "wake_engine": self._wake_engine,
+            "armed": self._is_armed(),
+        }
+
+    # -- Loop -------------------------------------------------------------
+
+    async def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                await self._tick()
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"[voice] loop error: {e}")
+                await asyncio.sleep(0.2)
+
+    async def _tick(self) -> None:
+        # Muted: never read the mic at all. Not "read and discard" — the
+        # frames must not enter the process (REQ-M-04).
+        if self._gate.is_muted():
+            if self._collector.is_speaking:
+                self._collector.reset()
+            self._disarm(silent=True)
+            await asyncio.sleep(0.15)
+            return
+
+        # While speaking, ignore the mic so we don't transcribe ourselves.
+        if self._speaking:
+            await asyncio.sleep(0.05)
+            return
+
+        frame = await asyncio.to_thread(self._audio.read, 0.5)
+        if frame is None:
+            return
+
+        # Wake-word gate: while not armed, only listen for the trigger. When no
+        # wake engine is configured (_wake is None) this block is skipped and
+        # the loop transcribes continuously, exactly as before.
+        if self._wake is not None and not self._is_armed():
+            if self._wake_triggered(frame):
+                self._arm()
+            return
+
+        utterance = self._collector.push(frame)
+        if utterance is not None:
+            await self._handle(utterance)
+            if self._wake is not None:
+                # Extend the window so a quick follow-up needs no second trigger.
+                self._arm()
+        elif self._wake is not None and self._armed_expired():
+            self._disarm()
+
+    # -- Wake-word gating -------------------------------------------------
+
+    def _is_armed(self) -> bool:
+        return self._armed_until > time.monotonic()
+
+    def _arm(self) -> None:
+        was_armed = self._is_armed()
+        self._armed_until = time.monotonic() + self._wake_window_sec
+        if not was_armed:
+            logger.info("[voice] wake trigger -> ARMED (listening window open)")
+            self._emit("wake", {"armed": True})
+
+    def _disarm(self, *, silent: bool = False) -> None:
+        if self._armed_until == 0.0:
+            return
+        self._armed_until = 0.0
+        self._wake_buffer = b""
+        if self._collector.is_speaking:
+            self._collector.reset()
+        if not silent:
+            logger.info("[voice] wake window closed -> PASSIVE")
+            self._emit("wake", {"armed": False})
+
+    def _armed_expired(self) -> bool:
+        return (
+            self._armed_until > 0.0
+            and time.monotonic() >= self._armed_until
+            and not self._collector.is_speaking
+        )
+
+    def _wake_triggered(self, frame) -> bool:
+        # Push-to-talk engines (hotkey) aren't frame-driven; they expose consume().
+        consume = getattr(self._wake, "consume", None)
+        if callable(consume) and self._wake_frame_bytes == 0:
+            return bool(consume())
+        if self._wake_frame_bytes <= 0:
+            return False
+        # Frame-driven engine (Porcupine): slice to its exact frame size.
+        self._wake_buffer += frame.pcm
+        while len(self._wake_buffer) >= self._wake_frame_bytes:
+            chunk = self._wake_buffer[: self._wake_frame_bytes]
+            self._wake_buffer = self._wake_buffer[self._wake_frame_bytes:]
+            try:
+                if self._wake.process(chunk):
+                    self._wake_buffer = b""
+                    return True
+            except Exception as e:
+                logger.warning(f"[voice] wake-word process failed: {e}")
+                return False
+        return False
+
+    # -- One turn ---------------------------------------------------------
+
+    async def _handle(self, utterance: Utterance) -> None:
+        logger.info(f"[voice] utterance {utterance.duration_sec:.1f}s -> transcribing")
+        self._emit("utterance", {"duration_sec": round(utterance.duration_sec, 2)})
+
+        transcript = await self._stt.transcribe(utterance.audio)
+        text = (transcript.text or "").strip()
+        if len(text) < self._min_chars:
+            logger.info("[voice] transcript too short; ignoring")
+            return
+
+        # Re-check: the user may have muted while we were transcribing.
+        if self._gate.is_muted():
+            logger.info("[voice] muted during transcription - dropping turn")
+            return
+
+        # Second line of defence against self-conversation. Even with correct
+        # playback waiting, a loud room or an open speaker can bleed our own
+        # words back in. If what we just "heard" is essentially what we just
+        # said, it isn't a user turn.
+        if self._echo_guard and self._is_echo(text):
+            logger.warning(f"[voice] ignoring probable self-echo: {text[:60]!r}")
+            self._emit("echo_ignored", {"text": text})
+            return
+
+        self._last_transcript = text
+        logger.info(f"[voice] heard: {text!r}")
+        self._emit("transcript", {"text": text})
+
+        ctx = AgentContext(user_message=text, from_voice=True)
+        if self._speak_replies and self._tts is not None:
+            # Stream + speak per sentence so the first words play while the rest
+            # of the reply is still generating (low time-to-first-audio).
+            reply = await self._stream_and_speak(ctx)
+        else:
+            result = await self._supervisor.execute(ctx)
+            reply = (result.response or "").strip()
+
+        self._last_reply = reply
+        self._turns += 1
+        logger.info(f"[voice] reply: {reply[:120]!r}")
+        self._emit("reply", {"text": reply})
+
+    def _is_echo(self, heard: str) -> bool:
+        """True if `heard` looks like our own last reply coming back."""
+        if not self._last_reply:
+            return False
+        said = {w for w in _WORD_RE.findall(self._last_reply.lower()) if len(w) > 2}
+        got = {w for w in _WORD_RE.findall(heard.lower()) if len(w) > 2}
+        if not said or not got:
+            return False
+        overlap = len(said & got) / len(got)
+        return overlap >= 0.6
+
+    async def speak(self, text: str) -> None:
+        """Speak arbitrary text through the same echo-guarded path as a reply."""
+        await self._speak(text)
+
+    async def _speak(self, text: str) -> None:
+        """Synthesise and play with the mic held closed until playback truly ends."""
+        self._speaking = True
+        self._emit("speaking", {"text": text})
+        try:
+            if await self._say_pcm(text):
+                await self._wait_playback()
+        except Exception as e:
+            logger.error(f"[voice] TTS failed: {e}")
+        finally:
+            await self._after_speaking()
+
+    async def _stream_and_speak(self, ctx: AgentContext) -> str:
+        """Stream the reply and speak each sentence as it completes.
+
+        Speaking on sentence boundaries plays the first words while the rest of
+        the reply is still generating — the dominant perceived-latency win for a
+        CPU-bound voice assistant.
+        """
+        self._speaking = True
+        self._emit("speaking", {"text": ""})
+        parts: list[str] = []
+        buffer = ""
+        spoke_anything = False
+        try:
+            async for chunk in self._supervisor.execute_stream(ctx):
+                if not chunk:
+                    continue
+                parts.append(chunk)
+                buffer += chunk
+                sentence, buffer = self._pop_sentence(buffer)
+                while sentence:
+                    spoke_anything = await self._say_pcm(sentence) or spoke_anything
+                    sentence, buffer = self._pop_sentence(buffer)
+            tail = buffer.strip()
+            if tail:
+                spoke_anything = await self._say_pcm(tail) or spoke_anything
+            if spoke_anything:
+                await self._wait_playback()
+        except Exception as e:
+            logger.error(f"[voice] streaming speak failed: {e}")
+        finally:
+            await self._after_speaking()
+        return "".join(parts).strip()
+
+    @staticmethod
+    def _pop_sentence(buffer: str) -> tuple[str, str]:
+        match = _SENTENCE_END_RE.search(buffer)
+        if not match:
+            return "", buffer
+        cut = match.end()
+        return buffer[:cut].strip(), buffer[cut:]
+
+    async def _say_pcm(self, text: str) -> bool:
+        spoke = False
+        async for pcm in self._tts.synthesize(text):
+            if pcm:
+                self._speaker.play_pcm(pcm, self._tts.sample_rate)
+                spoke = True
+        return spoke
+
+    async def _wait_playback(self) -> None:
+        wait_done = getattr(self._speaker, "wait_done", None)
+        if callable(wait_done):
+            finished = await asyncio.to_thread(wait_done, self._speak_timeout_sec)
+            if not finished:
+                logger.warning("[voice] playback did not finish within timeout")
+        else:
+            # Adapter without completion signalling — conservative sleep rather
+            # than reopening the mic blind.
+            await asyncio.sleep(1.0)
+
+    async def _after_speaking(self) -> None:
+        # Settle THEN drain, so the tail of our own voice doesn't land in the
+        # buffer after the drain. Then reopen the mic.
+        await asyncio.sleep(self._post_speak_settle_sec)
+        drain = getattr(self._audio, "drain", None)
+        if callable(drain):
+            drain()
+        self._collector.reset()
+        self._speaking = False
+        self._emit("idle", {})
+
+    def _emit(self, kind: str, payload: dict) -> None:
+        try:
+            self._on_event({"kind": kind, "at": datetime.now().isoformat(), **payload})
+        except Exception:
+            pass

@@ -1,8 +1,8 @@
-"""BlinkStickIndicator / SoftwareIndicator - laptop IndicatorPort adapters.
+"""BlinkStickIndicator / SoftwareIndicator — laptop IndicatorPort adapters.
 
-* New, PS-mandatory on the laptop profile (REQ-M-05). BlinkStickIndicator
+★ New, PS-mandatory on the laptop profile (REQ-M-05). BlinkStickIndicator
 is the recommended hardware path (docs/roadmap/09-privacy-compliance.md);
-SoftwareIndicator is the "no hardware detected" fallback - logs state
+SoftwareIndicator is the "no hardware detected" fallback — logs state
 changes and is meant to be paired with a persistent tray icon rendered by
 the controller layer, not a substitute for real hardware trust.
 """
@@ -39,7 +39,7 @@ class BlinkStickIndicator:
 
 
 class SoftwareIndicator:
-    """Fallback IndicatorPort - logs state; pair with a UI tray icon."""
+    """Fallback IndicatorPort — logs state; pair with a UI tray icon."""
 
     def set_muted(self, muted: bool) -> None:
         logger.info(f"[indicator:software] mute state -> {muted} (no hardware LED detected)")

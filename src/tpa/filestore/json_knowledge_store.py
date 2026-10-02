@@ -1,7 +1,7 @@
-"""JsonKnowledgeStore – flat-file JSON persistence for KnowledgeStorePort.
+"""JsonKnowledgeStore — flat-file JSON persistence for KnowledgeStorePort.
 
 Donor: veda/brain/knowledge.py's `_load`/`_save` half, read in full
-(Batch 3 grounding) and split out per migration rule 3 – the use-case
+(Batch 3 grounding) and split out per migration rule 3 — the use-case
 logic (add/remove/list/context) stays in service/memory/knowledge_base.py,
 this class is only the file I/O.
 """

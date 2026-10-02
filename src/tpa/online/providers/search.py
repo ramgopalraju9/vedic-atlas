@@ -1,10 +1,10 @@
-"""SearchProvider – implements FactProviderPort via DuckDuckGo's Instant
+"""SearchProvider — implements FactProviderPort via DuckDuckGo's Instant
 Answer API (free, no API key).
 
-* new – second reference implementation of the fact-lookup pattern
+★ new — second reference implementation of the fact-lookup pattern
 (alongside weather.py), proving the registry needs zero changes to add a
 category. Instant Answer only returns a result for queries DuckDuckGo can
-resolve directly (definitions, disambiguation, known entities) – it is
+resolve directly (definitions, disambiguation, known entities) — it is
 NOT a general web search API, so `text` may legitimately be empty for
 open-ended queries.
 """

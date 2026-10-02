@@ -1,4 +1,3 @@
-
 """System awareness route — active window info (Windows/laptop profile only).
 
 Donor: veda/routes/system.py, copied verbatim. Degrades gracefully via

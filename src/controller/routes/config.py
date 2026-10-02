@@ -1,5 +1,3 @@
-
-
 """Runtime configuration HTTP API.
 
 Donor: veda/routes/config.py, copied verbatim (proactivity is the only
@@ -35,4 +33,3 @@ async def set_proactivity(body: ProactivityBody, supervisor: SupervisorAgent = D
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"level": level, "valid": list(_VALID_PROACTIVITY)}
-

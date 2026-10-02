@@ -1,9 +1,9 @@
-"""KeyboardMuteFallback - implements MuteSwitchPort via a global hotkey.
+"""KeyboardMuteFallback — implements MuteSwitchPort via a global hotkey.
 
-* New. Fallback path when no hardware mute device is detected - per
+★ New. Fallback path when no hardware mute device is detected — per
 docs/roadmap/09-privacy-compliance.md, this is explicitly WEAKER than a
 hardware switch (software can be bypassed) and must surface a
-"software mute - no hardware detected" badge in the UI. That badge is a
+"software mute — no hardware detected" badge in the UI. That badge is a
 controller-layer concern; this adapter just implements the port and
 reports `source_name = "keyboard_fallback"` so callers can render the
 weaker-trust badge.
@@ -20,9 +20,9 @@ from domain.events.capture_event import CaptureEvent
 class KeyboardMuteFallback:
     """Implements MuteSwitchPort via a toggling global hotkey (pynput)."""
 
-    def __init__(self, hotkey: str = "<f9>"):
+    def __init__(self, hotkey: str = "<f9>", start_muted: bool = True):
         self._hotkey = hotkey
-        self._muted = False
+        self._muted = start_muted
         self._subscribers: list[Callable[[CaptureEvent], None]] = []
         self._listener = None
 
@@ -53,3 +53,8 @@ class KeyboardMuteFallback:
 
     def subscribe(self, on_change: Callable[[CaptureEvent], None]) -> None:
         self._subscribers.append(on_change)
+
+    def sync_state(self, muted: bool) -> None:
+        # Align the toggle baseline after an external (API/CLI) change so the
+        # next hotkey press toggles from the gate's real state, not a stale one.
+        self._muted = muted

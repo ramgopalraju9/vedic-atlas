@@ -1,6 +1,6 @@
-"""HotkeyWakeWord – a fallback trigger when no wake-word engine is available.
+"""HotkeyWakeWord — a fallback trigger when no wake-word engine is available.
 
-* New – grounded in the config concept confirmed in the donor's
+★ New — grounded in the config concept confirmed in the donor's
 `VoiceConfig.hotkey`/`daemon_trigger` fields (config.py, read during Phase
 1 of the codebase-guide work) but the actual pynput-based implementation
 was never read in this migration (voice/triggers.py's exact API wasn't
@@ -16,7 +16,7 @@ from typing import Callable
 
 
 class HotkeyWakeWord:
-    """Push-to-talk fallback trigger – not frame-driven, so WakeWordPort.process()
+    """Push-to-talk fallback trigger — not frame-driven, so WakeWordPort.process()
     always returns False. Callers should also check `is_pressed()` alongside
     the normal per-frame WakeWordPort flow."""
 
@@ -38,6 +38,14 @@ class HotkeyWakeWord:
 
     def is_pressed(self) -> bool:
         return self._pressed
+
+    def consume(self) -> bool:
+        # Return True once per press, then clear — lets the voice loop treat a
+        # key press as a single arm trigger rather than a latched state.
+        if self._pressed:
+            self._pressed = False
+            return True
+        return False
 
     def start(self, on_press: Callable[[], None] | None = None) -> None:
         from pynput import keyboard

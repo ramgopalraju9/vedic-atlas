@@ -23,23 +23,39 @@ import re
 from domain.entities.agent_profile import AgentProfile
 
 _WORD_RE = re.compile(r"[a-z']+")
-_MIN_SCORE = 1  # at least one shared keyword, tune once real usage data exists
+_MIN_SCORE = 1  # at least one shared *content* keyword after stopword removal
+
+# Dropped so a shared "the"/"is"/"what" can't route a plain question to a
+# specialist — that mis-score was forcing an extra LLM routing call per turn.
+_STOPWORDS = frozenset({
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "am",
+    "to", "of", "in", "on", "at", "for", "and", "or", "but", "if", "then", "so",
+    "do", "does", "did", "can", "could", "would", "should", "will", "shall",
+    "may", "might", "i", "you", "he", "she", "it", "we", "they", "me", "my",
+    "your", "our", "their", "what", "whats", "how", "why", "when", "where",
+    "who", "which", "this", "that", "these", "those", "with", "as", "by",
+    "from", "about", "into", "please", "tell", "give", "show", "get",
+})
 
 
 def _keywords(text: str) -> set[str]:
-    return set(_WORD_RE.findall(text.lower()))
+    return set(_WORD_RE.findall(text.lower())) - _STOPWORDS
 
 
-def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str) -> str | None:
-    """Return the best-matching agent name, or None to signal 'ask the LLM instead'."""
+def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str) -> str:
+    """Return the best-matching agent name, or the default on no clear match.
+
+    Never returns None: a no-match resolves to `default` directly so the
+    supervisor does NOT make an extra LLM routing call for an ordinary turn.
+    """
     if not candidates:
-        return None
+        return default
     if len(candidates) == 1:
         return candidates[0].name
 
     message_words = _keywords(message)
     if not message_words:
-        return None
+        return default
 
     best_name: str | None = None
     best_score = 0
@@ -50,6 +66,6 @@ def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str)
             best_score = score
             best_name = profile.name
 
-    if best_score >= _MIN_SCORE:
+    if best_score >= _MIN_SCORE and best_name is not None:
         return best_name
-    return None  # ambiguous — let the caller fall back to an LLM call
+    return default  # ambiguous — go straight to the default agent, no LLM call

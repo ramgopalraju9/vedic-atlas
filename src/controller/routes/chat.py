@@ -1,6 +1,3 @@
-
-
-
 """Chat API route — routes a text message through the Supervisor agent.
 
 Donor: veda/routes/chat.py, read in full. Vision dropped entirely:
@@ -30,4 +27,3 @@ async def chat(req: ChatRequest, supervisor: SupervisorAgent = Depends(get_super
     )
     result = await supervisor.execute(ctx)
     return ChatResponse(response=result.response)
-

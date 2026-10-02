@@ -1,3 +1,22 @@
+"""Approval HTTP API — UI-facing surface over ApprovalBroker.
+
+Donor: veda/routes/approval.py, read in full. Field names follow the
+Batch 6 rename (`tool_name`/`tool_input` → `action_name`/`arguments`) since
+there's no Claude/Copilot MCP subprocess calling this anymore — skills
+call `ApprovalBroker.request_approval` directly, in-process.
+
+Endpoints:
+
+  POST /api/approval/request          — a gated skill blocks on this until
+                                         the user approves/denies (or the
+                                         broker's own timeout auto-denies).
+  POST /api/approval/{id}/approve     — Approve button
+  POST /api/approval/{id}/deny        — Deny button
+  GET  /api/approval/pending          — list open asks
+  POST /api/approval/yolo/on|off      — toggle yolo mode
+  GET  /api/approval/yolo             — current yolo state
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

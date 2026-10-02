@@ -1,4 +1,4 @@
-"""TaskService - use-case facade over a TaskRepositoryPort.
+"""TaskService — use-case facade over a TaskRepositoryPort.
 
 New (Feature D). Thin orchestration so routes, the CLI, and the tasks skill
 all go through one place.

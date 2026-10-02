@@ -1,24 +1,24 @@
-"""OllamaClient – InferencePort implementation talking to a local Ollama server.
+"""OllamaClient — InferencePort implementation talking to a local Ollama server.
 
-* New, no donor equivalent (the donor's brain/ clients all shelled out to
+★ New, no donor equivalent (the donor's brain/ clients all shelled out to
 cloud CLIs). Grounded directly in docs/roadmap/adr/ADR-001-local-llm-backend.md
 (Ollama as the default local backend, HTTP API on localhost) and the
-InferencePort contract (Batch 3). Only `httpx` may be imported here –
+InferencePort contract (Batch 3). Only `httpx` may be imported here —
 this file, plus llama_cpp_client.py, are the ONLY places allowed to
 produce a completion, per REQ-M-02/M-03.
 
 Tuning (added after benchmarking Qwen3-8B-Q4_K_M and Qwen2.5-0.5B on a
-12-core CPU-only laptop – both measured, not assumed):
+12-core CPU-only laptop — both measured, not assumed):
 
-* `options` was previously never sent, so Ollama silently used its own
-  defaults and generation ran unbounded. A 0.5B base model answered
-  "Say hello" with 225 tokens of rambling because nothing capped it.
-  `num_predict` is the single most effective latency control on CPU.
-* `think=False` disables reasoning-model thinking blocks. Measured on
-  Qwen3-8B: 245 tokens/73s with thinking vs 12 tokens/4.5s without –
-  16x for identical visible output. Ignored by models without it.
-* `num_thread` is left unset by default: Ollama's own core detection is
-  usually right, and over-subscribing threads makes things slower.
+  * `options` was previously never sent, so Ollama silently used its own
+    defaults and generation ran unbounded. A 0.5B base model answered
+    "Say hello" with 225 tokens of rambling because nothing capped it.
+    `num_predict` is the single most effective latency control on CPU.
+  * `think=False` disables reasoning-model thinking blocks. Measured on
+    Qwen3-8B: 245 tokens/73s with thinking vs 12 tokens/4.5s without —
+    16x for identical visible output. Ignored by models without it.
+  * `num_thread` is left unset by default: Ollama's own core detection is
+    usually right, and over-subscribing threads makes things slower.
 """
 
 from __future__ import annotations
@@ -45,6 +45,7 @@ class OllamaClient:
         num_ctx: int = 4096,
         num_predict: int = 512,
         num_thread: int | None = None,
+        num_batch: int | None = None,
         temperature: float = 0.7,
         think: bool = False,
         stop: tuple[str, ...] = (),
@@ -56,6 +57,7 @@ class OllamaClient:
         self._num_ctx = num_ctx
         self._num_predict = num_predict
         self._num_thread = num_thread
+        self._num_batch = num_batch
         self._temperature = temperature
         self._think = think
         self._stop = list(stop)
@@ -79,6 +81,8 @@ class OllamaClient:
         }
         if self._num_thread is not None:
             options["num_thread"] = self._num_thread
+        if self._num_batch is not None:
+            options["num_batch"] = self._num_batch
         if self._stop:
             options["stop"] = self._stop
         return options
@@ -146,7 +150,7 @@ class OllamaClient:
         except httpx.HTTPError as exc:
             raise RuntimeError(f"ollama stream failed: {exc}") from exc
 
-    # -- Boot-time checks --------------------------------------------------
+    # -- Boot-time checks -------------------------------------------------
 
     async def list_models(self) -> list[str]:
         """Model names this Ollama server currently has imported."""
@@ -164,7 +168,7 @@ class OllamaClient:
         try:
             available = await self.list_models()
         except Exception as exc:
-            raise RuntimeError(f"Ollama not reachable at {self._host} – is it running? ({exc})") from exc
+            raise RuntimeError(f"Ollama not reachable at {self._host} — is it running? ({exc})") from exc
 
         wanted = self._default_model
         # Ollama reports "name:tag"; config usually omits the implicit ":latest".

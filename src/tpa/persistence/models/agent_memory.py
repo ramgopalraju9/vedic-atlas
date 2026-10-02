@@ -1,4 +1,4 @@
-"""AgentMemoryRow – SQLAlchemy ORM model for the cross-agent memory mesh.
+"""AgentMemoryRow — SQLAlchemy ORM model for the cross-agent memory mesh.
 
 Donor: veda/db/models.py's AgentMemory, read in full. Columns and indexes
 ported verbatim.
@@ -13,7 +13,7 @@ from tpa.persistence.session import Base
 
 
 class AgentMemoryRow(Base):
-    """Persistent agent memory – records routing decisions and agent actions."""
+    """Persistent agent memory — records routing decisions and agent actions."""
 
     __tablename__ = "agent_memory"
 

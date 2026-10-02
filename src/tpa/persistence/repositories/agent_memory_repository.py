@@ -1,16 +1,16 @@
-"""AgentMemoryRepository – SQLAlchemy implementation of MemoryRepositoryPort.
+"""AgentMemoryRepository — SQLAlchemy implementation of MemoryRepositoryPort.
 
 Donor: veda/db/agent_memory_repo.py, read in full. Ported closely:
   - `record` still resolves `session_id` via the injected
     `ConversationRepository` (donor design: memory rows and conversation
-    turns share the same session boundary – kept, it's a real, sound
+    turns share the same session boundary — kept, it's a real, sound
     decision, not incidental coupling).
   - `RETENTION_DAYS = 10` pruning-on-every-write behaviour kept verbatim
     (this is also the constant `domain.policies.retention_policy` uses
-    for its pure `is_expired_agent_memory` check – the two now agree by
+    for its pure `is_expired_agent_memory` check — the two now agree by
     construction rather than by coincidence).
   - `last_specialist` / `last_project` (donor-specific supervisor
-    helpers) intentionally NOT ported here – see the Batch 6 ledger note
+    helpers) intentionally NOT ported here — see the Batch 6 ledger note
     on why `last_action(agent_name="supervisor")` replaces the former,
     and why the latter had no confirmed caller anywhere in this
     migration.

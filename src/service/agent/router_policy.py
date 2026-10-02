@@ -1,7 +1,7 @@
-"""RouterPolicy - thin service-layer adapter over the domain routing policy.
+"""RouterPolicy — thin service-layer adapter over the domain routing policy.
 
-* NEW. Wraps domain.policies.routing_policy so the supervisor doesn't call
-a bare function directly - if the routing strategy ever needs state
+★ NEW. Wraps domain.policies.routing_policy so the supervisor doesn't call
+a bare function directly — if the routing strategy ever needs state
 (caching, per-agent hit-rate stats) this is where it goes, without
 touching the pure function itself.
 """

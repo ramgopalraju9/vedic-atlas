@@ -1,6 +1,6 @@
-"""HidMuteSwitch - implements MuteSwitchPort via a USB HID button (laptop dev).
+"""HidMuteSwitch — implements MuteSwitchPort via a USB HID button (laptop dev).
 
-* New, PS-mandatory on the laptop profile (REQ-M-04). Grounded in
+★ New, PS-mandatory on the laptop profile (REQ-M-04). Grounded in
 docs/roadmap/09-privacy-compliance.md's laptop implementation plan
 (BlinkStick / Stream Deck key as the recommended device). Polls the
 device on a background thread since most simple HID buttons don't push

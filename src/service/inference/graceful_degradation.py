@@ -1,19 +1,19 @@
-"""GracefulDegradation - primary/fallback orchestrator for local inference.
+"""GracefulDegradation — primary/fallback orchestrator for local inference.
 
 Donor: veda/brain/hybrid.py's HybridClient, read in full and adapted:
-- DROPPED `_runner_holds_backend` / the "runner-busy bypass" entirely -
-  that logic exists only because the donor could have a long-running
-  code-agent session holding the CLI subprocess semaphore. The code
-  agent is out of scope; there is no runner to be busy.
-- DROPPED `image_path` / `image_paths` params (vision out), matching
-  InferencePort's signature (Batch 3).
-- The donor's per-call `governance.record_success` / `record_failure`
-  circuit-breaker hooks are kept as OPTIONAL constructor callbacks
-  rather than a hard import of a `veda.governance` module - this class
-  should not need to know governance exists to be constructed with
-  fakes (AC5). server.py wires the real governance callbacks in later.
-- The retry-once-before-falling-back behaviour is kept verbatim - it's
-  real, useful behaviour, not incidental complexity.
+  - DROPPED `_runner_holds_backend` / the "runner-busy bypass" entirely —
+    that logic exists only because the donor could have a long-running
+    code-agent session holding the CLI subprocess semaphore. The code
+    agent is out of scope; there is no runner to be busy.
+  - DROPPED `image_path`/`image_paths` params (vision out), matching
+    InferencePort's signature (Batch 3).
+  - The donor's per-call `governance.record_success`/`record_failure`
+    circuit-breaker hooks are kept as OPTIONAL constructor callbacks
+    rather than a hard import of a `veda.governance` module — this class
+    should not need to know governance exists to be constructed with
+    fakes (AC5). server.py wires the real governance callbacks in later.
+  - The retry-once-before-falling-back behaviour is kept verbatim — it's
+    real, useful behaviour, not incidental complexity.
 """
 
 from __future__ import annotations
@@ -68,13 +68,7 @@ class GracefulDegradation:
         return await self._try_complete(self.fallback, prompt, system, model, timeout, **kwargs)
 
     async def _try_complete(
-        self,
-        client: InferencePort,
-        prompt: str,
-        system: str,
-        model: str | None,
-        timeout: int | None,
-        **kwargs,
+        self, client: InferencePort, prompt: str, system: str, model: str | None, timeout: int | None, **kwargs
     ) -> str:
         self._last_was_timeout = False
         try:
@@ -103,7 +97,7 @@ class GracefulDegradation:
         """Stream from primary; fall back only if no chunk arrived yet.
 
         Once at least one chunk has been yielded from the primary, we are
-        committed and will NOT switch mid-stream - the user is already
+        committed and will NOT switch mid-stream — the user is already
         hearing/seeing tokens.
         """
         yielded_any = False

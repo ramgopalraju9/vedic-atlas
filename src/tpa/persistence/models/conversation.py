@@ -1,11 +1,11 @@
-"""ConversationTurnRow / ConversationSummaryRow – SQLAlchemy ORM models.
+"""ConversationTurnRow / ConversationSummaryRow — SQLAlchemy ORM models.
 
 Donor: veda/db/models.py's ConversationTurn/ConversationSummary, read in
 full. Columns and indexes ported verbatim; classes renamed with a `Row`
 suffix to keep them visually distinct from the domain entities
 (domain.entities.conversation.Turn / ConversationSummary) that
 tpa/persistence/mappers.py converts them to/from. Person/FaceEmbedding/
-Observation dropped entirely – vision is out of scope.
+Observation dropped entirely — vision is out of scope.
 """
 
 from datetime import datetime
@@ -37,7 +37,7 @@ class ConversationSummaryRow(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[str] = mapped_column(String(32), nullable=False)
-    from_ts: Mapped[datetime] = mapped_column(String(32), nullable=False)
+    from_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     to_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     turn_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

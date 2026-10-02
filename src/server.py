@@ -1,22 +1,22 @@
-"""Composition root - wires every port to a concrete adapter and boots FastAPI.
+"""Composition root — wires every port to a concrete adapter and boots FastAPI.
 
 Donor: veda/app.py, read in full (489 real lines). This is the direct
 analogue of `_bootstrap_agents()` + `lifespan()` + route registration, but
 built from scratch against the ported `domain`/`service`/`tpa`/`controller`
-tree rather than adapted line-by-line - the donor wired Teams, vision, the
+tree rather than adapted line-by-line — the donor wired Teams, vision, the
 Claude/Copilot CLI, and a code-runner agent, none of which exist here.
 
 Deliberately NOT wired this batch (see docs/migration/MIGRATION_LEDGER.md's
 Batch 11 entry for the full reasoning on each):
-- The always-on ambient voice loop (`service/voice/voice_session.py` was
-  never built in any batch - `AmbientLoop`/wake-word/STT/TTS adapters
-  exist in `tpa/` but have no orchestrator wired to them yet).
-- `ResponderAgent` has no skill-calling loop - the donor's tool-calling
-  relied on the Claude/Copilot CLI's native tool-use protocol, which a
-  raw Ollama/llama.cpp `complete()` call doesn't provide equivalently.
-- `SkillRunner` is still constructed and available on `app.state` for a
-  future tool-calling redesign; `SystemAgent`'s bespoke single-action
-  JSON protocol is the only skill-invocation path wired today.
+  - The always-on ambient voice loop (`service/voice/voice_session.py` was
+    never built in any batch — `AmbientLoop`/wake-word/STT/TTS adapters
+    exist in `tpa/` but have no orchestrator wired to them yet).
+  - `ResponderAgent` has no skill-calling loop — the donor's tool-calling
+    relied on the Claude/Copilot CLI's native tool-use protocol, which a
+    raw Ollama/llama.cpp `complete()` call doesn't provide equivalently.
+    `SkillRunner` is still constructed and available on `app.state` for a
+    future tool-calling redesign; `SystemAgent`'s bespoke single-action
+    JSON protocol is the only skill-invocation path wired today.
 """
 
 from __future__ import annotations
@@ -30,26 +30,12 @@ from fastapi import FastAPI
 
 from controller.middleware.request_context import request_context
 from controller.routes import (
-    admin,
-    ambient,
-    approval,
-    chat,
-    config as config_route,
-    governance as governance_route,
-    health,
-    knowledge,
-    lookup,
-    memory as memory_route,
-    persona,
-    privacy,
-    stream,
-    system,
-    tasks as tasks_route,
-    voice,
+    admin, ambient, approval, chat, config as config_route, governance as governance_route,
+    health, knowledge, lookup, memory as memory_route, persona, privacy, stream, system,
+    tasks as tasks_route, voice,
 )
 from core.config import ensure_dirs, load_full_config
 from core.constants import PROJECT_NAME, VERSION
-from core.enums import HookEvent
 from core.logging_config import configure_logging, logger
 from domain.events.ambient_event import AmbientEvent
 from domain.events.event_kind import EventKind
@@ -69,11 +55,8 @@ from service.guardrails.permissions import PermissionManager
 from service.guardrails.rate_limit import RateLimiter
 from service.guardrails.validators import InputValidator, OutputValidator
 from service.hooks.dispatcher import (
-    create_audit_hook,
-    create_input_validator_hook,
-    create_output_validator_hook,
-    create_permission_check_hook,
-    create_rate_limit_hook,
+    create_audit_hook, create_input_validator_hook, create_output_validator_hook,
+    create_permission_check_hook, create_rate_limit_hook,
 )
 from service.hooks.registry import HookRegistry
 from service.lookup.lookup_service import LookupService
@@ -88,8 +71,8 @@ from service.skills.skill_runner import SkillRunner
 from tpa.filestore.json_knowledge_store import JsonKnowledgeStore
 from tpa.governance.sqlite_audit_sink import NullAuditSink, SqliteAuditSink
 from tpa.inference.factory import build_inference_client
-from tpa.inference.graceful_degradation import GracefulDegradation
-from tpa.inference.single_flight import SingleFlight
+from service.inference.graceful_degradation import GracefulDegradation
+from service.inference.single_flight import SingleFlight
 from tpa.online.http_client import AllowListedHttpClient
 from tpa.online.providers.fx import FxProvider
 from tpa.online.providers.search import SearchProvider
@@ -98,13 +81,14 @@ from tpa.persistence.migrations import init_tables
 from tpa.persistence.repositories.agent_memory_repository import AgentMemoryRepository
 from tpa.persistence.repositories.conversation_repository import ConversationRepository
 from tpa.persistence.session import SessionLocal
+from core.enums import HookEvent
 
 _IS_WINDOWS = platform.system() == "Windows"
 
 
-# -----------------------------------------------------------------------------
-# Subsystem builders - each takes the config it needs and returns wired objects.
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Subsystem builders — each takes the config it needs and returns wired objects.
+# ---------------------------------------------------------------------------
 
 def _build_system_control():
     if _IS_WINDOWS:
@@ -126,7 +110,7 @@ def _build_mute_switch(cfg: AppConfig):
     """Mute switch selected by privacy.mute_switch; software if it can't start.
 
     Boots muted unless privacy.start_muted is explicitly false. Any adapter
-    that cannot be constructed or started falls back to SoftwareMuteSwitch -
+    that cannot be constructed or started falls back to SoftwareMuteSwitch —
     an input-device failure must never crash the server or leave it unable to
     mute. 'keyboard' reads the global hotkey from config/audio.yaml.
     """
@@ -146,7 +130,7 @@ def _build_mute_switch(cfg: AppConfig):
             from tpa.hardware.gpio_mute_switch import GpioMuteSwitch
             switch = GpioMuteSwitch(pin=cfg.privacy.mute_gpio_pin)
         elif choice == "hid":
-            raise RuntimeError("hid mute needs vendor_id/product_id (not configured)")
+            raise RuntimeError("hid mute switch needs vendor_id/product_id (not configured)")
         else:
             logger.warning(f"[privacy] unknown mute_switch '{choice}'; using software")
             return SoftwareMuteSwitch(start_muted=start_muted)
@@ -177,7 +161,7 @@ def _build_audio_capture(cfg: AppConfig, frame_length: int | None = None):
     """Mic capture adapter, or None when `sounddevice` isn't installed.
 
     `frame_length` is dictated by the VAD frame size so every captured
-    block is exactly one VAD frame - a mismatch silently makes the
+    block is exactly one VAD frame — a mismatch silently makes the
     detector reject every frame.
     """
     try:
@@ -185,7 +169,6 @@ def _build_audio_capture(cfg: AppConfig, frame_length: int | None = None):
     except Exception as e:
         logger.info(f"[privacy] audio capture unavailable ({e}); capture gate will run mic-less")
         return None
-
     try:
         blocksize = frame_length or int(SAMPLE_RATE * cfg.audio.vad.frame_duration_ms / 1000)
         return SoundDeviceCapture(frame_length=blocksize, device_index=cfg.audio.mic_device_index)
@@ -227,7 +210,7 @@ def _build_vad(cfg: AppConfig):
 
 
 def _build_stt(cfg: AppConfig):
-    """Local STT, or None. Never downloads - the model must be staged."""
+    """Local STT, or None. Never downloads — the model must be staged."""
     try:
         from core.constants import PROJECT_ROOT
         from tpa.stt.faster_whisper import FasterWhisperProvider
@@ -279,24 +262,21 @@ def _build_wake_word(cfg: AppConfig):
 
     'hotkey' arms a listening window on a global key (works today). 'porcupine'
     is spoken-wake but needs PORCUPINE_ACCESS_KEY + a .ppn keyword file. A
-    failure never crashes the voice loop - it returns None and the loop
+    failure never crashes the voice loop — it returns None and the loop
     transcribes while unmuted, exactly as before.
     """
     if not cfg.audio.wake_word_enabled:
         return None
-
     engine = (cfg.audio.wake_engine or "none").lower()
     if engine == "none":
         return None
-
     try:
         if engine == "hotkey":
-            from tpa.wake_word.hotkey import HotkeyWakeword
-            wake = HotkeyWakeword(hotkey=cfg.audio.wake_hotkey)
+            from tpa.wake_word.hotkey import HotkeyWakeWord
+            wake = HotkeyWakeWord(hotkey=cfg.audio.wake_hotkey)
             wake.start()
             logger.info(f"[voice] wake engine 'hotkey' active ({cfg.audio.wake_hotkey})")
             return wake
-
         if engine == "porcupine":
             import os
             access_key = os.environ.get("PORCUPINE_ACCESS_KEY", "")
@@ -304,10 +284,10 @@ def _build_wake_word(cfg: AppConfig):
                 logger.warning("[voice] porcupine needs PORCUPINE_ACCESS_KEY + audio.wake_keyword_path; wake disabled")
                 return None
             from core.constants import PROJECT_ROOT
-            from tpa.wake_word.porcupine import PorcupineWakeword
+            from tpa.wake_word.porcupine import PorcupineWakeWord
             kw = cfg.audio.wake_keyword_path
             resolved = kw if Path(kw).is_absolute() else PROJECT_ROOT / kw
-            wake = PorcupineWakeword(access_key=access_key, keyword_path=str(resolved))
+            wake = PorcupineWakeWord(access_key=access_key, keyword_path=str(resolved))
             if getattr(wake, "sample_rate", 16000) not in (0, 16000):
                 logger.warning("[voice] porcupine sample rate != 16kHz; wake disabled")
                 return None
@@ -391,7 +371,7 @@ def _build_inference(cfg: AppConfig, governance):
 
     The raw backend is returned alongside because boot-time helpers
     (`verify_ready`, `warmup`) are adapter-specific and deliberately not
-    part of InferencePort - the wrappers shouldn't have to know about them.
+    part of InferencePort — the wrappers shouldn't have to know about them.
     """
     icfg = cfg.inference
     primary = build_inference_client(
@@ -435,7 +415,7 @@ def _build_embedding(cfg: AppConfig):
             path = Path(ecfg.cache_dir)
             cache_dir = path if path.is_absolute() else PROJECT_ROOT / path
         provider = FastEmbedProvider(model_id=ecfg.model_id, model_path=model_path, cache_dir=cache_dir)
-        logger.info(f"[embedding] model {provider.model_id} ready")
+        logger.info(f"[embedding] model {provider.model_id!r} ready")
         return provider
     except Exception as e:
         logger.warning(f"[embedding] unavailable: {e}")
@@ -443,7 +423,7 @@ def _build_embedding(cfg: AppConfig):
 
 
 def _build_lookup(cfg: AppConfig) -> LookupService:
-    allow_list = frozen_set(cfg.privacy.online.allowlist)
+    allow_list = frozenset(cfg.privacy.online.allowlist)
     http_client = AllowListedHttpClient(allow_list=allow_list)
     registry = FactProviderRegistry(allow_list=allow_list)
     for provider in (WeatherProvider(http_client), SearchProvider(http_client), FxProvider(http_client)):
@@ -478,6 +458,7 @@ def _build_guardrails(cfg: AppConfig) -> tuple[HookRegistry, PermissionManager]:
         log_inputs=gcfg.audit.log_inputs,
         log_outputs=gcfg.audit.log_outputs,
     )
+
     hooks = HookRegistry()
     hooks.register(HookEvent.PRE_SKILL, create_permission_check_hook(permissions))
     hooks.register(HookEvent.PRE_SKILL, create_rate_limit_hook(rate_limiter))
@@ -490,10 +471,8 @@ def _build_guardrails(cfg: AppConfig) -> tuple[HookRegistry, PermissionManager]:
 def _build_skills(cfg: AppConfig, hooks: HookRegistry) -> tuple[SkillRegistry, SkillRunner]:
     scfg = cfg.skills
     registry = SkillRegistry()
-    registry.register(TerminalSkill(permission_level=scfg.terminal.permission_level, enabled=scfg.terminal.enabled,
-                                    **scfg.terminal.extra))
-    registry.register(FileOpsSkill(permission_level=scfg.file_ops.permission_level, enabled=scfg.file_ops.enabled,
-                                  **scfg.file_ops.extra))
+    registry.register(TerminalSkill(permission_level=scfg.terminal.permission_level, enabled=scfg.terminal.enabled, **scfg.terminal.extra))
+    registry.register(FileOpsSkill(permission_level=scfg.file_ops.permission_level, enabled=scfg.file_ops.enabled, **scfg.file_ops.extra))
     return registry, SkillRunner(skill_registry=registry, hook_registry=hooks)
 
 
@@ -517,9 +496,9 @@ def bootstrap(app: FastAPI) -> None:
     app.state.inference_backend = inference_backend
     app.state.embedding_provider = _build_embedding(cfg)
 
+    from tpa.persistence.vector_store import SqliteVectorStore
     from service.memory.memory_indexer import MemoryIndexer
     from service.memory.semantic_recall import SemanticRecall
-    from tpa.persistence.vector_store import SqliteVectorStore
     vector_store = SqliteVectorStore()
     memory_indexer = MemoryIndexer(vector_store, app.state.embedding_provider)
     semantic_recall = SemanticRecall(
@@ -564,7 +543,7 @@ def bootstrap(app: FastAPI) -> None:
         try:
             asyncio.get_running_loop().create_task(_reindex_facts())
         except RuntimeError:
-            pass  # no running loop (e.g. tests) - indexing is best-effort
+            pass  # no running loop (e.g. tests) — indexing is best-effort
 
     knowledge = KnowledgeBase(
         store=JsonKnowledgeStore(),
@@ -572,8 +551,8 @@ def bootstrap(app: FastAPI) -> None:
     )
     app.state.knowledge = knowledge
 
-    from service.tasks.task_service import TaskService
     from tpa.persistence.repositories.task_repository import SqliteTaskRepository
+    from service.tasks.task_service import TaskService
     task_service = TaskService(SqliteTaskRepository())
     app.state.task_service = task_service
 
@@ -612,7 +591,6 @@ def bootstrap(app: FastAPI) -> None:
         client=inference_client, system_control=system_control,
         model=cfg.agents.system.model, governance=governance, memory=memory_repo,
     )
-
     agent_registry.register(responder)
     agent_registry.register(system_agent)
 
@@ -624,18 +602,17 @@ def bootstrap(app: FastAPI) -> None:
         conversation=conversation,
         routing_num_predict=cfg.inference.routing_num_predict,
     )
-
     agent_registry.register(supervisor)
     app.state.agent_registry = agent_registry
     app.state.supervisor = supervisor
 
     app.state.lookup_service = _build_lookup(cfg)
     app.state.notifier = _build_notifier()
-    app.state.egress_allow_list = frozen_set(cfg.privacy.online.allowlist)
+    app.state.egress_allow_list = frozenset(cfg.privacy.online.allowlist)
 
     # Privacy chain (REQ-M-04/M-05). CaptureGate owns mute state and is the
     # only thing allowed to start/stop the mic or drive the indicator.
-    # The same capture adapter instance is shared with the voice loop -
+    # The same capture adapter instance is shared with the voice loop —
     # two independent mic streams would fight over the device.
     mute_switch = _build_mute_switch(cfg)
     audio_capture = _build_audio_capture(cfg)
@@ -649,7 +626,7 @@ def bootstrap(app: FastAPI) -> None:
     app.state.capture_gate = capture_gate
 
     # Always-on voice loop. Gated by CaptureGate, so building it does not
-    # mean the mic is open - it opens only when the gate says unmuted.
+    # mean the mic is open — it opens only when the gate says unmuted.
     app.state.voice_session = _build_voice_session(
         cfg, audio=audio_capture, capture_gate=capture_gate,
         supervisor=supervisor, event_bus=event_bus,
@@ -701,7 +678,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"[inference] warmup skipped: {e}")
 
-    # Must start inside the running loop - the gate captures it so a
+    # Must start inside the running loop — the gate captures it so a
     # mute transition raised on a hardware thread can still reach the bus.
     try:
         app.state.capture_gate.start()
@@ -759,7 +736,7 @@ for _mod in (
 
 @app.get("/", include_in_schema=False)
 async def _root() -> dict:
-    """Headless build - the Pi target has no browser (ADR-008). The API and
+    """Headless build — the Pi target has no browser (ADR-008). The API and
     the `veda` CLI are the interfaces; the Angular SPA was removed."""
     return {
         "name": PROJECT_NAME,

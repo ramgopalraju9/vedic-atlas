@@ -1,7 +1,7 @@
-"""FxProvider – implements FactProviderPort via the Frankfurter API
+"""FxProvider — implements FactProviderPort via the Frankfurter API
 (free, no API key, ECB reference rates).
 
-* new – third reference implementation, demonstrating a category
+★ new — third reference implementation, demonstrating a category
 (exchange rates) with two required params instead of weather's lat/lon.
 """
 
