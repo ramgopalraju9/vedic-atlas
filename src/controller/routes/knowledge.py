@@ -1,5 +1,11 @@
-"""
-module-level singletons - the KnowledgeBase instance is constructed once
+
+
+
+"""Knowledge base API — save and retrieve facts about the user.
+
+Donor: veda/routes/knowledge.py, read in full. The donor's module-level
+`_kb` singleton (`get_kb()`) is dropped per migration rule 4 (no
+module-level singletons) — the KnowledgeBase instance is constructed once
 in server.py and reached here via `Depends(get_knowledge_base)`.
 """
 

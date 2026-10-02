@@ -1,4 +1,17 @@
-from __future__ import annotations
+
+
+
+"""Voice API — status and control for the always-on listen/think/speak loop.
+
+Donor: veda/routes/voice_config.py (the browser wake-word config endpoint),
+now extended to drive `service/voice/voice_session.py`.
+
+Deliberately does NOT expose mute here: muting is a privacy control and
+lives on /api/privacy/* behind the capture gate. Stopping the voice
+session is an availability control — a stopped session is not the same
+claim as a muted microphone, and conflating them would let the UI imply
+the mic is off when it merely isn't being read.
+"""
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -15,8 +28,8 @@ def _session(request: Request):
     if s is None:
         raise HTTPException(
             status_code=503,
-            detail="voice session unavailable - check server log for the missing component "
-            "(mic / vad / stt / tts / speaker)",
+            detail="voice session unavailable — check server log for the missing component "
+                   "(mic / vad / stt / tts / speaker)",
         )
     return s
 
@@ -55,7 +68,7 @@ class SayBody(BaseModel):
 
 @router.post("/voice/say")
 async def voice_say(body: SayBody, request: Request) -> dict:
-    """Speak arbitrary text - lets a demo prove TTS without waiting for a turn."""
+    """Speak arbitrary text — lets a demo prove TTS without waiting for a turn."""
     s = _session(request)
     await s.speak(body.text)
     return {"spoken": body.text}

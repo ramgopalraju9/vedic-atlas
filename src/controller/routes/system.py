@@ -1,3 +1,11 @@
+
+"""System awareness route — active window info (Windows/laptop profile only).
+
+Donor: veda/routes/system.py, copied verbatim. Degrades gracefully via
+`ImportError` on platforms without pywin32 (the Pi profile has no
+foreground-window concept anyway).
+"""
+
 import asyncio
 
 from fastapi import APIRouter
@@ -26,6 +34,7 @@ def _get_active_window() -> SystemInfo:
 
         title = win32gui.GetWindowText(hwnd)
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
+
         try:
             proc = psutil.Process(pid)
             return SystemInfo(
@@ -37,6 +46,6 @@ def _get_active_window() -> SystemInfo:
             return SystemInfo(window_title=title[:150])
 
     except ImportError:
-        return SystemInfo(window_title="pywin32 not available")
+        return SystemInfo(window_title="(pywin32 not available)")
     except Exception:
         return SystemInfo()

@@ -1,3 +1,13 @@
+
+
+
+"""Ambient-event API: SSE stream out, test publish in.
+
+Donor: veda/routes/ambient.py, read in full. The RUNNER_OUTPUT bypass
+branch is dropped — that EventKind member doesn't exist in this build
+(code-runner is out of scope; see domain/events/event_kind.py).
+"""
+
 import asyncio
 import json
 from typing import Any
@@ -72,7 +82,7 @@ async def ambient_stream(request: Request, bus=Depends(get_event_bus), superviso
                     # of the same observation (retried toast, sensor
                     # re-detection, etc.) instead of queuing duplicate tiles.
                     "dedupe_key": event.dedupe_key,
-                    # event-specific data - approval_id etc. travel here.
+                    # event-specific data — approval_id etc. travel here.
                     "payload": event.payload,
                 }
                 yield f"data: {json.dumps(payload)}\n\n"
@@ -82,3 +92,4 @@ async def ambient_stream(request: Request, bus=Depends(get_event_bus), superviso
             bus.unsubscribe(q)
 
     return sse_response(gen())
+

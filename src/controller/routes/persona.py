@@ -1,3 +1,14 @@
+
+
+"""Persona REST surface — backs both the CLI and the Angular UI.
+
+Donor: veda/routes/persona.py, read in full and copied near-verbatim.
+Persistence: data/cli_persona.json (single-user, single file). When
+persona changes, seeds proactivity via supervisor.set_proactivity() the
+same way the Angular PersonaStore does, so the brain matches the UI/CLI
+in one round-trip.
+"""
+
 from __future__ import annotations
 
 import json
@@ -59,7 +70,7 @@ async def set_persona(
         state.persona = info.id
         try:
             supervisor.set_proactivity(info.proactivity)
-            logger.info(f"persona: set to {info.id}; proactivity seeded to {info.proactivity!r}")
+            logger.info(f"persona: set to {info.id!r}; proactivity seeded to {info.proactivity!r}")
         except Exception as e:
             logger.warning(f"persona: proactivity seed failed: {e}")
 
@@ -71,3 +82,4 @@ async def set_persona(
         "state": state.model_dump(),
         "catalog": [p.model_dump() for p in PERSONA_CATALOG],
     }
+

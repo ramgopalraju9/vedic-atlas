@@ -1,3 +1,11 @@
+
+
+"""Lookup API — surfaces the current-public-fact provider registry.
+
+★ new (REQ-M-09). No donor equivalent — VEDA had no online-fact concept.
+Backed by the already-built service/lookup/{registry,lookup_service}.py.
+"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,7 +39,6 @@ async def fetch_fact(body: FactQueryBody, lookup: LookupService = Depends(get_lo
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
     return {
         "provider_id": answer.provider_id,
         "category": answer.category,

@@ -1,10 +1,13 @@
-"""Chat API route - routes a text message through the Supervisor agent.
+
+
+
+"""Chat API route — routes a text message through the Supervisor agent.
 
 Donor: veda/routes/chat.py, read in full. Vision dropped entirely:
 `apply_vision_intent`, `image_paths` validation, and the recognized-user
 injection from face recognition are all gone (`_vision_bridge.py` /
-`uploads.py` are out of scope - see FILE_MAP.md). The `warm_pool` mark
-also drops - Ollama's `keep_alive` covers that concept.
+`uploads.py` are out of scope — see FILE_MAP.md). The `warm_pool` mark
+also drops — Ollama's `keep_alive` covers that concept.
 """
 
 from fastapi import APIRouter, Depends
@@ -27,3 +30,4 @@ async def chat(req: ChatRequest, supervisor: SupervisorAgent = Depends(get_super
     )
     result = await supervisor.execute(ctx)
     return ChatResponse(response=result.response)
+

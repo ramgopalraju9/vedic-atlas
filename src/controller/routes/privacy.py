@@ -1,3 +1,18 @@
+
+
+
+"""Privacy API — mute state (read + control) and the network egress allow-list.
+
+★ new (REQ-M-04/M-05/M-06/M-09 visibility). Reads and drives
+`service/privacy/capture_gate.py`, which is the single source of truth for
+whether the mic is live — this route never touches the indicator or the
+audio adapter directly, so the UI cannot desync the light from the gate.
+
+`source` is surfaced verbatim so the UI can badge a software switch as
+weaker-trust than a hardware one (currently "software" — see
+tpa/hardware/software_mute_switch.py).
+"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -23,7 +38,7 @@ def get_capture_gate(request: Request):
 
 def _snapshot(request: Request, gate) -> dict:
     state = gate.state
-    allow_list = getattr(request.app.state, "egress_allow_list", frozenSet())
+    allow_list = getattr(request.app.state, "egress_allow_list", frozenset())
     return {
         "muted": state.muted,
         "source": state.mute_source,

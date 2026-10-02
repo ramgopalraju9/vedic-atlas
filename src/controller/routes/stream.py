@@ -1,3 +1,14 @@
+
+
+
+"""SSE streaming route — streams Supervisor/sub-agent responses in real-time.
+
+Donor: veda/routes/stream.py, read in full. Vision dropped (see chat.py's
+docstring for the same rationale). SSE encoding moved to
+controller/sse/encoder.py; the disconnect-watch/response-header plumbing
+moved to controller/sse/stream_adapter.py — both shared with ambient.py.
+"""
+
 import asyncio
 
 from fastapi import APIRouter, Depends, Request
@@ -20,7 +31,6 @@ async def stream_chat(req: StreamRequest, request: Request, supervisor: Supervis
         system_context=(req.system_context or "")[:2000],
         from_voice=req.from_voice,
     )
-
     cancel_event = asyncio.Event()
 
     async def event_generator():
