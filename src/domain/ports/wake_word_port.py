@@ -1,4 +1,16 @@
+"""WakeWordPort — detects the trigger word in a stream of audio frames.
+
+Donor: veda/voice/wakeword.py's WakeWordDetector (wraps pvporcupine).
+The donor exposed `frame_length` / `sample_rate` properties (kept here
+verbatim) but the actual per-frame detection call lived outside the class
+(in the daemon/trigger loop, not yet read in this migration). `process()`
+below is the natural Protocol shape for that call: porcupine's real API
+returns a keyword index (>=0 on detection, -1 otherwise); adapters map
+that to a bool so callers don't need to know porcupine's convention.
+"""
+
 from typing import Protocol, runtime_checkable
+
 
 @runtime_checkable
 class WakeWordPort(Protocol):

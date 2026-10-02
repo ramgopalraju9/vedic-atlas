@@ -1,5 +1,13 @@
+"""AgentResult — the output of an agent's execution.
+
+Donor: veda/meta/agent.py (AgentResult only — the BaseAgent ABC that lived
+in the same file is a service-layer base class, not domain data; it is
+staged separately at service/agent/base_agent.py in a later batch).
+"""
+
 from dataclasses import dataclass, field
 from typing import Any
+
 
 @dataclass
 class AgentResult:
