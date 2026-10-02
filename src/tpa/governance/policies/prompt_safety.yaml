@@ -1,0 +1,25 @@
+# Prompt Safety Policy – blocks sensitive patterns in LLM input/output
+name: prompt-safety
+version: "1.0"
+description: "Prevents sensitive data from being sent to or received from LLMs"
+
+rules:
+  - name: audit-all-llm-calls
+    condition:
+      field: action
+      operator: eq
+      value: llm_call
+    action: audit
+    priority: 10
+
+blocked_patterns:
+  # SSN pattern
+  - "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+  # Credit card (16 digits)
+  - "\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b"
+  # API keys / secrets
+  - "(?i)(api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token)\\s*[=:]\\s*['\"]?[A-Za-z0-9+/=_-]{20,}"
+  # AWS access key pattern
+  - "(?i)AKIA[0-9A-Z]{16}"
+  # Private key blocks
+  - "-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----"

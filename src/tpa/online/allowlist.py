@@ -1,9 +1,9 @@
-"""allow_list - the configured set of allowed domains/hosts.
+"""allow_list – the configured set of hosts permitted for outbound egress.
 
-* New, PS-mandatory. Single source of truth shared between
-AllowListedHttpClient (transport-level enforcement) and
-FactProviderRegistry (boot-time provider validation)
-so the two can never disagree about what is allowed.
+* New, PS-mandatory. Single source of truth read by both
+AllowListedHttpClient (transport-layer enforcement) and
+FactProviderRegistry (boot-time provider validation, service/lookup/registry.py)
+so the two can never disagree about which hosts are permitted.
 """
 
 DEFAULT_ALLOW_LIST: frozenset[str] = frozenset({

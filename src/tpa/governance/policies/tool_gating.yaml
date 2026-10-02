@@ -1,0 +1,43 @@
+# Tool Gating Policy – controls which tools/skills agents may invoke
+name: tool-gating
+version: "1.0"
+description: "Controls which tools and skills are allowed"
+
+rules:
+  - name: block-rm-rf
+    condition:
+      field: tool
+      operator: matches
+      value: "rm\\s+-rf\\s+/"
+    action: deny
+    priority: 200
+
+  - name: block-format
+    condition:
+      field: tool
+      operator: matches
+      value: "(?i)^format\\s+"
+    action: deny
+    priority: 200
+
+  - name: block-del-system
+    condition:
+      field: tool
+      operator: matches
+      value: "(?i)del\\s+/s\\s+/q"
+    action: deny
+    priority: 200
+
+  # Adapted from donor: dropped vision/vscode/pycharm/intellij/teams – none
+  # of those skills/integrations exist in this build. "lookup" added to
+  # cover the fact-provider registry once it's wrapped as a skill.
+  - name: allow-standard-skills
+    condition:
+      field: skill
+      operator: in
+      value:
+        - terminal
+        - file_ops
+        - lookup
+    action: allow
+    priority: 50
