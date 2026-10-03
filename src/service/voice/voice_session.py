@@ -66,6 +66,9 @@ class VoiceSession:
         wake_word: Any | None = None,
         wake_engine: str = "none",
         wake_window_sec: float = 8.0,
+        speaker_id: Any | None = None,
+        require_known_speaker: bool = False,
+        speaker_match_threshold: float = 0.6,
         on_event: Callable[[dict], None] | None = None,
     ):
         self._audio = audio
@@ -91,6 +94,20 @@ class VoiceSession:
         self._wake_frame_bytes = (getattr(wake_word, "frame_length", 0) or 0) * 2
         self._wake_buffer = b""
         self._armed_until = 0.0
+
+        # Multi-speaker recognition. Scored continuously, frame by frame,
+        # while armed/collecting (same slicing idiom as the wake buffer
+        # above) - but the accept/reject decision is made once per
+        # utterance, off the accumulated mean score, not frame by frame.
+        # A single noisy frame scoring low must not clip real speech from
+        # an enrolled speaker.
+        self._speaker_id = speaker_id
+        self._require_known_speaker = require_known_speaker
+        self._speaker_match_threshold = speaker_match_threshold
+        self._speaker_frame_bytes = (getattr(speaker_id, "frame_length", 0) or 0) * 2
+        self._speaker_buffer = b""
+        self._speaker_score_sums: list[float] = []
+        self._speaker_score_count = 0
 
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -147,6 +164,8 @@ class VoiceSession:
             "last_reply": self._last_reply,
             "wake_engine": self._wake_engine,
             "armed": self._is_armed(),
+            "speaker_id_enabled": self._speaker_id is not None,
+            "require_known_speaker": self._require_known_speaker,
         }
 
     # -- Loop -------------------------------------------------------------
@@ -188,6 +207,9 @@ class VoiceSession:
                 self._arm()
             return
 
+        if self._speaker_id is not None:
+            self._feed_speaker_frame(frame)
+
         utterance = self._collector.push(frame)
         if utterance is not None:
             await self._handle(utterance)
@@ -210,6 +232,7 @@ class VoiceSession:
             self._emit("wake", {"armed": True})
 
     def _disarm(self, *, silent: bool = False) -> None:
+        self._reset_speaker_scoring()
         if self._armed_until == 0.0:
             return
         self._armed_until = 0.0
@@ -248,6 +271,51 @@ class VoiceSession:
                 return False
         return False
 
+    # -- Speaker recognition ------------------------------------------------
+
+    def _feed_speaker_frame(self, frame) -> None:
+        """Slice raw PCM into the recognizer's frame size and accumulate a
+        running score per enrolled speaker. Mirrors _wake_triggered's
+        buffering idiom - same reason: the mic callback's blocksize rarely
+        matches a vendor SDK's required frame size exactly."""
+        if self._speaker_frame_bytes <= 0:
+            return
+        self._speaker_buffer += frame.pcm
+        while len(self._speaker_buffer) >= self._speaker_frame_bytes:
+            chunk = self._speaker_buffer[: self._speaker_frame_bytes]
+            self._speaker_buffer = self._speaker_buffer[self._speaker_frame_bytes:]
+            try:
+                scores = self._speaker_id.process(chunk)
+            except Exception as e:
+                logger.warning(f"[voice] speaker-id process failed: {e}")
+                return
+            if not scores:
+                continue
+            if not self._speaker_score_sums:
+                self._speaker_score_sums = [0.0] * len(scores)
+            for i, s in enumerate(scores):
+                self._speaker_score_sums[i] += s
+            self._speaker_score_count += 1
+
+    def _resolve_speaker(self) -> tuple[str | None, bool]:
+        """Mean score over the whole utterance, not a single frame - Eagle's
+        scores stabilise with more audio, so deciding off one noisy frame
+        would risk rejecting a real enrolled speaker, not just stray talk."""
+        if self._speaker_id is None or not self._speaker_score_sums or self._speaker_score_count == 0:
+            return None, False
+        means = [s / self._speaker_score_count for s in self._speaker_score_sums]
+        best_i = max(range(len(means)), key=lambda i: means[i])
+        if means[best_i] < self._speaker_match_threshold:
+            return None, False
+        names = getattr(self._speaker_id, "speaker_names", [])
+        name = names[best_i] if best_i < len(names) else None
+        return name, name is not None
+
+    def _reset_speaker_scoring(self) -> None:
+        self._speaker_buffer = b""
+        self._speaker_score_sums = []
+        self._speaker_score_count = 0
+
     # -- One turn ---------------------------------------------------------
 
     async def _handle(self, utterance: Utterance) -> None:
@@ -265,6 +333,17 @@ class VoiceSession:
             logger.info("[voice] muted during transcription - dropping turn")
             return
 
+        # Resolve who (if anyone enrolled) said this, then clear the running
+        # scores so the next utterance starts clean. Reading before
+        # resetting is safe - no other frames are fed while _handle runs,
+        # this coroutine owns the only consumer of _tick's frame loop.
+        speaker_name, speaker_known = self._resolve_speaker()
+        self._reset_speaker_scoring()
+        if self._require_known_speaker and self._speaker_id is not None and not speaker_known:
+            logger.info("[voice] unrecognized speaker; dropping turn as stray talk")
+            self._emit("speaker_rejected", {})
+            return
+
         # Second line of defence against self-conversation. Even with correct
         # playback waiting, a loud room or an open speaker can bleed our own
         # words back in. If what we just "heard" is essentially what we just
@@ -279,6 +358,8 @@ class VoiceSession:
         self._emit("transcript", {"text": text})
 
         ctx = AgentContext(user_message=text, from_voice=True)
+        if speaker_name:
+            ctx.metadata["speaker_name"] = speaker_name
         if self._speak_replies and self._tts is not None:
             # Stream + speak per sentence so the first words play while the rest
             # of the reply is still generating (low time-to-first-audio).
@@ -387,6 +468,7 @@ class VoiceSession:
         if callable(drain):
             drain()
         self._collector.reset()
+        self._reset_speaker_scoring()
         self._speaking = False
         self._emit("idle", {})
 

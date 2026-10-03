@@ -6,15 +6,31 @@ preferred). Loads a local GGUF file directly — no server process. Fails
 loudly at construction if the model file is missing rather than
 attempting any network fetch, per the "no runtime auto-download when
 offline_mode is enforced" rule (REQ-M-02).
+
+Thinking-mode suppression (`think=False`, the default): unlike OllamaClient,
+llama-cpp-python's `create_chat_completion` has no `think`/`enable_thinking`
+parameter of its own — Qwen3's chat template reacts to a `/no_think` marker
+placed in the conversation text instead (the model's own documented
+fallback for engines that don't support template-level thinking control).
+That alone isn't fully reliable (a truncated generation can still leave a
+dangling `<think>` block), so every return path also strips any
+`<think>...</think>` block as a safety net - belt and suspenders, not
+either/or.
 """
 
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import AsyncIterator
 
 from domain.ports.inference_port import InferencePort, InferenceTimeoutError
+
+_THINK_OPEN = "<think>"
+_THINK_CLOSE = "</think>"
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
+_UNCLOSED_THINK_RE = re.compile(r"<think>.*", re.DOTALL)
 
 
 class LlamaCppClient:
@@ -27,6 +43,7 @@ class LlamaCppClient:
         n_threads: int | None = None,
         timeout: float = 120.0,
         num_predict: int = 512,
+        think: bool = False,
     ):
         path = Path(model_path)
         if not path.exists():
@@ -39,17 +56,32 @@ class LlamaCppClient:
         self._llama = llama_cpp.Llama(model_path=str(path), n_ctx=n_ctx, n_threads=n_threads, verbose=False)
         self._timeout = timeout
         self._num_predict = num_predict
+        self._think = think
 
     @property
     def name(self) -> str:
         return "llama_cpp"
 
     def _prompt_messages(self, prompt: str, system: str) -> list[dict]:
+        if not self._think:
+            # Qwen3's documented soft-switch for engines (like raw
+            # llama-cpp-python) that don't expose chat-template-level
+            # thinking control.
+            prompt = f"{prompt} /no_think"
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         return messages
+
+    @staticmethod
+    def _strip_thinking(text: str) -> str:
+        """Safety net: remove any <think>...</think> block, or an unclosed
+        one if generation was cut off mid-thought, that slipped through
+        despite the /no_think prompt directive."""
+        text = _THINK_BLOCK_RE.sub("", text)
+        text = _UNCLOSED_THINK_RE.sub("", text)
+        return text.strip()
 
     async def complete(
         self,
@@ -75,7 +107,8 @@ class LlamaCppClient:
             )
         except asyncio.TimeoutError as exc:
             raise InferenceTimeoutError(f"llama.cpp request timed out: {exc}") from exc
-        return result["choices"][0]["message"]["content"]
+        content = result["choices"][0]["message"]["content"]
+        return self._strip_thinking(content) if not self._think else content
 
     async def stream(
         self,
@@ -105,10 +138,50 @@ class LlamaCppClient:
 
         asyncio.get_event_loop().run_in_executor(None, _produce)
 
+        if self._think:
+            # Nothing to filter - pass chunks through as they arrive.
+            while True:
+                if cancel_event is not None and cancel_event.is_set():
+                    return
+                item = await queue.get()
+                if item is None:
+                    return
+                yield item
+            return
+
+        # Safety-net filtering: suppress any text between <think> and
+        # </think>, tolerating the tag being split across chunk boundaries
+        # by holding back a short tail until we're sure it isn't half a tag.
+        in_think = False
+        pending = ""
         while True:
             if cancel_event is not None and cancel_event.is_set():
                 return
             item = await queue.get()
             if item is None:
+                if pending and not in_think:
+                    yield pending
                 return
-            yield item
+            pending += item
+            while True:
+                if in_think:
+                    idx = pending.find(_THINK_CLOSE)
+                    if idx == -1:
+                        pending = ""  # still inside the think block - discard
+                        break
+                    pending = pending[idx + len(_THINK_CLOSE):]
+                    in_think = False
+                    continue
+                idx = pending.find(_THINK_OPEN)
+                if idx == -1:
+                    # Hold back a short tail in case "<think>" is split
+                    # across this chunk and the next one.
+                    safe_len = max(0, len(pending) - len(_THINK_OPEN))
+                    if safe_len > 0:
+                        yield pending[:safe_len]
+                        pending = pending[safe_len:]
+                    break
+                if idx > 0:
+                    yield pending[:idx]
+                pending = pending[idx + len(_THINK_OPEN):]
+                in_think = True

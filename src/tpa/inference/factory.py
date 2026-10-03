@@ -68,6 +68,7 @@ def build_inference_client(
             n_threads=n_threads,
             timeout=timeout,
             num_predict=num_predict,
+            think=think,
         )
 
     raise UnsupportedBackendError(f"unknown backend '{backend}' — expected 'ollama' or 'llama_cpp'")

@@ -59,3 +59,5 @@ def ensure_dirs() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     TEMP_DIR.mkdir(exist_ok=True)
     AUDIT_DIR.mkdir(exist_ok=True)
+    (DATA_DIR / "speaker_profiles").mkdir(exist_ok=True)
+    (DATA_DIR / "models" / "openwakeword").mkdir(parents=True, exist_ok=True)

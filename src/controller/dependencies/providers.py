@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from service.lookup.lookup_service import LookupService
     from service.memory.knowledge_base import KnowledgeBase
     from service.sensing.event_bus import EventBus
+    from service.speakers.speaker_enrollment_service import SpeakerEnrollmentService
 
 
 def _require(request: Request, attr: str, label: str):
@@ -68,3 +69,9 @@ def get_semantic_recall(request: Request):
 
 def get_task_service(request: Request):
     return _require(request, "task_service", "task service")
+
+
+def get_speaker_enrollment_service(request: Request) -> "SpeakerEnrollmentService":
+    """503 when speaker ID is disabled/unavailable - same "not initialized"
+    semantics as every other _require'd service, just conditionally built."""
+    return _require(request, "speaker_enrollment_service", "speaker enrollment service")

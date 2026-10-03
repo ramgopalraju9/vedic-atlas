@@ -31,7 +31,7 @@ from fastapi import FastAPI
 from controller.middleware.request_context import request_context
 from controller.routes import (
     admin, ambient, approval, chat, config as config_route, governance as governance_route,
-    health, knowledge, lookup, memory as memory_route, persona, privacy, stream, system,
+    health, knowledge, lookup, memory as memory_route, persona, privacy, speakers, stream, system,
     tasks as tasks_route, voice,
 )
 from core.config import ensure_dirs, load_full_config
@@ -260,10 +260,14 @@ def _build_speaker(cfg: AppConfig):
 def _build_wake_word(cfg: AppConfig):
     """Wake trigger selected by audio.wake_engine; None (always-transcribe) on any failure.
 
-    'hotkey' arms a listening window on a global key (works today). 'porcupine'
-    is spoken-wake but needs PORCUPINE_ACCESS_KEY + a .ppn keyword file. A
-    failure never crashes the voice loop — it returns None and the loop
-    transcribes while unmuted, exactly as before.
+    'hotkey' arms a listening window on a global key (does not work headless —
+    see docs/07-backlog.md). 'openwakeword' is spoken-wake via a local ONNX
+    model, no API key, works headless — the default. 'porcupine' is
+    Picovoice's spoken-wake, needs PICOVOICE_ACCESS_KEY + a .ppn keyword file;
+    kept available, not installed/used by default (see
+    docs/voice/open-source-wake-speaker-design.md). A failure never crashes
+    the voice loop — it returns None and the loop transcribes while unmuted,
+    exactly as before.
     """
     if not cfg.audio.wake_word_enabled:
         return None
@@ -277,11 +281,25 @@ def _build_wake_word(cfg: AppConfig):
             wake.start()
             logger.info(f"[voice] wake engine 'hotkey' active ({cfg.audio.wake_hotkey})")
             return wake
+        if engine == "openwakeword":
+            model_path = cfg.audio.wake_oww_model_path
+            if not model_path:
+                logger.warning("[voice] openwakeword needs audio.wake_oww_model_path; wake disabled")
+                return None
+            from core.constants import PROJECT_ROOT
+            from tpa.wake_word.openwakeword_engine import OpenWakeWordEngine
+            resolved = model_path if Path(model_path).is_absolute() else PROJECT_ROOT / model_path
+            wake = OpenWakeWordEngine(
+                model_name=cfg.audio.wake_oww_model,
+                model_path=str(resolved),
+                threshold=cfg.audio.wake_threshold,
+            )
+            logger.info(f"[voice] wake engine 'openwakeword' active ({cfg.audio.wake_oww_model})")
+            return wake
         if engine == "porcupine":
-            import os
-            access_key = os.environ.get("PORCUPINE_ACCESS_KEY", "")
+            access_key = _picovoice_access_key()
             if not access_key or not cfg.audio.wake_keyword_path:
-                logger.warning("[voice] porcupine needs PORCUPINE_ACCESS_KEY + audio.wake_keyword_path; wake disabled")
+                logger.warning("[voice] porcupine needs PICOVOICE_ACCESS_KEY + audio.wake_keyword_path; wake disabled")
                 return None
             from core.constants import PROJECT_ROOT
             from tpa.wake_word.porcupine import PorcupineWakeWord
@@ -303,7 +321,84 @@ def _build_wake_word(cfg: AppConfig):
         return None
 
 
-def _build_voice_session(cfg: AppConfig, *, audio, capture_gate, supervisor, event_bus):
+def _picovoice_access_key() -> str:
+    """One key covers every Picovoice SDK (Porcupine, Eagle, ...). Prefer the
+    generic name; fall back to the wake-word-specific one some installs set."""
+    import os
+    return os.environ.get("PICOVOICE_ACCESS_KEY") or os.environ.get("PORCUPINE_ACCESS_KEY", "")
+
+
+def _build_speaker_id(cfg: AppConfig):
+    """Multi-speaker recognizer, backend selected by audio.speaker_id.backend;
+    None (feature off) on any failure.
+
+    'resemblyzer' (default) is local/no-key — see
+    docs/voice/open-source-wake-speaker-design.md. 'eagle' is Picovoice,
+    kept available, needs PICOVOICE_ACCESS_KEY, not installed/used by
+    default. Zero enrolled profiles is not a failure — the recognizer
+    still builds and simply scores no one until someone is enrolled via
+    /api/speakers.
+    """
+    scfg = cfg.audio.speaker_id
+    if not scfg.enabled:
+        return None
+    backend = (scfg.backend or "resemblyzer").lower()
+    try:
+        from core.constants import PROJECT_ROOT
+        profiles_dir = PROJECT_ROOT / scfg.profiles_dir
+        if backend == "resemblyzer":
+            from tpa.speaker.resemblyzer_speaker_recognizer import ResemblyzerSpeakerRecognizer
+            recognizer = ResemblyzerSpeakerRecognizer(
+                profiles_dir=profiles_dir, score_window_sec=scfg.score_window_sec,
+            )
+        elif backend == "eagle":
+            access_key = _picovoice_access_key()
+            if not access_key:
+                logger.warning("[voice] speaker ID backend 'eagle' needs PICOVOICE_ACCESS_KEY; disabled")
+                return None
+            from tpa.speaker.eagle_speaker_recognizer import EagleSpeakerRecognizer
+            recognizer = EagleSpeakerRecognizer(access_key=access_key, profiles_dir=profiles_dir)
+        else:
+            logger.warning(f"[voice] unknown speaker_id backend '{backend}'; disabled")
+            return None
+        logger.info(f"[voice] speaker ID active, backend={backend} ({len(recognizer.speaker_names)} enrolled)")
+        return recognizer
+    except Exception as e:
+        logger.warning(f"[voice] speaker ID unavailable ({e}); disabled")
+        return None
+
+
+def _build_speaker_enrollment_service(cfg: AppConfig, audio_capture):
+    """Enrollment-side counterpart to _build_speaker_id. None if speaker ID
+    is disabled, misconfigured, or the mic adapter failed to build."""
+    scfg = cfg.audio.speaker_id
+    if not scfg.enabled or audio_capture is None:
+        return None
+    backend = (scfg.backend or "resemblyzer").lower()
+    try:
+        from core.constants import PROJECT_ROOT
+        from service.speakers.speaker_enrollment_service import SpeakerEnrollmentService
+        profiles_dir = PROJECT_ROOT / scfg.profiles_dir
+        if backend == "resemblyzer":
+            from tpa.speaker.resemblyzer_speaker_enroller import ResemblyzerSpeakerEnroller
+            enroller = ResemblyzerSpeakerEnroller(
+                profiles_dir=profiles_dir, min_enroll_seconds=scfg.min_enroll_seconds,
+            )
+        elif backend == "eagle":
+            access_key = _picovoice_access_key()
+            if not access_key:
+                return None
+            from tpa.speaker.eagle_speaker_enroller import EagleSpeakerEnroller
+            enroller = EagleSpeakerEnroller(access_key=access_key, profiles_dir=profiles_dir)
+        else:
+            return None
+        return SpeakerEnrollmentService(enroller=enroller, audio=audio_capture)
+    except Exception as e:
+        logger.warning(f"[voice] speaker enrollment unavailable ({e}); disabled")
+        return None
+
+
+def _build_voice_session(cfg: AppConfig, *, audio, capture_gate, supervisor, event_bus, speaker_id=None):
     """Assemble the always-on voice loop. None if any required piece is missing."""
     if not cfg.audio.voice_enabled:
         logger.info("[voice] disabled by config")
@@ -354,6 +449,9 @@ def _build_voice_session(cfg: AppConfig, *, audio, capture_gate, supervisor, eve
         wake_word=_build_wake_word(cfg),
         wake_engine=cfg.audio.wake_engine,
         wake_window_sec=cfg.audio.wake_window_sec,
+        speaker_id=speaker_id,
+        require_known_speaker=cfg.audio.speaker_id.require_known_speaker,
+        speaker_match_threshold=cfg.audio.speaker_id.match_threshold,
         on_event=_publish,
     )
 
@@ -374,11 +472,19 @@ def _build_inference(cfg: AppConfig, governance):
     part of InferencePort — the wrappers shouldn't have to know about them.
     """
     icfg = cfg.inference
+    # Resolve relative to PROJECT_ROOT, not the process cwd — same pattern
+    # _build_stt already uses for its model path. Unexercised until now:
+    # the ollama backend never reads model_path at all, so this relative-
+    # path bug had no way to surface before llama_cpp was first used.
+    model_path = icfg.model_path
+    if model_path and not Path(model_path).is_absolute():
+        from core.constants import PROJECT_ROOT
+        model_path = str(PROJECT_ROOT / model_path)
     primary = build_inference_client(
         backend=icfg.backend,
         ollama_host=icfg.ollama_host,
         model_alias=icfg.model_alias,
-        llama_cpp_model_path=icfg.model_path,
+        llama_cpp_model_path=model_path,
         n_ctx=icfg.n_ctx,
         n_threads=icfg.n_threads,
         num_batch=icfg.num_batch,
@@ -625,11 +731,19 @@ def bootstrap(app: FastAPI) -> None:
     app.state.mute_switch = mute_switch
     app.state.capture_gate = capture_gate
 
+    # Multi-speaker recognition (REQ-M-04 extension: "don't react to stray
+    # talk" sharpened to "don't react to an unenrolled voice"). Built once
+    # here so the live recognizer instance is reachable both from the voice
+    # loop and from the enrollment route's reload_profiles() call.
+    speaker_recognizer = _build_speaker_id(cfg)
+    app.state.speaker_recognizer = speaker_recognizer
+    app.state.speaker_enrollment_service = _build_speaker_enrollment_service(cfg, audio_capture)
+
     # Always-on voice loop. Gated by CaptureGate, so building it does not
     # mean the mic is open — it opens only when the gate says unmuted.
     app.state.voice_session = _build_voice_session(
         cfg, audio=audio_capture, capture_gate=capture_gate,
-        supervisor=supervisor, event_bus=event_bus,
+        supervisor=supervisor, event_bus=event_bus, speaker_id=speaker_recognizer,
     )
 
     logger.info(f"Bootstrap: {agent_registry.count} agents, {len(skill_registry.list_all())} skills registered")
@@ -716,6 +830,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"CaptureGate failed to stop cleanly: {e}")
 
+    recognizer = getattr(app.state, "speaker_recognizer", None)
+    if recognizer is not None:
+        try:
+            recognizer.stop()
+        except Exception:
+            pass
+
     from core.constants import TEMP_DIR
     if TEMP_DIR.exists():
         for f in TEMP_DIR.iterdir():
@@ -729,7 +850,7 @@ logger.info(f"{PROJECT_NAME} v{VERSION} application initialized")
 
 for _mod in (
     admin, ambient, approval, chat, config_route, governance_route,
-    health, knowledge, lookup, memory_route, persona, privacy, stream, system, tasks_route, voice,
+    health, knowledge, lookup, memory_route, persona, privacy, speakers, stream, system, tasks_route, voice,
 ):
     app.include_router(_mod.router, prefix="/api")
 

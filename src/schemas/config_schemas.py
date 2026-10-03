@@ -135,14 +135,50 @@ class VadConfig(BaseModel):
     pre_roll_frames: int = 5
 
 
+class SpeakerIdConfig(BaseModel):
+    """audio.speaker_id: sub-section — multi-speaker voice recognition.
+
+    backend=resemblyzer (default): local PyTorch embedding model, no API
+    key — see docs/voice/open-source-wake-speaker-design.md.
+    backend=eagle: Picovoice Eagle, needs PICOVOICE_ACCESS_KEY; kept
+    available, not installed/used by default.
+    """
+
+    enabled: bool = False
+    backend: str = "resemblyzer"  # resemblyzer | eagle
+    profiles_dir: str = "data/speaker_profiles"
+    # Minimum similarity score to count an utterance as a known speaker.
+    # Scale depends on backend — Eagle's own score and Resemblyzer's
+    # cosine similarity are NOT the same scale; re-tune when switching.
+    match_threshold: float = 0.6
+    # When true, utterances from an unrecognized voice are dropped before
+    # reaching the agent — the stray-talk filter half of this feature.
+    # False by default: speaker ID only tags/personalizes, never blocks,
+    # until profiles have actually been enrolled.
+    require_known_speaker: bool = False
+    # resemblyzer only: seconds of audio required before enroll_finish()
+    # will accept a profile.
+    min_enroll_seconds: float = 12.0
+    # resemblyzer only: seconds of buffered audio per recognition window
+    # (Resemblyzer has no per-frame API — see ResemblyzerSpeakerRecognizer).
+    score_window_sec: float = 2.0
+
+
 class AudioConfig(BaseModel):
     """audio: section — wake-word / STT / TTS / device selection."""
 
     wake_word_enabled: bool = True
-    wake_engine: str = "hotkey"  # none | hotkey | porcupine
+    wake_engine: str = "openwakeword"  # none | hotkey | openwakeword | porcupine
     wake_hotkey: str = "<f9>"  # separate from the mute hotkey below
     wake_window_sec: float = 8.0
     wake_keyword_path: str | None = None  # .ppn file, porcupine only
+    # openwakeword only. "Hey Veda" is a custom-trained model (see
+    # docs/voice/open-source-wake-speaker-design.md §4.8) — not one of
+    # openwakeword's bundled pretrained words — so wake_oww_model_path is
+    # required in practice; there's no bundled fallback for this phrase.
+    wake_oww_model: str = "hey_veda"
+    wake_oww_model_path: str = "data/models/openwakeword/hey_veda.onnx"
+    wake_threshold: float = 0.5
     daemon_trigger: str = "auto"  # "auto" | "wake_word" | "hotkey"
     hotkey: str = "<f8>"
 
@@ -174,6 +210,7 @@ class AudioConfig(BaseModel):
     echo_guard: bool = True
 
     vad: VadConfig = VadConfig()
+    speaker_id: SpeakerIdConfig = SpeakerIdConfig()
 
 
 class SensingConfig(BaseModel):

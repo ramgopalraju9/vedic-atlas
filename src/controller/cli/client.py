@@ -71,13 +71,23 @@ class VedaClient:
                 f"Start it with `veda server` or drop --no-spawn."
             )
         repo_root = Path(__file__).resolve().parents[3]
+        src_dir = repo_root / "src"
         env = os.environ.copy()
-        env["PYTHONPATH"] = str(repo_root / "src") + os.pathsep + env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = str(src_dir) + os.pathsep + env.get("PYTHONPATH", "")
         host = "127.0.0.1"
         port = "8000"
+        log_path = repo_root / "data" / "veda-server.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_file = open(log_path, "wb")
         kwargs: dict[str, Any] = {
-            "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "stdin": subprocess.DEVNULL,
-            "env": env, "cwd": str(repo_root),
+            "stdout": log_file, "stderr": log_file, "stdin": subprocess.DEVNULL,
+            # cwd must be src/, not repo_root: the repo also has a root-level
+            # server.py (the `veda server` launcher script, no `app` attribute).
+            # With cwd=repo_root, python -m uvicorn puts repo_root on
+            # sys.path[0] ahead of the PYTHONPATH entry above, so "server:app"
+            # resolves to the wrong file ("Attribute 'app' not found in module
+            # 'server'"). cwd=src_dir makes "server" unambiguous.
+            "env": env, "cwd": str(src_dir),
         }
         if sys.platform == "win32":
             # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP — hide the console
@@ -86,17 +96,23 @@ class VedaClient:
         else:
             kwargs["start_new_session"] = True
         logger.info(f"Veda server not reachable; spawning at {self.server_url}")
-        subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "server:app", "--host", host, "--port", port],
-            **kwargs,
-        )
+        try:
+            subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "server:app", "--host", host, "--port", port],
+                **kwargs,
+            )
+        finally:
+            log_file.close()
 
         deadline = time.monotonic() + wait_secs
         while time.monotonic() < deadline:
             if self.is_up():
                 return
             time.sleep(0.5)
-        raise CliError(f"Spawned Veda server but it didn't come up within {wait_secs}s. Check logs.")
+        raise CliError(
+            f"Spawned Veda server but it didn't come up within {wait_secs}s. "
+            f"Check the log at {log_path}."
+        )
 
     # ---------- chat / stream ----------
 
