@@ -1,11 +1,11 @@
 # ollama create qwen3-4b -f data/models/Modelfile.qwen3-4b
-backend: ollama
+backend: llama_cpp
 ollama_host: http://127.0.0.1:11434
 
 model_alias: qwen3-4b
 
 # llama_cpp backend only (unused while backend=ollama)
-model_path: data/Qwen3-4B-Q4_K_M.gguf
+model_path: data/qwen3-5-2B-Q4_K_M.gguf
 
 n_ctx: 4096
 n_threads: null

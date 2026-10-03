@@ -1,3 +1,17 @@
 .env
 __pycache__/
 *.pyc
+data/
+docs/
+src/vedic_atlas.egg-info/SOURCES.txt
+src/vedic_atlas.egg-info/top_level.txt
+src/vedic_atlas.egg-info/requires.txt
+src/vedic_atlas.egg-info/PKG-INFO
+src/vedic_atlas.egg-info/dependency_links.txt
+src/veda.egg-info/top_level.txt
+src/veda.egg-info/SOURCES.txt
+src/veda.egg-info/requires.txt
+src/veda.egg-info/PKG-INFO
+src/veda.egg-info/entry_points.txt
+src/veda.egg-info/dependency_links.txt
+src/download_model.py

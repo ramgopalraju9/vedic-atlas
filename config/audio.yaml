@@ -1,7 +1,7 @@
 wake_word_enabled: true
 # Wake trigger: none (transcribe while unmuted) | hotkey (press a key to arm a
 # listening window) | porcupine (spoken wake word; needs PORCUPINE_ACCESS_KEY + .ppn).
-wake_engine: hotkey
+wake_engine: none
 wake_hotkey: <f9>
 wake_window_sec: 8.0
 wake_keyword_path: null
