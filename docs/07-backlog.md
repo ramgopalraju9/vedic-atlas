@@ -163,3 +163,15 @@ list whenever the user wants it tackled.
 - **Search quality** is Tavily's: snippets only, no page reading. An "open this link" tool would need its own allow-list and limits.
 - **`tests/test_vector_store.py`** has a syntax error on line 7 (`import import`) and cannot be collected.
 - **Old conversation history** may still contain wrong earlier replies; only "Task added"-style claims are filtered from the chat prompt.
+
+## Voice — wake word model quality (measured 2026-10-03)
+
+`config/audio.yaml` now uses `wake_engine: openwakeword` with the custom-trained `hey_veda.onnx`. Scored against
+synthetic SAPI speech (two Windows voices) it is **not reliable**: "Hey Veda" triggered on one voice (0.77) and not the
+other (0.001); "Hello there" falsely triggered (0.85) and "subscribe to our channel" falsely triggered (0.62); silence and
+white noise were fine (0.001). No threshold separates the hits from the false triggers on that data. Synthetic voices differ
+from the model's training voices, so this is not conclusive for a real voice, but it needs verifying:
+
+- Run `python scripts/wake_test.py` (stop the server first) and say "Hey Veda", ordinary sentences, then stay quiet; pick `wake_threshold` from what you see.
+- If it still misses or false-triggers, retrain with real recordings of the user's voice and many hard negatives (common phrases, TV/YouTube speech). The training run in `wakeword_training/` ended with an `onnx_tf` import error after exporting the ONNX; the ONNX itself is what is used.
+- "Hey Veda what is the weather" (no pause after the wake phrase) scored ~0.002 — the model seems to need the phrase to stand alone.

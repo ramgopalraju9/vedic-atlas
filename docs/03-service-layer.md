@@ -432,8 +432,18 @@ history first, then the tool result. Uses the exact tokenizer when the backend o
   only check for the trigger; otherwise feed the frame to the
   `UtteranceCollector`.
 
-  On a completed utterance: transcribe, drop if below `min_chars`,
-  re-check mute (it may have changed mid-transcription), apply a
+  On a completed utterance the turn runs as a **cancellable task** (`_run_turn`) that is
+  watched against the mute switch every 100 ms. Muting means *stop*: the in-flight turn is
+  cancelled, a streaming model is told to stop generating (`cancel_event`), playback is cut
+  off (`SpeakerPlayback.interrupt()`: `sd.stop()` + the queue is dropped), the collector and
+  wake window are reset and a `turn_cancelled` event is emitted. Nothing heard before the
+  mute is answered after it.
+
+  Inside the turn: transcribe, drop if below `min_chars`, re-check mute, **drop probable
+  speech-to-text artefacts** (`domain/policies/transcript_policy.artifact_reason`: stock
+  Whisper hallucinations such as "subscribe to our channel", one word repeated, phrase
+  loops, sound tags, symbols only, and filler heard from a very short clip; genuine speech
+  such as "thank you" or "no no no" is never dropped), apply a
   word-overlap self-echo guard (layer 2 — catches the case where the
   assistant heard its own reply), then either stream-and-speak
   sentence-by-sentence (lower time-to-first-audio) or do a single blocking
@@ -442,6 +452,11 @@ history first, then the tool result. Uses the exact tokenizer when the backend o
   Playback discipline matters for ordering: settle delay happens *before*
   the audio buffer is drained, specifically so the tail of the assistant's
   own voice doesn't land in the buffer after the drain.
+
+  **Wake word fails closed.** `server._build_voice_session` refuses to start the voice loop if
+  a wake engine is configured but could not be built (missing model, import error) — it never
+  falls back to listening continuously. Always-on listening is an explicit opt-in
+  (`audio.wake_engine: none`).
 
   `status()` exposes a dict snapshot (`running`, `muted`, `speaking`,
   `listening`, `turns`, `last_transcript`, `last_reply`, `armed`, ...) —
