@@ -29,8 +29,6 @@ buys nothing.
 from __future__ import annotations
 
 import asyncio
-import json
-import re
 from typing import AsyncIterator
 
 from domain.entities.agent_context import AgentContext
@@ -49,17 +47,6 @@ from service.sensing.event_bus import EventBus
 from service.sensing.rate_limiter import Debouncer, RateLimiter
 from core.logging_config import logger
 
-_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
-_ROUTER_SYSTEM_TEMPLATE = """You are a router for a personal assistant named Veda.
-You never answer the user directly. Your only job is to pick the best specialist.
-
-Available agents:
-{agents}
-
-Respond with EXACTLY one line of JSON, no markdown, no explanation:
-{{"agent": "<agent_name>", "reason": "<one short sentence>"}}
-
-If no specialist clearly fits, pick "{default}"."""
 
 
 class SupervisorAgent(BaseAgent):
@@ -80,6 +67,7 @@ class SupervisorAgent(BaseAgent):
         router: RouterPolicy | None = None,
         conversation=None,
         routing_num_predict: int = 64,
+        llm_router=None,
     ):
         super().__init__(name="supervisor", description="Routes user requests to the correct specialist agent.", model=model)
         self.agent_registry = agent_registry
@@ -90,6 +78,7 @@ class SupervisorAgent(BaseAgent):
         self.router = router or RouterPolicy()
         self.conversation = conversation  # ConversationManager, optional — used only to mirror ambient summaries into history
         self.routing_num_predict = routing_num_predict
+        self.llm_router = llm_router  # LlmRouter | None — decides messages the rules did not recognise
         self._rate_limit_max = rate_limit_max
         self._rate_limit_window_sec = rate_limit_window_sec
         self.proactivity = proactivity if proactivity in {"conservative", "medium", "chatty"} else "medium"
@@ -111,15 +100,14 @@ class SupervisorAgent(BaseAgent):
 
     # -- Routing ---------------------------------------------------------
 
-    def _router_system_prompt(self) -> str:
-        lines = [f"- {a.name}: {a.description}" for a in self.agent_registry.list_routable(exclude={self.name})]
-        return _ROUTER_SYSTEM_TEMPLATE.format(agents="\n".join(lines), default=self.default_agent)
-
     async def _pick(self, ctx: AgentContext) -> BaseAgent:
+        """Deterministic rules first (instant), then an LLM router for what they did not recognise."""
         routable = self.agent_registry.list_routable(exclude={self.name})
         if not routable:
+            ctx.metadata["routed_via"] = "default"
             return self.agent_registry.get(self.default_agent)
         if len(routable) == 1:
+            ctx.metadata["routed_via"] = "only-agent"
             return routable[0]
 
         profiles = tuple(
@@ -129,55 +117,20 @@ class SupervisorAgent(BaseAgent):
             )
             for a in routable
         )
-        chosen = self.router.pick(ctx.user_message, profiles, self.default_agent)
+        chosen = self.router.match(ctx.user_message, profiles)
         if chosen and self.agent_registry.is_registered(chosen):
-            logger.info(f"Supervisor keyword-routed to '{chosen}'")
+            logger.info(f"Supervisor rule-routed to '{chosen}'")
+            ctx.metadata["routed_via"] = "rules"
             return self.agent_registry.get(chosen)
 
-        # Fallback: LLM router (mirrors the donor's default path, now the fallback)
-        system_prompt = self._router_system_prompt()
-        try:
-            raw = await self.client.complete(
-                prompt=ctx.user_message,
-                system=system_prompt,
-                model=self.model,
-                num_predict=self.routing_num_predict,
-            )
-            parsed = self._parse_agent_choice(raw)
-            if parsed and self.agent_registry.is_registered(parsed):
-                logger.info(f"Supervisor LLM-routed to '{parsed}' (raw={raw[:120]})")
-                return self.agent_registry.get(parsed)
-            logger.warning(f"Supervisor LLM routing failed or unknown agent (chosen={parsed!r}); falling back")
-        except Exception as e:
-            logger.error(f"Supervisor LLM routing call failed: {e}; falling back")
+        if self.llm_router is not None:
+            decision = await self.llm_router.route(ctx.user_message, [(a.name, a.description) for a in routable])
+            if decision is not None and self.agent_registry.is_registered(decision.agent):
+                ctx.metadata["routed_via"] = f"llm ({decision.ms} ms)"
+                return self.agent_registry.get(decision.agent)
 
-        if self.memory is not None:
-            try:
-                last = self.memory.last_action(agent_name="supervisor")
-                target = (last.context or {}).get("target") if last else None
-                if target and target != self.default_agent and self.agent_registry.is_registered(target):
-                    logger.info(f"Supervisor memory-routed to '{target}' (LLM failed, last specialist)")
-                    return self.agent_registry.get(target)
-            except Exception as e:
-                logger.warning(f"Supervisor memory lookup failed: {e}")
-
+        ctx.metadata["routed_via"] = "default"
         return self.agent_registry.get(self.default_agent)
-
-    @staticmethod
-    def _parse_agent_choice(raw: str) -> str | None:
-        if not raw:
-            return None
-        text = _JSON_FENCE_RE.sub("", raw).strip()
-        start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            return None
-        try:
-            data = json.loads(text[start : end + 1])
-        except json.JSONDecodeError:
-            return None
-        agent = data.get("agent")
-        return agent.strip() if isinstance(agent, str) else None
 
     # -- Execute ---------------------------------------------------------
 

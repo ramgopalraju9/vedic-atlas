@@ -12,6 +12,10 @@ n_threads: null
 # Prompt-eval batch size (Ollama default 512). Prompt eval dominates CPU
 # latency; raising this can improve throughput. Measure before/after.
 num_batch: 512
+# llama_cpp only: RAM for a cache of evaluated prompt prefixes shared by chat / routing / tool-call prompts.
+# Without it every call re-reads its whole prompt (measured: chat 14 s -> 2.4 s, routing 5.5 s -> 2.4 s,
+# tool decision 10 s -> 4.2 s once warm). ~70 MB per cached prefix; set 0 on a small device.
+prompt_cache_mb: 768
 timeout: 300
 
 # Replies are usually short (15-30 tokens); a lower cap bounds tail latency.

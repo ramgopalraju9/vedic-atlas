@@ -44,6 +44,7 @@ class LlamaCppClient:
         timeout: float = 120.0,
         num_predict: int = 512,
         think: bool = False,
+        prompt_cache_mb: int = 0,
     ):
         path = Path(model_path)
         if not path.exists():
@@ -54,6 +55,11 @@ class LlamaCppClient:
         import llama_cpp  # imported lazily so this module can be inspected without the dependency installed
 
         self._llama = llama_cpp.Llama(model_path=str(path), n_ctx=n_ctx, n_threads=n_threads, verbose=False)
+        if prompt_cache_mb > 0:
+            # The context only reuses its KV cache when consecutive prompts share a start. Veda alternates between
+            # chat, routing and tool-call prompts, each with a long fixed prefix, so every call re-read its whole
+            # prompt. A RAM cache of evaluated prefixes lets each prompt type reuse its own prefix.
+            self._llama.set_cache(llama_cpp.LlamaRAMCache(capacity_bytes=prompt_cache_mb * 1024 * 1024))
         self._timeout = timeout
         self._num_predict = num_predict
         self._think = think

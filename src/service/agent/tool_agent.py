@@ -95,7 +95,8 @@ class ToolAgent(BaseAgent):
                      "result": (c.observation or "")[:300], "error": c.error}
                     for c in outcome.calls
                 ],
-                prompt_tokens=outcome.prompt_tokens, timings_ms=outcome.timings_ms, notes=outcome.notes,
+                prompt_tokens=outcome.prompt_tokens, timings_ms=outcome.timings_ms,
+                notes=[f"routed via {ctx.metadata.get('routed_via', '?')}", *outcome.notes],
             ))
         except Exception as e:  # tracing must never break a turn
             logger.warning(f"[{self.name}] trace record failed: {e}")

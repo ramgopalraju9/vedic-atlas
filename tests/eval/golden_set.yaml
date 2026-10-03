@@ -17,7 +17,7 @@
 - {say: "what do I need to do today?", agent: tasks, tool: tasks, args: {action: list}}
 - {say: "show my to-do list", agent: tasks, tool: tasks, args: {action: list}}
 - {say: "what tasks have I completed?", agent: tasks, tool: tasks, args: {action: list, include_done: true}}
-- {say: "forget the bank thing", agent: responder, tool: null}
+- {say: "forget the bank thing", agent: tasks, tool: tasks, args: {action: delete, title: bank}, llm: true}
 - {say: "delete the task about the dentist", agent: tasks, tool: tasks, args: {action: delete, title: dentist}}
 
 # ---- weather ------------------------------------------------------------------
@@ -56,10 +56,10 @@
 - {say: "explain recursion in one sentence", agent: responder, tool: null}
 - {say: "write me a two line poem about the sea", agent: responder, tool: null}
 - {say: "I'm feeling a bit tired today", agent: responder, tool: null}
-- {say: "can you speak more slowly", agent: responder, tool: null}
+- {say: "can you speak more slowly", agent: responder, tool: null, llm: true}
 
 # ---- time-sensitive questions that must search (regression: "upcoming Tollywood movies" went to chat) ----
-- {say: "can you tell what are the upcoming movies releasing in the year 2026 october from tollywood?", agent: lookup, tool: web_search, args: {query: tollywood}}
+- {say: "can you tell what are the upcoming movies releasing in the year 2026 october from tollywood?", agent: lookup, tool: web_search, args: {query: movies}}
 - {say: "any new telugu movies releasing this friday", agent: lookup, tool: web_search, args: {query: telugu}}
 - {say: "what's playing in theatres this week", agent: lookup, tool: web_search}
 - {say: "when does the next IPL match start", agent: lookup, tool: web_search, args: {query: IPL}}
@@ -70,3 +70,22 @@
 - {say: "I'm so tired this week", agent: responder, tool: null}
 - {say: "tell me a story about a dragon", agent: responder, tool: null}
 - {say: "what is the best way to learn guitar", agent: responder, tool: null}
+
+# ---- phrasings with NO trigger words: only the LLM router can send these to the right agent (llm: true) ----
+# `agent` is the expected final route. CI checks that the rules really do not match them; the model eval measures the LLM.
+- {say: "do I need an umbrella in Pune tomorrow", agent: lookup, tool: get_weather, args: {place: Pune}, llm: true}
+- {say: "is it chilly in Shimla right now", agent: lookup, tool: get_weather, args: {place: Shimla}, llm: true}
+- {say: "which team is top of the IPL table", agent: lookup, tool: web_search, args: {query: IPL}, llm: true}
+- {say: "is bitcoin going up today", agent: lookup, tool: web_search, args: {query: bitcoin}, llm: true}
+- {say: "when is Diwali this year", agent: lookup, tool: web_search, args: {query: Diwali}, llm: true}
+- {say: "add dentist on friday", agent: tasks, tool: tasks, args: {action: add, title: dentist}, llm: true}
+- {say: "make a note to buy gifts", agent: tasks, tool: tasks, args: {action: add, title: gifts}, llm: true}
+- {say: "cross off the gym thing", agent: tasks, tool: tasks, args: {action: complete, title: gym}, llm: true}
+- {say: "what's eating my CPU", agent: system, tool: null, llm: true}
+# chat decoys: must NOT be hijacked into a tool agent
+- {say: "tell me about the history of Rome", agent: responder, tool: null, llm: true}
+- {say: "who wrote Hamlet", agent: responder, tool: null, llm: true}
+- {say: "I feel like going for a walk", agent: responder, tool: null, llm: true}
+- {say: "how do I make pasta", agent: responder, tool: null, llm: true}
+- {say: "can you help me write an email to my boss", agent: responder, tool: null, llm: true}
+- {say: "what is two plus two", agent: responder, tool: null, llm: true}

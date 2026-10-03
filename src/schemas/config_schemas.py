@@ -71,6 +71,9 @@ class InferenceConfig(BaseModel):
     n_ctx: int = 4096
     n_threads: int | None = None
     num_batch: int | None = None  # Ollama prompt-eval batch size (default 512)
+    # llama_cpp only: RAM (MB) for a cache of evaluated prompt prefixes, shared across chat / routing / tool-call
+    # prompts. 0 = off. Each cached prefix of ~500 tokens costs roughly 70 MB.
+    prompt_cache_mb: int = 0
     timeout: int = 120
 
     # Generation budget. `num_predict` is the strongest latency control on
@@ -317,7 +320,10 @@ class AgentsConfig(BaseModel):
         description="Device actions: open/close apps, volume, running processes",
         skills=["terminal", "file_ops"],
     )
+    tasks: AgentEntry = AgentEntry(description="The user's to-do list: add, list, complete, delete tasks")
+    lookup: AgentEntry = AgentEntry(description="Live data from the web: weather, currency rates, news, current facts")
     tools_enabled: bool = False  # when true, tool-owning specialist agents (from config/tools) are registered
+    llm_routing: bool = False  # when true, messages the routing rules don't recognise are routed by a small LLM call
 
 
 class SkillEntry(BaseModel):

@@ -32,6 +32,7 @@ def build_inference_client(
     keep_alive: str = "30m",
     think: bool = False,
     timeout: float = 120.0,
+    prompt_cache_mb: int = 0,
 ) -> InferencePort:
     backend = backend.lower().strip()
 
@@ -69,6 +70,7 @@ def build_inference_client(
             timeout=timeout,
             num_predict=num_predict,
             think=think,
+            prompt_cache_mb=prompt_cache_mb,
         )
 
     raise UnsupportedBackendError(f"unknown backend '{backend}' — expected 'ollama' or 'llama_cpp'")

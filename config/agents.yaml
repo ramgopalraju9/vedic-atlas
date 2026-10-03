@@ -3,6 +3,11 @@
 # call -> guarded execution -> reply. Routing, prompts and guard rules come from the manifests.
 tools_enabled: true
 
+# Routing: manifest triggers and keyword overlap decide first (instant). With llm_routing on, a message
+# they don't recognise is routed by one tiny constrained model call (adds ~1-3 s to those turns)
+# instead of defaulting to plain chat. Set false to route by rules only.
+llm_routing: true
+
 supervisor:
   enabled: true
   model: null
@@ -12,6 +17,14 @@ responder:
   enabled: true
   model: null
   description: General conversation, Q&A, brainstorming
+
+tasks:
+  enabled: true
+  description: "The user's to-do list: add, list, complete, delete tasks"
+
+lookup:
+  enabled: true
+  description: "Live data from the web: weather, currency rates, news, current facts"
 
 system:
   enabled: true
