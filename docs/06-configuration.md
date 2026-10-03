@@ -54,7 +54,7 @@ both also required at runtime). See the setup notes in
 | `guardrails.validators` | `block_pii_in_output=True`, `block_credentials_in_output=True`, `max_input_length=10000`, `max_output_length=50000` |
 | `guardrails.rate_limiting` | `enabled=True`, `global_rpm=30`, `per_skill_rpm=10` |
 | `guardrails.audit` | `enabled=True`, `log_dir="data/audit"`, `log_inputs=True`, `log_outputs=True`, `retention_days=30` |
-| `agents: AgentsConfig` | `supervisor/responder/system: AgentEntry` (each `enabled=True`, `model=None` → inherits `inference.model_alias`, `description=""`, `skills=[]`; `system` defaults `skills=["terminal","file_ops"]`), `tools_enabled=False` (True registers a specialist `ToolAgent` per owner named in `config/tools/*.yaml`; see docs/08-tool-harness.md) |
+| `agents: AgentsConfig` | `supervisor/responder/system: AgentEntry` (each `enabled=True`, `model=None` → inherits `inference.model_alias`, `description=""`, `skills=[]`; `system` defaults `skills=["terminal","file_ops"]`), `tasks` / `lookup: AgentEntry` (short descriptions used by the routing prompt), `tools_enabled=False` (True registers a specialist `ToolAgent` per owner named in `config/tools/*.yaml`; see docs/08-tool-harness.md), `llm_routing=False` (**config/agents.yaml sets True**: messages the rules don't recognise are routed by one small constrained model call instead of defaulting to chat) |
 | `skills: SkillsConfig` | `terminal` (`permission_level="approve"`, extra: `working_directory`, `timeout`, `blocked_commands`, `blocked_patterns`), `file_ops` (`permission_level="notify"`, extra: `allowed_paths`, `blocked_paths`), `tasks` (`permission_level="notify"`), `custom_skills_dir="data/custom_skills"` |
 
 The repo's actual `config/*.yaml` files override a handful of these
@@ -132,3 +132,5 @@ Besides `ExceptionCode`/`ErrorMessage` (covered in
   `service/skills/skill_runner.py` and `service/hooks/`.
 
 All enums in this file override `__repr__`/`__str__` to return `.value`.
+
+`inference.prompt_cache_mb` (llama_cpp only, schema default `0`, **config/inference.yaml sets `768`**): RAM for a cache of evaluated prompt prefixes shared across chat, routing and tool-call prompts. Without it every call re-reads its whole prompt because the prompts alternate; measured warm: chat 14 s -> 2.4 s, routing 5.5 s -> 2.4 s, tool decision 10 s -> 4.2 s. About 70 MB per cached ~500-token prefix; use `0` on a small device.
