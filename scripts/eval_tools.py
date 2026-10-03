@@ -28,7 +28,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from core.config import load_full_config  # noqa: E402
 from domain.entities.agent_profile import AgentProfile  # noqa: E402
-from domain.policies.routing_policy import pick_agent  # noqa: E402
+from domain.policies.routing_policy import match_agent  # noqa: E402
+from service.agent.llm_router import LlmRouter  # noqa: E402
 from service.agent.tool_turn_runner import ToolTurnRunner  # noqa: E402
 from service.agent.tool_use_guard import ToolUseGuard  # noqa: E402
 from service.prompting.prompt_composer import PromptComposer  # noqa: E402
@@ -89,6 +90,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", action="store_true", help="also run the model's decide stage")
     ap.add_argument("--min-accuracy", type=float, default=0.85)
+    ap.add_argument("--routing-only", action="store_true", help="with --model: only evaluate routing, skip the decide stage")
     ap.add_argument("--golden", default=str(ROOT / "tests" / "eval" / "golden_set.yaml"))
     args = ap.parse_args()
 
@@ -96,26 +98,73 @@ def main() -> int:
     manifests = YamlToolManifestStore().load_all()
     profiles = _profiles(manifests)
     for item in items:
-        item["_routed"] = pick_agent(item["say"], profiles, "responder")
+        item["_rule"] = match_agent(item["say"], profiles)          # None = the rules did not recognise it
+        item["_routed"] = item["_rule"] or "responder"               # rules-only: unmatched falls to chat
 
     route_ok = [i["_routed"] == i["agent"] for i in items]
-    print(f"routing: {sum(route_ok)}/{len(items)} correct")
-    for item, ok in zip(items, route_ok):
-        if not ok:
-            print(f"  MISROUTED {item['say']!r}: got {item['_routed']}, expected {item['agent']}")
-    accuracy = sum(route_ok) / len(items)
+    rule_items = [i for i in items if not i.get("llm")]
+    print(f"rules only: {sum(i['_routed'] == i['agent'] for i in rule_items)}/{len(rule_items)} of the trigger-word cases; "
+          f"{sum(route_ok)}/{len(items)} overall (the {len(items) - len(rule_items)} no-trigger cases need the LLM router)")
+    accuracy = sum(i["_routed"] == i["agent"] for i in rule_items) / max(1, len(rule_items))
 
     if args.model:
         from tpa.inference.llama_cpp_client import LlamaCppClient
 
         cfg = load_full_config()
         model_path = Path(cfg.inference.model_path)
-        client = LlamaCppClient(model_path if model_path.is_absolute() else ROOT / model_path, n_ctx=cfg.inference.n_ctx)
+        client = LlamaCppClient(
+            model_path if model_path.is_absolute() else ROOT / model_path,
+            n_ctx=cfg.inference.n_ctx, prompt_cache_mb=cfg.inference.prompt_cache_mb,
+        )
         mmap = {m.name: m for m in manifests}
         composer = PromptComposer(FilePromptStore(), manifests, count_tokens=client.count_tokens)
         runner = ToolTurnRunner(
             client=client, composer=composer, skill_runner=None, manifests=mmap, guard=ToolUseGuard(manifests),
         )
+        # ---- LLM routing of everything the rules did not recognise ----
+        agents = [
+            (name, getattr(cfg.agents, name).description)
+            for name in ("responder", "system", *sorted({m.agent for m in manifests}))
+        ]
+        router = LlmRouter(client, composer, num_predict=24)
+
+        async def _route_all():
+            out = []
+            for item in items:
+                if item["_rule"] is not None:
+                    out.append(None)
+                    continue
+                d = await router.route(item["say"], agents)
+                out.append(d)
+            return out
+
+        decisions = asyncio.run(_route_all())
+        llm_n = llm_ok = tool_hijacks = 0
+        lat = []
+        for item, d in zip(items, decisions):
+            if d is None and item["_rule"] is not None:
+                continue
+            llm_n += 1
+            routed = d.agent if d is not None else "responder"
+            if d is not None:
+                lat.append(d.ms)
+            item["_routed"] = routed
+            if routed == item["agent"]:
+                llm_ok += 1
+            else:
+                print(f"  LLM MISROUTE {item['say']!r}: got {routed}, expected {item['agent']}")
+                if item["agent"] == "responder" and routed in ("tasks", "lookup"):
+                    tool_hijacks += 1
+        print(f"LLM router (messages the rules did not match): {llm_ok}/{llm_n} correct, "
+              f"{tool_hijacks} chat message(s) wrongly sent to a tool agent; "
+              f"latency ms median {int(statistics.median(lat))}, max {max(lat)}" if lat else "LLM router: nothing to route")
+        accuracy = sum(i["_routed"] == i["agent"] for i in items) / len(items)
+        print(f"routing with LLM router: {sum(i['_routed'] == i['agent'] for i in items)}/{len(items)}")
+
+        if args.routing_only:
+            print(f"overall accuracy: {accuracy:.0%} (gate {args.min_accuracy:.0%})")
+            return 0 if accuracy >= args.min_accuracy else 1
+
         outputs = asyncio.run(_decide_all(items, manifests, composer, runner))
 
         tool_ok, arg_ok, scored, latencies, tokens = 0, 0, 0, [], []
@@ -145,7 +194,7 @@ def main() -> int:
             f"call-stage prompt tokens: median {int(statistics.median(tokens))}, max {max(tokens)}   "
             f"decide latency ms: median {int(statistics.median(latencies))}, p95 {int(sorted(latencies)[int(len(latencies) * 0.95) - 1])}"
         )
-        accuracy = min(accuracy, arg_ok / scored)
+        accuracy = min(accuracy, arg_ok / max(1, scored))
 
     print(f"overall accuracy: {accuracy:.0%} (gate {args.min_accuracy:.0%})")
     return 0 if accuracy >= args.min_accuracy else 1

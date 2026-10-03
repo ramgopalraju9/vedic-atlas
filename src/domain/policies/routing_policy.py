@@ -64,8 +64,18 @@ def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str)
     Never returns None: a no-match resolves to `default` directly so the
     supervisor does NOT make an extra LLM routing call for an ordinary turn.
     """
+    return match_agent(message, candidates) or default
+
+
+def match_agent(message: str, candidates: tuple[AgentProfile, ...]) -> str | None:
+    """The agent the deterministic rules pick, or None when nothing matched.
+
+    Same rules as `pick_agent` (manifest triggers, then keyword overlap), but a
+    miss is reported as None instead of silently becoming the default, so the
+    caller can hand the ambiguous message to an LLM router.
+    """
     if not candidates:
-        return default
+        return None
     if len(candidates) == 1:
         return candidates[0].name
 
@@ -75,7 +85,7 @@ def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str)
 
     message_words = _keywords(message)
     if not message_words:
-        return default
+        return None
 
     best_name: str | None = None
     best_score = 0
@@ -88,4 +98,4 @@ def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str)
 
     if best_score >= _MIN_SCORE and best_name is not None:
         return best_name
-    return default  # ambiguous — go straight to the default agent, no LLM call
+    return None

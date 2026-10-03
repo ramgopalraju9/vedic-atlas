@@ -29,6 +29,7 @@ class PromptBudgets:
     call: int = 700       # Stage A: pick the tool, fill arguments
     narrate: int = 500    # Stage B: phrase the tool result
     chat: int = 1500      # plain conversation, no tools
+    route: int = 450      # LLM routing of a message the rules did not recognise
     call_history_turns: int = 2
     chat_history_turns: int = 8
     observation_max: int = 320  # a tool result is cut to this many tokens before narration

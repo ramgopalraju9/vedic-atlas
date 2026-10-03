@@ -37,6 +37,16 @@ def tool_args_schema(manifest: ToolManifest) -> dict[str, Any]:
     return schema
 
 
+def build_route_schema(agent_names: list[str]) -> dict[str, Any]:
+    """JSON-schema for the router's `{"agent": "<name>"}` answer: `agent` can only be a real agent."""
+    return {
+        "type": "object",
+        "properties": {"agent": {"enum": list(agent_names)}},
+        "required": ["agent"],
+        "additionalProperties": False,
+    }
+
+
 def build_call_schema(manifests: list[ToolManifest], *, min_calls: int = 0, max_calls: int = MAX_CALLS) -> dict[str, Any]:
     """JSON-schema for `{"calls": [...]}` over the given tools."""
     one_of = [

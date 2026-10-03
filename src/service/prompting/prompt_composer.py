@@ -132,6 +132,42 @@ class PromptComposer:
         }
         return ComposedPrompt(system=system, prompt=volatile, tokens=total, sections=sections, trimmed=trimmed)
 
+    def route_stage(
+        self, agents: Sequence[tuple[str, str]], user_message: str, history: Sequence[Turn] = ()
+    ) -> ComposedPrompt:
+        """Routing prompt: each agent with its one-line description, plus example phrases taken from
+        the tool manifests (so adding a tool teaches the router about it with no code change)."""
+        agent_lines = "\n".join(f"- {name}: {desc}" for name, desc in agents)
+        example_lines = []
+        for name, _ in agents:
+            seen = 0
+            for m in self._manifests.values():
+                if m.agent != name:
+                    continue
+                for ex in m.examples[:2]:
+                    if seen >= 4:
+                        break
+                    example_lines.append(f'"{ex.user}" -> {name}')
+                    seen += 1
+        system = (
+            self._prompts.get("router")
+            .replace("<<agents>>", agent_lines)
+            .replace("<<examples>>", "\n".join(example_lines))
+        )
+        keep = 2
+        trimmed: list[str] = []
+        while True:
+            hist = self._history_lines(history, keep)
+            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [f"MESSAGE: {self._clip(user_message, _USER_MSG_CHARS)}"])
+            total = self._count(system) + self._count(volatile)
+            if total <= self.budgets.route or keep == 0:
+                break
+            keep -= 1
+            trimmed.append("history_turn")
+        return ComposedPrompt(system=system, prompt=volatile, tokens=total,
+                              sections={"static": self._count(system), "history": self._count("\n".join(hist)) if hist else 0},
+                              trimmed=trimmed)
+
     def narrate_stage(self, user_message: str, tool_results: Sequence[str]) -> ComposedPrompt:
         system = f"{self._prompts.get('persona_lite')}\n\n{self._prompts.get('narrate')}"
         result = "\n".join(r.strip() for r in tool_results if r and r.strip())

@@ -46,6 +46,7 @@ from domain.value_objects.urgency import Urgency
 from exceptions.handlers import register_exception_handlers
 from schemas.config_schemas import AppConfig
 from service.agent.registry import AgentRegistry
+from service.agent.llm_router import LlmRouter
 from service.agent.tool_agent import ToolAgent
 from service.agent.tool_turn_runner import ToolTurnRunner
 from service.agent.tool_use_guard import ToolUseGuard
@@ -553,6 +554,7 @@ def _build_inference(cfg: AppConfig, governance):
         keep_alive=icfg.keep_alive,
         think=icfg.think,
         timeout=icfg.timeout,
+        prompt_cache_mb=icfg.prompt_cache_mb,
     )
     on_success = (lambda name: governance.record_success(name)) if governance else None
     on_failure = (lambda name: governance.record_failure(name)) if governance else None
@@ -827,7 +829,11 @@ def bootstrap(app: FastAPI) -> None:
             owned = composer.tools_of_agent(owner)
             agent_registry.register(ToolAgent(
                 name=owner,
-                description="; ".join(tool_manifests[n].description for n in owned),
+                description=(
+                    getattr(cfg.agents, owner, None).description
+                    if getattr(cfg.agents, owner, None) is not None and getattr(cfg.agents, owner).description
+                    else "; ".join(tool_manifests[n].description for n in owned)
+                ),
                 tool_names=owned,
                 triggers=[t for n in owned for t in tool_manifests[n].triggers],
                 runner=tool_runner, fallback=responder, guard=guard,
@@ -835,13 +841,19 @@ def bootstrap(app: FastAPI) -> None:
                 model=cfg.agents.responder.model, traces=trace_repo,
             ))
 
+    llm_router = None
+    if cfg.agents.llm_routing:
+        llm_router = LlmRouter(
+            client=inference_client, composer=composer, model=cfg.agents.supervisor.model,
+            num_predict=min(cfg.inference.routing_num_predict, 24), history=lambda: conversation.turns,
+        )
     supervisor = SupervisorAgent(
         agent_registry=agent_registry, client=inference_client, default_agent="responder",
         model=cfg.agents.supervisor.model, debounce_window_sec=cfg.sensing.debounce_window_sec,
         rate_limit_max=cfg.sensing.rate_limit_max, rate_limit_window_sec=cfg.sensing.rate_limit_window_sec,
         proactivity=cfg.sensing.proactivity, memory=memory_repo, governance=governance,
         conversation=conversation,
-        routing_num_predict=cfg.inference.routing_num_predict,
+        routing_num_predict=cfg.inference.routing_num_predict, llm_router=llm_router,
     )
     agent_registry.register(supervisor)
     app.state.agent_registry = agent_registry
