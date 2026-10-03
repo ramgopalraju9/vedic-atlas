@@ -9,7 +9,12 @@ start_muted: true
 mute_gpio_pin: 17
 indicator_gpio_pin: 27
 online:
+  enabled: true                    # false = fully offline, no online tools registered
+  default_place: Hyderabad          # weather with no place named
+  search_api_key_env: TAVILY_API_KEY  # name of the env var (set the key in .env)
   allowlist:
-    - api.open-meteo.com
-    - api.duckduckgo.com
-    - api.frankfurter.app
+    - api.open-meteo.com            # weather
+    - geocoding-api.open-meteo.com  # place name -> coordinates
+    - api.frankfurter.dev           # currency (ECB reference rates)
+    - open.er-api.com               # currency fallback for the ~130 currencies ECB doesn't carry
+    - api.tavily.com                # web search (needs TAVILY_API_KEY)

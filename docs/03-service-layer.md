@@ -31,6 +31,7 @@ BaseAgent (ABC)
   ├── LLMAgent                      — + InferencePort, MemoryRepositoryPort
   │     ├── ResponderAgent          — general conversation (the default agent)
   │     └── SystemAgent             — device-control planner
+  ├── ToolAgent                     — owns tools declared in manifests ("tasks", "lookup")
   └── SupervisorAgent               — routes to the above (does not extend LLMAgent)
 ```
 
@@ -85,14 +86,16 @@ performance choice so the inference backend's KV-cache prefix is reused.
 
 `build_prompt(ctx)` assembles context in least-volatile-first order (for
 the same cache-friendliness reason): semantic-knowledge block → system
-context → cross-agent memory → recent conversation history → time-of-day
+context → recent conversation history (earlier-session summaries first, then
+recent turns; "Task added…"-style exchanges filtered out) → time-of-day
 context → voice-brevity instruction (if `ctx.from_voice`) → user message.
+The cross-agent "recent agent activity" block is deliberately **not** included:
+it held only internal routing records, which the model repeated back as if
+they were the user's tasks.
 
-If a `ToolCallingLoop` was wired in (only when `agents.tools_enabled` and
-`agents.responder.skills` are both configured), execution is delegated
-entirely to it instead of the plain complete/stream path — tool-calling
-can't stream, so `execute_stream` in that mode just runs `execute()` once
-and yields the whole response.
+The responder is plain chat only — it has no tools. Tool use lives in
+`ToolAgent` (below); when a tool agent decides no tool is needed, it hands the
+turn back to the responder.
 
 `on_completion` records both sides of the turn via
 `ConversationManager.add_turn()` and logs a `"chat"` memory action.
@@ -107,16 +110,27 @@ governance-checked, then dispatched via `asyncio.to_thread` to the matching
 `SystemControlPort` method. No streaming value for a single-shot planner,
 so `execute_stream` just wraps `execute()`.
 
-### `ToolCallingLoop` (`tool_calling.py`) — opt-in agentic tool use
+### `ToolAgent`, `ToolTurnRunner`, `ToolUseGuard` — staged tool use
 
-`run(ctx, system, user) -> str` loops up to `max_iterations` (default 3):
-calls the LLM, parses the response as JSON — non-JSON is treated as a
-final plain-text answer; a `"final"` key returns immediately; a `"tool"`
-key invokes `SkillRunner.execute_skill(ctx, name, **args)` — explicitly
-routed through the skill runner so **every guardrail hook still applies**
-to tool-initiated skill calls — and appends an `OBSERVATION:` block before
-looping again. Exhausting iterations returns an apologetic "tool budget"
-message rather than erroring.
+Registered by `server.py` (when `agents.tools_enabled`) once per owner named in
+`config/tools/*.yaml` (`tasks`, `lookup`). Full design: [08-tool-harness.md](08-tool-harness.md).
+
+- **`tool_agent.py` — `ToolAgent`**: the supervisor routes to it deterministically
+  from the manifests' trigger patterns (`AgentProfile.triggers`, consulted by
+  `domain/policies/routing_policy.py` before keyword overlap). It runs the
+  `ToolTurnRunner`; `reply is None` (no tool needed) hands the turn to the chat
+  fallback, and a fallback reply that *claims* an action is replaced with "I can't
+  confirm that…". Persists the turn and writes a `TurnTrace` per turn (a failing
+  trace store never breaks a turn).
+- **`tool_turn_runner.py` — `ToolTurnRunner`**: **decide** (one constrained
+  completion → `{"calls":[...]}`; if the message matches a tool's `required_when`
+  and no call came back, retry once with `minItems=1`), **execute** (each call via
+  `SkillRunner.execute_skill`, so every guardrail hook still applies; each logged
+  as `[tool-call]`), **reply** (the tool's own `spoken` text for template/`final`
+  results, else a short narrate-stage completion that must pass the grounding
+  check, else the deterministic text).
+- **`tool_use_guard.py` — `ToolUseGuard`**: built from the manifests; `required_tools(msg)`
+  and `claims_action(reply)`.
 
 ## "Agent" vs. "skill" — the distinction that matters
 
@@ -137,8 +151,7 @@ are invoked via `SkillRunner` — never routed to directly.
   into a skill, auto-generating its parameter description from
   `inspect.signature`.
 - **`registry.py` — `SkillRegistry`**: same shape as `AgentRegistry`, plus
-  `get_prompt_descriptions(skill_names=None)` which feeds
-  `ToolCallingLoop`'s tool list.
+  `get_prompt_descriptions(skill_names=None)`.
 - **`skill_runner.py` — `SkillRunner`**: `execute_skill(ctx, skill_name,
   **params)` fires `HookEvent.PRE_SKILL` (permission/rate-limit/input
   validation) — any pre-hook returning `False` aborts with a failed
@@ -152,8 +165,19 @@ are invoked via `SkillRunner` — never routed to directly.
   (substring) and `blocked_patterns` (regex), raises
   `AppException(COMMAND_BLOCKED)` on match, truncates output at 10000
   chars, timeout-bounded.
-- **`builtin/tasks.py` — `TasksSkill`**: thin wrapper over
-  `service/tasks/task_service.py`.
+- **`manifest_skill.py` — `ManifestSkill(BaseSkill)`**: name, description, permission and
+  argument schema come from the tool's `ToolManifest`; subclasses implement only
+  `run()`. Gives every tool the same envelope: unknown arguments rejected, provider /
+  validation errors turned into a failed `SkillResult` with a plain `spoken` sentence
+  (never a stack trace or an invented answer), and `spoken` / `final` / `source` /
+  `as_of` / `cached` in `SkillResult.metadata`.
+- **`builtin/tasks.py` — `TasksSkill`**: `add|list|complete|delete` over
+  `service/tasks/task_service.py`. `complete`/`delete` take a `task_id` or a spoken
+  phrase ("milk packets") resolved by content-word matching to exactly one open task;
+  no match or an ambiguous match changes nothing and says so. Duplicate `add`s are
+  rejected.
+- **`builtin/weather.py`, `currency.py`, `web_search.py`**: `GetWeatherSkill`,
+  `ConvertCurrencySkill`, `WebSearchSkill` — thin `ManifestSkill`s over the lookup services.
 
 ## Governance vs. guardrails — the distinction that matters
 
@@ -277,6 +301,26 @@ SingleFlight( GracefulDegradation( primary_adapter, fallback_adapter ) )
 
 ## `service/lookup/` — fact retrieval with egress enforcement
 
+The providers answer through `LookupService`; the higher-level services below turn
+their structured `FactAnswer.data` into `ToolObservation`s (`text` for logs/narration,
+`spoken` for the user, `final` = ready to say as-is):
+
+- **`place_resolver.py` — `PlaceResolver`**: name → `Place` via the geocoder (best-ranked
+  match used, others logged); blank/"here" → the configured default place; unknown name →
+  coordinates parsed from a web search (accepted only if they parse cleanly and are in
+  range); otherwise `NOT_FOUND`.
+- **`weather_lookup.py` — `WeatherLookup`**: place → reading → spoken sentence; if the
+  weather provider is down, a web-search answer labelled "approximate".
+- **`currency_lookup.py` — `CurrencyLookup`**: spoken names ("rupees", "$") → ISO codes
+  (`domain/policies/currency_policy.py`), amount validation, provider-computed conversion.
+- **`search_lookup.py` — `SearchLookup`**: news questions speak the top dated headlines;
+  general questions speak the provider's answer (first sentences, with the source).
+- **`ttl_cache.py` — `TtlCache`**: per-category cache (TTLs from the manifests: weather
+  10 min, currency 1 h, search 15 min, geocode 24 h); hits are logged as `cache=hit`.
+- **`health_service.py` — `LookupHealthService`**: concurrent probes with timeouts for
+  `veda doctor` / `GET /api/lookup/health`; a probe whose secret is missing reports
+  "not configured" without a network call.
+
 - **`registry.py` — `FactProviderRegistry`**: constructed with the egress
   allow-list; `register(provider)` **refuses at registration time** if any
   of the provider's `allowed_hosts` isn't covered by the allow-list —
@@ -350,8 +394,20 @@ pending requests within a time window).
 
 ## `service/tasks/`
 
-`TaskService(repo: TaskRepositoryPort)` — `add`/`list`/`complete`/`delete`.
-Used by both `TasksSkill` and the `/api/tasks` routes.
+`TaskService(repo: TaskRepositoryPort)` — `add`/`add_unique`/`list`/`complete`/`delete`,
+`find_open(phrase)` (best content-word match, `domain/policies/task_matching.py`) and
+`purge_completed()` (tasks completed more than `COMPLETED_TASK_RETENTION_DAYS` = 7 ago;
+`complete` records `completed_at`). Used by both `TasksSkill` and the `/api/tasks` routes.
+
+## `service/prompting/` — `PromptComposer`
+
+Assembles each stage's prompt from `PromptStorePort` text and the tool manifests under
+hard token budgets (`domain/policies/token_budget_policy.py`: call 700, narrate 500,
+chat 1500). Call stage = persona-lite + only the owning agent's tools + their examples
++ last 2 turns; narrate stage = persona-lite + narrate rules + question + the capped tool
+result. Static text first so the KV prefix cache is reused; trimming order is oldest
+history first, then the tool result. Uses the exact tokenizer when the backend offers
+`count_tokens`.
 
 ## `service/voice/` — the always-on pipeline
 

@@ -34,3 +34,25 @@ class AppException(Exception):
 
     def __str__(self):
         return self.message
+
+class ToolUnavailableError(AppException):
+    """An online tool's provider could not answer (down, timeout, rate-limited, not configured).
+
+    `status` is the upstream HTTP status when there was one; `not_configured`
+    marks a missing secret (e.g. TAVILY_API_KEY) so the user-facing message can
+    say "not set up" instead of "didn't respond".
+    """
+
+    def __init__(self, class_name: str, tool: str, detail: str, *, status: int | None = None,
+                 not_configured: bool = False):
+        from core.enums import ErrorMessage, ExceptionCode
+
+        super().__init__(
+            class_name=class_name,
+            code=ExceptionCode.TOOL_UNAVAILABLE,
+            error_message=ErrorMessage.TOOL_UNAVAILABLE,
+            tool=tool,
+            detail=detail,
+        )
+        self.status = status
+        self.not_configured = not_configured

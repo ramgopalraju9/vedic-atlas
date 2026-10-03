@@ -29,7 +29,7 @@ from rich.console import Console
 
 from controller.cli.client import CliError, open_client
 from controller.cli.logo import render_banner
-from controller.cli.commands import cmd_approve, cmd_config, cmd_listen, cmd_mute, cmd_status, cmd_task, cmd_unmute
+from controller.cli.commands import cmd_approve, cmd_config, cmd_doctor, cmd_listen, cmd_mute, cmd_status, cmd_task, cmd_trace, cmd_unmute
 from controller.cli.persona import cmd_persona
 from controller.cli.render import stream_to_terminal
 from controller.cli.repl import Repl
@@ -85,6 +85,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_listen = sub.add_parser("listen", help="Show microphone state (muted / listening / turns).")
     p_listen.set_defaults(func=_handle_listen)
+
+    p_trace = sub.add_parser("trace", help="Show what the tool harness did on recent turns (calls, results, timings).")
+    p_trace.add_argument("limit", nargs="?", type=int, default=10)
+    p_trace.set_defaults(func=_handle_trace)
+
+    p_doctor = sub.add_parser("doctor", help="Check that the online tools (weather, search, currency) work.")
+    p_doctor.set_defaults(func=_handle_doctor)
 
     p_task = sub.add_parser("task", help="Manage tasks: add <title> | list | done <id>.")
     p_task.add_argument("action", nargs="?", default="list", help="add | list | done")
@@ -187,6 +194,26 @@ def _handle_listen(args: argparse.Namespace) -> int:
         return cmd_listen(client)
 
 
+def _handle_trace(args: argparse.Namespace) -> int:
+    with open_client(server_url=args.server_url) as client:
+        try:
+            client.ensure_up(allow_spawn=not args.no_spawn)
+        except CliError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        return cmd_trace(client, args.limit)
+
+
+def _handle_doctor(args: argparse.Namespace) -> int:
+    with open_client(server_url=args.server_url) as client:
+        try:
+            client.ensure_up(allow_spawn=not args.no_spawn)
+        except CliError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        return cmd_doctor(client)
+
+
 def _handle_task(args: argparse.Namespace) -> int:
     with open_client(server_url=args.server_url) as client:
         try:
@@ -234,7 +261,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
 
     raw = list(argv if argv is not None else sys.argv[1:])
-    known_subs = {"hello", "server", "persona", "approve", "config", "status", "mute", "unmute", "listen", "task", "-h", "--help"}
+    known_subs = {"hello", "server", "persona", "approve", "config", "status", "mute", "unmute", "listen", "task", "doctor", "trace", "-h", "--help"}
 
     first_pos = next((a for a in raw if not a.startswith("-")), None)
     is_subcommand = first_pos in known_subs if first_pos else False

@@ -123,7 +123,10 @@ class SupervisorAgent(BaseAgent):
             return routable[0]
 
         profiles = tuple(
-            AgentProfile(name=a.name, description=a.description, model_alias=a.model, skills=tuple(a.skills))
+            AgentProfile(
+                name=a.name, description=a.description, model_alias=a.model,
+                skills=tuple(a.skills), triggers=tuple(a.triggers),
+            )
             for a in routable
         )
         chosen = self.router.pick(ctx.user_message, profiles, self.default_agent)

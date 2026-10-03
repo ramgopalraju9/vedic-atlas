@@ -54,12 +54,6 @@ class BaseSkill(ABC):
         """JSONSchema describing this skill's parameters. Override for precise typing."""
         return {"type": "object", "additionalProperties": True}
 
-    def get_usage_examples(self) -> str:
-        """Optional worked examples (user phrase -> tool call) injected into
-        the tool-calling prompt. Small local models follow examples far more
-        reliably than rules."""
-        return ""
-
     @abstractmethod
     async def execute(self, ctx: AgentContext, **params) -> SkillResult:
         """Execute the skill with the given parameters."""

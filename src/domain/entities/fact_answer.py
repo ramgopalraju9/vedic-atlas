@@ -7,6 +7,7 @@ that only the declared category's host was contacted (REQ-M-13).
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -18,3 +19,7 @@ class FactAnswer:
     text: str
     sources: tuple[str, ...] = field(default_factory=tuple)
     fetched_at: datetime | None = None
+    # Structured form of `text` (numbers, places, hits) for the tool layer, so
+    # callers never have to re-parse prose. Provider-specific keys.
+    data: dict[str, Any] = field(default_factory=dict)
+    cached: bool = False  # served from the TTL cache, not a fresh network call

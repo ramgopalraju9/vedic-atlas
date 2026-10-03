@@ -33,21 +33,26 @@ The codebase draws a consistent distinction:
 | Class | Fields |
 |---|---|
 | `AgentContext` | `request_id` (auto `uuid4().hex[:12]`), `timestamp`, `user_message`, `system_context`, `from_voice`, `agent_chain: list[str]`, `current_agent`, `skill_results: list[dict]`, `conversation_history: list[dict]`, `knowledge_context`, `pending_approvals: list[dict]`, `approved_actions: list[str]`, `metadata: dict` |
-| `AgentProfile` | `name`, `description`, `model_alias`, `skills: tuple[str,...]`, `system_prompt_extra`, `enabled` |
+| `AgentProfile` | `name`, `description`, `model_alias`, `skills: tuple[str,...]`, `system_prompt_extra`, `enabled`, `triggers: tuple[str,...]` (regexes that route a message straight to this agent) |
 | `AgentResult` | `agent_name`, `response`, `skill_calls: list[dict]`, `delegated_to: str\|None`, `metadata: dict` |
 | `ApprovalRequest` | `request_id`, `action_name`, `arguments: dict`, `reason`, `created_at`, `timeout_sec=60`, `status="pending"` (`pending\|approved\|denied\|timed_out`), `resolved_via: str\|None` (`ui\|voice\|timeout`). Method: `age_sec(now) -> float` |
 | `AuditEntry` | `event_type`, `agent`, `action`, `context: dict`, `decision: PolicyDecision`, `timestamp` (UTC), `hash=""` (filled in by the audit-sink adapter) |
 | `CaptureState` | `muted`, `mute_source`, `since` |
 | `Turn` | `id: int\|None`, `session_id`, `role`, `content`, `created_at`, `summarized=False` |
 | `ConversationSummary` | `id: int\|None`, `session_id`, `from_ts`, `to_ts`, `content`, `turn_count`, `created_at` |
-| `FactAnswer` | `provider_id`, `category`, `text`, `sources: tuple[str,...]`, `fetched_at: datetime\|None` |
+| `FactAnswer` | `provider_id`, `category`, `text`, `sources: tuple[str,...]`, `fetched_at: datetime\|None`, `data: dict` (structured form of `text`), `cached=False` |
 | `FactQuery` | `category`, `params: dict`, `requested_at: datetime\|None` |
 | `MemoryRecord` | `agent_name`, `action`, `context: dict`, `user_message`, `created_at: datetime\|None` |
 | `PolicyDecision` (**frozen**) | `allowed=True`, `action="allow"` (`allow\|deny\|audit\|block`), `rule_name: str\|None`, `reason`, `audit_entry: dict` |
 | `SkillDefinition` | `name`, `description`, `permission_level=APPROVE`, `input_schema: dict`, `enabled=True`. Method: `to_prompt_block() -> str` |
 | `SkillResult` | `skill_name`, `success`, `output: Any=None`, `error: str\|None`, `metadata: dict` |
-| `Task` | `id: int\|None`, `title`, `done=False`, `notes`, `due_at: datetime\|None`, `created_at` |
+| `Task` | `id: int\|None`, `title`, `done=False`, `notes`, `due_at: datetime\|None`, `created_at`, `completed_at: datetime\|None` |
 | `Utterance` | `audio: AudioWindow`, `started_at`, `duration_sec`, `frame_count`, `truncated=False` |
+| `Place` (**frozen**) | `name`, `lat`, `lon`, `region`, `country`, `source` (`geocoder\|search\|default`). Method: `label()` |
+| `ProviderHealth` (**frozen**) | `name`, `ok`, `configured`, `latency_ms`, `detail` |
+| `ToolManifest` (**frozen**) | `name`, `agent`, `description`, `params: tuple[ToolParam,...]`, `examples: tuple[ToolExample,...]`, `triggers`, `required_when`, `claims` (regex tuples), `reply_mode` (`template\|llm`), `cache_ttl_sec`, `permission_level`, `hosts`, `requires_online`. `ToolParam`: `name`, `type`, `required`, `enum`, `description`. `ToolExample`: `user`, `calls` |
+| `ToolObservation` (**frozen**) | `text`, `spoken`, `source`, `as_of`, `cached`, `final`, `data` |
+| `TurnTrace` | `request_id`, `agent`, `user_message`, `reply`, `decided` (`tool\|no-tool\|error`), `created_at`, `forced`, `narrated`, `total_ms`, `calls: list[dict]`, `prompt_tokens`, `timings_ms`, `notes`, `id` |
 
 ### `domain/value_objects/`
 
@@ -75,9 +80,16 @@ No classes, no I/O, no implicit clock access (every function that needs
 | `permission_policy.py` | `requires_approval(level)`; `requires_notification(level)`; `proceeds_immediately(level)` | Maps a `PermissionLevel` to one of three gating behaviors |
 | `proactivity_policy.py` | `rate_limit_multiplier(level) -> int` | `2` for `CHATTY`, `1` otherwise |
 | `redaction_policy.py` | `find_pii(content) -> str\|None`; `find_credential(content) -> str\|None` | Regex match for SSN/credit-card/PAN/Aadhaar, and API-key/password/secret/AWS/OpenAI/GitHub-PAT patterns |
-| `retention_policy.py` | `is_expired_agent_memory(created_at, now) -> bool`; `is_expired_user_fact(...) -> bool` (always `False`) | `AGENT_MEMORY_RETENTION_DAYS = 10` rolling expiry; user facts never auto-expire |
-| `routing_policy.py` | `pick_agent(message, candidates, default) -> str` (never `None`) | Keyword-overlap between message and each `AgentProfile.description`, highest score wins, falls back to `default` |
+| `retention_policy.py` | `is_expired_agent_memory(created_at, now) -> bool`; `is_expired_user_fact(...) -> bool` (always `False`) | `AGENT_MEMORY_RETENTION_DAYS = 10` rolling expiry; user facts never auto-expire; `COMPLETED_TASK_RETENTION_DAYS = 7` and `TURN_TRACE_RETENTION_DAYS = 14` (windows enforced by the hourly housekeeping job) |
+| `routing_policy.py` | `pick_agent(message, candidates, default) -> str` (never `None`) | Keyword-overlap between message and each `AgentProfile.description`, highest score wins, falls back to `default`. **First** checks each agent's `triggers` (regexes from tool manifests) — the agent with most matches wins — before the keyword overlap |
 | `session_boundary_policy.py` | `is_same_session(last_activity_at, now, session_gap_min=30) -> bool` | `DEFAULT_SESSION_GAP_MIN = 30` — true if gap ≤ threshold |
+| `currency_policy.py` | `normalize_currency(token) -> str\|None`; `parse_amount(value) -> float\|None` | Spoken names/symbols ("rupees", "$") → ISO codes; positive finite amounts only |
+| `coordinate_policy.py` | `parse_lat_lon(text) -> tuple\|None` | Extracts lat/lon from (untrusted) web text; accepts only clean, in-range pairs |
+| `grounding_policy.py` | `is_grounded(reply, sources) -> bool`; `ungrounded_numbers(...)` | Every number in a narrated reply must appear in the tool result / question / date; URLs never accepted |
+| `task_matching.py` | `best_matches(query, titles) -> list[int]`; `normalize_title(...)` | Stemmed content-word overlap — "milk packets" finds "get milk home"; ties return several ids |
+| `token_budget_policy.py` | `estimate_tokens(text)`; `PromptBudgets` | Per-stage prompt budgets (call 700, narrate 500, chat 1500) and history-turn counts |
+| `tool_call_schema.py` | `build_call_schema(manifests, min_calls, max_calls) -> dict` | JSON-schema the model's `{"calls":[...]}` output is constrained to |
+| `weather_code_policy.py` | `describe_weather_code(code) -> str` | WMO weather code → plain words |
 
 These are consumed by `service/` (see [03-service-layer.md](03-service-layer.md))
 and, in the egress case, double-enforced: once at `FactProviderRegistry`
@@ -115,16 +127,19 @@ each one.
 | `FactProviderPort` | `category`, `allowed_hosts` (props); `async fetch(query) -> FactAnswer` | async fetch |
 | `GovernanceProvider` | `name` (prop); `check_action(action, context) -> PolicyDecision`; `check_pattern(text) -> list[str]`; `async audit(entry)`; `is_healthy(backend)`; `record_success(backend)`; `record_failure(backend)` | mixed |
 | `IndicatorPort` | `set_muted(muted) -> None` | sync |
-| `InferencePort` | `name` (prop); `async complete(prompt, system="", model=None, timeout=None) -> str`; `stream(...) -> AsyncIterator[str]`. Also declares `InferenceTimeoutError(RuntimeError)` in the same file | async |
+| `InferencePort` | `name` (prop); `async complete(prompt, system="", model=None, timeout=None, *, num_predict=None, json_schema=None, temperature=None) -> str` (`json_schema` = constrained decoding); `stream(...) -> AsyncIterator[str]`. Also declares `InferenceTimeoutError(RuntimeError)` in the same file | async |
 | `KnowledgeStorePort` | `add_fact`; `remove_fact(index) -> bool`; `list_facts()`; `get_context()` | sync |
 | `MemoryRepositoryPort` | `record(agent_name, action, context=None, user_message="") -> int`; `recent(limit=5)`; `recent_cross_agent(exclude=None, limit=5)`; `last_action(agent_name=None)`; `prune() -> int` | sync |
 | `MuteSwitchPort` | `source_name` (prop); `is_muted() -> bool`; `subscribe(on_change: Callable[[CaptureEvent], None])` | sync, callback-based |
 | `NotificationPort` | `notify(title, message, urgency=NORMAL) -> None` | sync |
 | `SensorPort` | `start()`; `async stop()`; `is_running` (prop) | mixed |
 | `StatusDisplayPort` | `rows`, `cols` (props); `show(lines: tuple[str,...])` | sync |
+| `ToolManifestStorePort` | `load_all() -> list[ToolManifest]` | sync |
+| `PromptStorePort` | `get(name) -> str`; `names() -> list[str]` | sync |
+| `TraceRepositoryPort` | `record(trace) -> int`; `recent(limit=20)`; `purge_before(cutoff) -> int` | sync |
 | `STTPort` | `async transcribe(audio) -> Transcript` | async |
 | `SystemControlPort` | `open_app/close_app/focus_app(name) -> (bool,str)`; `battery_info() -> dict`; `get_volume()/set_volume(level)`; `mute(on)/is_muted()`; `list_running(name_filter=None)`; `top_processes(limit=5)` | sync |
-| `TaskRepositoryPort` | `add(task) -> int`; `list(include_done=False)`; `get(task_id)`; `set_done(task_id, done=True) -> bool`; `delete(task_id) -> bool` | sync |
+| `TaskRepositoryPort` | `add(task) -> int`; `list(include_done=False)`; `get(task_id)`; `set_done(task_id, done=True) -> bool`; `delete(task_id) -> bool`; `purge_completed_before(cutoff) -> int` (`set_done` records `completed_at`) | sync |
 | `TTSPort` | `sample_rate` (prop); `synthesize(text, voice=None) -> AsyncIterator[bytes]` | async generator |
 | `VoiceActivityPort` | `frame_duration_ms` (prop); `is_speech(frame) -> bool` | sync |
 | `VectorStorePort` | `upsert(*, source, ref_id, model_id, vector, text)`; `search(*, vector, model_id, top_k=5, sources=None) -> list[MemoryHit]`; `has(*, source, ref_id, model_id)`; `delete(*, source, ref_id)`; `clear(source)` | sync, kwonly args |

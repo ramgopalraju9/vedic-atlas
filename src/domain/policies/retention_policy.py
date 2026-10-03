@@ -23,6 +23,9 @@ AGENT_MEMORY_RETENTION_DAYS = 10
 # still work), then purged. Pending tasks never expire.
 COMPLETED_TASK_RETENTION_DAYS = 7
 
+# Tool-turn traces are a debugging aid ("did the call really happen?"), not user data.
+TURN_TRACE_RETENTION_DAYS = 14
+
 
 def is_expired_agent_memory(created_at: datetime, now: datetime) -> bool:
     """True if a cross-agent memory-mesh row is past its retention window."""

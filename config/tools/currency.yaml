@@ -1,0 +1,42 @@
+name: convert_currency
+agent: lookup
+description: Convert an amount between two currencies at the latest exchange rate.
+reply_mode: template
+permission_level: auto
+requires_online: true
+cache_ttl_sec: 3600
+hosts: [api.frankfurter.dev, open.er-api.com]
+
+params:
+  amount:
+    type: number
+    required: true
+  from:
+    type: string
+    required: true
+    description: source currency, e.g. USD or dollars
+  to:
+    type: string
+    required: true
+    description: target currency, e.g. INR or rupees
+
+examples:
+  - user: how much is 100 dollars in rupees
+    calls: [{tool: convert_currency, args: {amount: 100, from: USD, to: INR}}]
+  - user: convert 5000 yen to euros
+    calls: [{tool: convert_currency, args: {amount: 5000, from: JPY, to: EUR}}]
+  - user: what's the dollar rate
+    calls: [{tool: convert_currency, args: {amount: 1, from: USD, to: INR}}]
+
+triggers:
+  - '\b(convert|exchange rate|currency|forex)\b'
+  - '\b(usd|inr|eur|gbp|jpy|aed|dollars?|rupees?|euros?|pounds?|yen|dirhams?)\b.*\b(in|to|into)\b.*\b(usd|inr|eur|gbp|jpy|aed|dollars?|rupees?|euros?|pounds?|yen|dirhams?)\b'
+  - '\b(dollar|euro|pound|yen) (rate|price)\b'
+  - '\bhow (many|much)\b.*\b(usd|inr|eur|gbp|jpy|aed|dollars?|rupees?|euros?|pounds?|yen|dirhams?)\b'
+
+required_when:
+  - '\b(convert|exchange rate|forex)\b'
+  - '\b(dollar|euro|pound|yen) (rate|price)\b'
+
+claims:
+  - '\b(is|are) (about|around|roughly) [\d,.]+\s*(usd|inr|eur|gbp|jpy|aed|dollars?|rupees?|euros?|pounds?|yen)\b'

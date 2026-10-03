@@ -1,0 +1,55 @@
+# The user's to-do list. Everything the harness needs to know about this tool lives here.
+name: tasks
+agent: tasks
+description: The user's to-do list - add, list, complete or delete tasks.
+reply_mode: template        # reply is built from the tool's own result; no second model call
+permission_level: notify
+
+params:
+  action:
+    type: string
+    required: true
+    enum: [add, list, complete, delete]
+  title:
+    type: string
+    description: task text for add; a few words naming the task for complete/delete
+  task_id:
+    type: integer
+  due_at:
+    type: string
+    description: ISO datetime
+  include_done:
+    type: boolean
+
+examples:
+  - user: I need to bring vegies
+    calls: [{tool: tasks, args: {action: add, title: bring vegies}}]
+  - user: yeah I bought the milk packets
+    calls: [{tool: tasks, args: {action: complete, title: milk packets}}]
+  - user: what are my tasks?
+    calls: [{tool: tasks, args: {action: list}}]
+  - user: what did I finish?
+    calls: [{tool: tasks, args: {action: list, include_done: true}}]
+  - user: remove the bank task from my list
+    calls: [{tool: tasks, args: {action: delete, title: bank}}]
+
+# User text that should be routed to the tasks agent.
+triggers:
+  - '\bwhat (do|should|must) (i|we) (need|have) to do\b'
+  - '\b(tasks?|to-?do|reminders?|my list)\b'
+  - '\bremind me\b|\bdon''t (let me )?forget\b'
+  - '\b(i|we)\s+(still\s+)?(need|have|got|must|want)\s+to\s+\w+'
+  - '\b(i|we)\s+(just\s+|already\s+)?(bought|finished|completed|picked up|paid|sent|called|did)\b'
+
+# User text for which a tool call is mandatory (the list must never be answered from memory).
+required_when:
+  - '\bwhat (do|should|must) (i|we) (need|have) to do\b'
+  - '\b(tasks?|to-?do|reminders?|my list)\b'
+  - '\bremind me\b|\bdon''t (let me )?forget\b'
+
+# Reply text that asserts a task action/listing happened (must be backed by a real call).
+claims:
+  - '\b(task added|added (it|that|this)?\s*(to|on)|i(''| ha)?ve added|i added|i''ll add|i will add)\b'
+  - '\b(marked (it |that )?(as )?(done|complete|completed)|ticked off|checked off|crossed off)\b'
+  - '\b((has been|have been|is now|was) (completed|removed|deleted|added)|(removed|deleted|completed) (it|that|the task))\b'
+  - '\b(your (tasks|to-?do list|list)( are| is|:)|you(''ve| have) (got )?(\d+|two|three|four|five|no|\w+) (pending )?tasks?)\b'

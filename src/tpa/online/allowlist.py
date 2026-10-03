@@ -10,6 +10,9 @@ DEFAULT_ALLOW_LIST: frozenset[str] = frozenset({
     "localhost",
     "127.0.0.1",
     "api.open-meteo.com",       # weather
-    "api.duckduckgo.com",       # search
+    "geocoding-api.open-meteo.com",  # place name -> coordinates
+    "api.tavily.com",           # web search
+    "api.frankfurter.dev",      # fx (ECB reference rates)
+    "open.er-api.com",          # fx fallback (166 currencies)
     "gdeltproject.org",         # news
 })

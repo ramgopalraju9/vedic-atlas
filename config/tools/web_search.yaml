@@ -1,0 +1,37 @@
+name: web_search
+agent: lookup
+description: Search the web for current facts, news, scores and prices.
+reply_mode: llm             # results are snippets, so a short narrate step phrases them
+permission_level: auto
+requires_online: true
+cache_ttl_sec: 900
+hosts: [api.tavily.com]
+
+params:
+  query:
+    type: string
+    required: true
+    description: a short, self-contained search query
+  topic:
+    type: string
+    enum: [general, news]
+
+examples:
+  - user: latest news on ISRO
+    calls: [{tool: web_search, args: {query: ISRO latest news, topic: news}}]
+  - user: who won the cricket match yesterday
+    calls: [{tool: web_search, args: {query: cricket match result yesterday, topic: news}}]
+  - user: who is the prime minister of Japan
+    calls: [{tool: web_search, args: {query: current prime minister of Japan}}]
+
+triggers:
+  - '\b(latest|news|headlines|breaking|trending|score|scores|results?)\b'
+  - '\b(search( the web| for| up)?|google|look up|find out|check online)\b'
+  - '\bwho (won|is|was|are)\b|\bprice of\b|\bwhat happened\b'
+
+required_when:
+  - '\b(latest|news|headlines|search( the web| for| up)?|google|look up|price of|what happened)\b'
+  - '\bwho (won|is the (current|new))\b'
+
+claims:
+  - '\b(according to|reports? (say|that)|per (the )?(latest|news))\b'

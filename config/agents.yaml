@@ -1,6 +1,7 @@
-# responder.skills via a JSON protocol (guarded by the approval/permission hooks).
+# When true, a specialist agent is registered for every owner named in config/tools/*.yaml
+# (tasks, lookup, ...). Each runs its tools through the staged tool turn: constrained JSON
+# call -> guarded execution -> reply. Routing, prompts and guard rules come from the manifests.
 tools_enabled: true
-max_tool_iterations: 4
 
 supervisor:
   enabled: true
@@ -11,8 +12,6 @@ responder:
   enabled: true
   model: null
   description: General conversation, Q&A, brainstorming
-  skills:
-    - tasks
 
 system:
   enabled: true

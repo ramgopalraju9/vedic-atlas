@@ -45,7 +45,7 @@ both also required at runtime). See the setup notes in
 | `audio.speaker_id: SpeakerIdConfig` | `enabled=False`, `backend="resemblyzer"`, `profiles_dir="data/speaker_profiles"`, `match_threshold=0.6`, `require_known_speaker=False`, `min_enroll_seconds=12.0`, `score_window_sec=2.0` — multi-speaker voice recognition; off and purely additive by default. `backend="eagle"` (Picovoice) remains available — see `docs/voice/open-source-wake-speaker-design.md` |
 | `sensing: SensingConfig` | `proactivity="medium"`, `debounce_window_sec=30.0`, `rate_limit_max=6`, `rate_limit_window_sec=60.0` |
 | `privacy: PrivacyConfig` | `mute_switch="software"`, `start_muted=True`, `mute_gpio_pin=17`, `indicator_gpio_pin=27`, `online: OnlineConfig` |
-| `privacy.online: OnlineConfig` | `allowlist=["api.open-meteo.com", "api.duckduckgo.com", "api.frankfurter.app"]` |
+| `privacy.online: OnlineConfig` | `enabled=True` (False = fully offline, no online tools), `allowlist=[open-meteo, geocoding-api.open-meteo, api.frankfurter.dev, open.er-api.com, api.tavily.com]`, `default_place="Hyderabad"`, `search_api_key_env="TAVILY_API_KEY"` (the *name* of the env var; the key lives in `.env`) |
 | `governance: GovernanceConfig` | `enabled=False`, `provider="builtin"`, `policies_dir="tpa/governance/policies"`, `audit: GovernanceAuditConfig`, `circuit_breaker_threshold=3`, `circuit_breaker_timeout=60.0` |
 | `governance.audit: GovernanceAuditConfig` | `backend="sqlite"`, `db_path="data/governance_audit.db"` |
 | `guardrails: GuardrailsConfig` | `permissions: PermissionsConfig`, `validators: ValidatorsConfig`, `rate_limiting: RateLimitingConfig`, `audit: AuditConfig` |
@@ -53,7 +53,7 @@ both also required at runtime). See the setup notes in
 | `guardrails.validators` | `block_pii_in_output=True`, `block_credentials_in_output=True`, `max_input_length=10000`, `max_output_length=50000` |
 | `guardrails.rate_limiting` | `enabled=True`, `global_rpm=30`, `per_skill_rpm=10` |
 | `guardrails.audit` | `enabled=True`, `log_dir="data/audit"`, `log_inputs=True`, `log_outputs=True`, `retention_days=30` |
-| `agents: AgentsConfig` | `supervisor/responder/system: AgentEntry` (each `enabled=True`, `model=None` → inherits `inference.model_alias`, `description=""`, `skills=[]`; `system` defaults `skills=["terminal","file_ops"]`), `tools_enabled=False`, `max_tool_iterations=3` |
+| `agents: AgentsConfig` | `supervisor/responder/system: AgentEntry` (each `enabled=True`, `model=None` → inherits `inference.model_alias`, `description=""`, `skills=[]`; `system` defaults `skills=["terminal","file_ops"]`), `tools_enabled=False` (True registers a specialist `ToolAgent` per owner named in `config/tools/*.yaml`; see docs/08-tool-harness.md) |
 | `skills: SkillsConfig` | `terminal` (`permission_level="approve"`, extra: `working_directory`, `timeout`, `blocked_commands`, `blocked_patterns`), `file_ops` (`permission_level="notify"`, extra: `allowed_paths`, `blocked_paths`), `tasks` (`permission_level="notify"`), `custom_skills_dir="data/custom_skills"` |
 
 The repo's actual `config/*.yaml` files override a handful of these

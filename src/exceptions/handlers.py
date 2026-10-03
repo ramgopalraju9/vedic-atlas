@@ -40,6 +40,7 @@ _STATUS_BY_CODE: dict[str, int] = {
     ExceptionCode.APPROVAL_TIMEOUT: 408,
     ExceptionCode.APPROVAL_REJECTED: 403,
     ExceptionCode.EGRESS_DENIED: 403,
+    ExceptionCode.TOOL_UNAVAILABLE: 503,
 }
 
 

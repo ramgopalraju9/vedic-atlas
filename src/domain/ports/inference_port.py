@@ -41,8 +41,17 @@ class InferencePort(Protocol):
         system: str = "",
         model: str | None = None,
         timeout: int | None = None,
+        *,
+        num_predict: int | None = None,
+        json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> str:
-        """Non-streaming completion. Returns the full response text."""
+        """Non-streaming completion. Returns the full response text.
+
+        `json_schema`: constrain decoding so the output is guaranteed to be
+        valid JSON matching this schema (llama.cpp grammar / Ollama `format`).
+        `temperature`: per-call override (low for tool-call JSON, higher for chat).
+        """
         ...
 
     async def stream(

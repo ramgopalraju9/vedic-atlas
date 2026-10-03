@@ -107,8 +107,14 @@ class OllamaClient:
         timeout: int | None = None,
         *,
         num_predict: int | None = None,
+        json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> str:
         payload = self._payload(prompt, system, model, stream=False, num_predict=num_predict)
+        if json_schema is not None:
+            payload["format"] = json_schema  # Ollama structured outputs
+        if temperature is not None:
+            payload["options"]["temperature"] = temperature
         try:
             async with httpx.AsyncClient(timeout=timeout or self._timeout) as client:
                 resp = await client.post(f"{self._host}/api/chat", json=payload)

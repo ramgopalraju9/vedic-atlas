@@ -19,13 +19,14 @@ runnable.
 | `governance.py` | `prefix="/governance"` | `GET /governance/status`; `GET /governance/audit/stats`; `GET /governance/audit/entries` (filters: `event_type`, `agent`, `limit`); `GET /governance/audit/verify`; `GET /governance/health` (circuit-breaker status); `GET /governance/policies`. Duck-types via `hasattr()` since the provider can be `None` |
 | `health.py` | — | `GET /health` — duck-types `supervisor`/`event_bus`/`governance`, separately probes the DB with `SELECT 1`. Deliberately never 503s itself — it's the "what's broken" endpoint |
 | `knowledge.py` | — | `GET /knowledge`; `POST /knowledge`; `DELETE /knowledge/{index}` |
-| `lookup.py` | — | `GET /lookup/providers`; `POST /lookup/fetch` (maps `EgressDeniedError`→403, `ValueError`→404) |
+| `lookup.py` | — | `GET /lookup/providers`; `GET /lookup/health` (live probe of geocoding, weather, currency, web search — incl. whether the API key is set); `POST /lookup/fetch` (maps `EgressDeniedError`→403, `ValueError`→404) |
 | `memory.py` | — | `GET /memory/recent`; `GET /memory/search` (returns `{"enabled": false}` if semantic recall isn't wired) |
 | `persona.py` | — | `GET /persona`; `POST /persona` — persists to `data/cli_persona.json` (flat file, not the DB); on change, calls `supervisor.set_proactivity()` to sync |
 | `privacy.py` | — | `GET /privacy/status`; `POST /privacy/mute`; `POST /privacy/mute/toggle` |
 | `stream.py` | — | `POST /stream` — SSE chat streaming via `supervisor.execute_stream()` |
 | `system.py` | — | `GET /system` — active window title via `win32gui`/`win32process`/`psutil` in a thread, `ImportError`-degrades on non-Windows |
 | `tasks.py` | — | `GET /tasks`; `POST /tasks`; `POST /tasks/{id}/complete`; `DELETE /tasks/{id}` |
+| `trace.py` | — | `GET /trace?limit=N` — recent tool turns: what was asked, every tool call with its real result, guard decisions, stage timings, prompt tokens |
 | `voice.py` | — | `GET /voice/config`; `GET /voice/status`; `POST /voice/start`; `POST /voice/stop`; `POST /voice/say`. Mute control deliberately lives under `/privacy`, not here |
 
 ## Dependency injection (`dependencies/providers.py`)
@@ -86,7 +87,8 @@ same as any other client would.
 
 - **`__main__.py`**: argparse entry point for `veda ...`. Subcommands:
   `hello`, `server`, `persona`, `approve`, `config`, `status`, `mute`,
-  `unmute`, `listen`, `task`. No subcommand + interactive TTY → launches
+  `unmute`, `listen`, `task`, `doctor` (health of the online tools), `trace [n]`
+  (what the tools actually did on the last n turns). No subcommand + interactive TTY → launches
   the REPL. No subcommand + piped stdin → one-shot chat with the piped
   text. Bare positional text → one-shot streaming chat.
 - **`client.py` — `VedaClient`**: sync `httpx.Client` wrapper, base URL
@@ -101,7 +103,7 @@ same as any other client would.
   helpers shared with the REPL.
 - **`repl.py` — `Repl`**: `prompt_toolkit`-based interactive loop with
   slash commands (`/help`, `/quit`, `/clear`, `/persona`, `/status`,
-  `/yolo on|off`, `/approve`, `/mute`, `/unmute`, `/listen`, `/task`);
+  `/yolo on|off`, `/approve`, `/mute`, `/unmute`, `/listen`, `/task`, `/doctor`, `/trace [n]`);
   bare text is sent as chat via `client.stream_chat()`.
 - **`server.py`**: `cmd_server(port, host)` — `veda server` runs
   `uvicorn.run("server:app", ...)` directly in-process; this one *is* the
@@ -145,7 +147,8 @@ adapter and the FastAPI app gets built. `_IS_WINDOWS = platform.system()
 | `_build_audit_sink(cfg)` | `AuditSinkPort` | `NullAuditSink` unless `governance.enabled` and `governance.audit.backend == "sqlite"` → `SqliteAuditSink` |
 | `_build_inference(cfg, governance)` | `InferencePort` | `build_inference_client(...)` wrapped in `SingleFlight(GracefulDegradation(...))`, hooked to `governance.record_success`/`record_failure` |
 | `_build_embedding(cfg)` | `EmbeddingPort` | Off unless `embedding.enabled` → `FastEmbedProvider` |
-| `_build_lookup(cfg)` | — | Builds `AllowListedHttpClient`, registers `WeatherProvider`/`SearchProvider`/`FxProvider` into a `FactProviderRegistry`, returns a `LookupService` |
+| `_build_lookup(cfg, tool_manifests)` | — | Builds `AllowListedHttpClient`, registers `WeatherProvider`/`GeocodingProvider`/`FxProvider`/`TavilyProvider` into a `FactProviderRegistry`, returns a `LookupService` (with a `TtlCache` and per-category TTLs from the manifests) plus the Tavily provider (for the health probe) |
+| `_build_lookup_health(lookup, search, key_env)` | — | Probes for `veda doctor` / `GET /lookup/health`: geocoding, weather, currency, web_search (skipped, with a hint, when the API key is missing) |
 | `_build_guardrails(cfg)` | — | Builds `PermissionManager`, `RateLimiter`, `InputValidator`, `OutputValidator`, `AuditLogger`; registers hooks onto a `HookRegistry` |
 | `_build_skills(cfg, hooks)` | — | Registers `TerminalSkill`, `FileOpsSkill` into a `SkillRegistry`, returns `(registry, SkillRunner)` |
 
@@ -163,15 +166,18 @@ adapter and the FastAPI app gets built. `_IS_WINDOWS = platform.system()
 8. Build `ConversationSummariser` → `app.state`
 9. Build `KnowledgeBase` (wired to re-index on change if memory indexing is enabled) → `app.state`
 10. Build `TaskService` → `app.state`
-11. Build guardrails + skills; register `TasksSkill` into the skill registry
-12. Build `SystemControlPort`, `AgentRegistry`; conditionally build
-    `ToolCallingLoop` (only if `agents.tools_enabled` and
-    `agents.responder.skills` is non-empty); build `ResponderAgent`,
-    `SystemAgent`; register both
+11. Load tool manifests (`YamlToolManifestStore`); if `privacy.online.enabled`, build the lookup
+    stack; build guardrails + skills and register `TasksSkill` plus (when online) `GetWeatherSkill`,
+    `ConvertCurrencySkill`, `WebSearchSkill`. With online disabled, manifests marked
+    `requires_online` are dropped
+12. Build `SystemControlPort`, `AgentRegistry`, `ToolUseGuard`, `PromptComposer`,
+    `ToolTurnRunner`, `SqliteTraceRepository`; build `ResponderAgent` (plain chat),
+    `SystemAgent`; register both; if `agents.tools_enabled`, register one `ToolAgent` per owner
+    named in the manifests (`tasks`, `lookup`)
 13. Build `SupervisorAgent` with every dependency above; register it too →
     `app.state.agent_registry`, `app.state.supervisor`
-14. `app.state.lookup_service`, `app.state.notifier`,
-    `app.state.egress_allow_list`
+14. `app.state.lookup_service` / `lookup_health` (set in step 11), `app.state.trace_repo`,
+    `app.state.notifier`, `app.state.egress_allow_list`
 15. **Privacy chain**: build `mute_switch`, `audio_capture`, then
     `CaptureGate(mute_switch, indicator, audio_capture, bus=event_bus)` —
     comment: CaptureGate is "the only thing allowed to start/stop the mic

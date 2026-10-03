@@ -152,3 +152,14 @@ list whenever the user wants it tackled.
 | Resemblyzer speaker recognition (Picovoice replacement) | implemented — install `resemblyzer`+`torch` (in progress), then live enrollment per person | code done — needs deps + verification, plus in-person enrollment |
 | Porcupine / Eagle (Picovoice originals) | kept in codebase, config-selectable; needs account + access key if ever switched back to | external account — parked, not planned |
 | Semantic memory recall (fastembed) | `pip install fastembed` + stage `bge-small-en-v1.5` model | none — pure staging work |
+
+## Tool harness — known gaps (see 08-tool-harness.md)
+
+- **Weather is current conditions only** — no forecast or rain probability (Open-Meteo's daily/hourly fields are unused).
+- **Follow-up fragments don't route** ("and in Mumbai?") — routing needs a full request; a sticky "last tool" hint is the likely fix.
+- **"I need to ..." always means a task** — "I need to open chrome" routes to the tasks agent, not the system agent.
+- **CLI `/task` parity** — `/task add` has no duplicate check, there is no `/task delete`, and `/task done` needs a numeric id (chat accepts a phrase).
+- **Summariser vs. live chat** — both share one model behind `SingleFlight`; a summarising tick delays a live reply. Yielding to chat is not implemented.
+- **Search quality** is Tavily's: snippets only, no page reading. An "open this link" tool would need its own allow-list and limits.
+- **`tests/test_vector_store.py`** has a syntax error on line 7 (`import import`) and cannot be collected.
+- **Old conversation history** may still contain wrong earlier replies; only "Task added"-style claims are filtered from the chat prompt.

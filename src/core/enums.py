@@ -46,6 +46,7 @@ class ExceptionCode(str, Enum):
     COMMAND_BLOCKED = "COMMAND_BLOCKED"
     PATH_BLOCKED = "PATH_BLOCKED"
     EGRESS_DENIED = "EGRESS_DENIED"  # new — NetworkPolicy / egress_guard denial
+    TOOL_UNAVAILABLE = "TOOL_UNAVAILABLE"  # provider down / API key not configured
 
     def __repr__(self):
         return self.value
@@ -73,6 +74,9 @@ class ErrorMessage(Enum):
     COMMAND_IS_BLOCKED = "Command '{command}' is blocked by guardrails"
     PATH_IS_BLOCKED = "Path '{path}' is not in allowed paths"
     EGRESS_DENIED = "Outbound call to '{host}' denied — not on the allow-list"
+    TOOL_MANIFEST_INVALID = "Invalid tool manifest '{name}': {detail}"
+    PROMPT_NOT_FOUND = "Prompt '{name}' not found in {path}"
+    TOOL_UNAVAILABLE = "Tool '{tool}' is unavailable: {detail}"
 
     def __repr__(self):
         return self.value
