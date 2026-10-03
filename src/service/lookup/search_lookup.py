@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from typing import Callable
 
 from core.enums import ErrorMessage, ExceptionCode
+from core.logging_config import logger
 from domain.entities.fact_query import FactQuery
 from domain.entities.tool_observation import ToolObservation
+from domain.policies.query_policy import resolve_relative_dates, results_look_relevant
 from exceptions.exception import AppException
 from service.lookup.lookup_service import LookupService
 
@@ -74,8 +77,9 @@ def _headlines(hits: list[dict]) -> str:
 
 
 class SearchLookup:
-    def __init__(self, lookup: LookupService):
+    def __init__(self, lookup: LookupService, today: Callable[[], date] = date.today):
         self._lookup = lookup
+        self._today = today
 
     async def search(self, query: str, topic: str = "general") -> ToolObservation:
         q = " ".join(str(query or "").split())[:_MAX_QUERY]
@@ -84,7 +88,27 @@ class SearchLookup:
                 class_name="SearchLookup", code=ExceptionCode.VALIDATION_ERROR, error_message=ErrorMessage.GENERIC,
                 detail="What should I search for?",
             )
+        # "this month" means nothing to a search engine (and the model often leaves it as-is),
+        # so relative dates become concrete ones before anything leaves the device.
+        resolved = resolve_relative_dates(q, self._today())
+        if resolved != q:
+            logger.info(f"[search] query dates resolved: {q!r} -> {resolved!r}")
+            q = resolved
+
         answer = await self._lookup.fetch(FactQuery(category="search", params={"query": q, "topic": topic}))
+        if not self._on_topic(q, answer.data):
+            # The provider's answer is machine-written and was sometimes about something else entirely
+            # (Hollywood re-releases for a Tollywood question). Retry once with the deeper search.
+            logger.warning(f"[search] results for {q!r} look off-topic; retrying with advanced depth")
+            answer = await self._lookup.fetch(
+                FactQuery(category="search", params={"query": q, "topic": topic, "depth": "advanced"})
+            )
+            if not self._on_topic(q, answer.data):
+                logger.warning(f"[search] results for {q!r} still look off-topic; refusing to report them")
+                raise AppException(
+                    class_name="SearchLookup", code=ExceptionCode.NOT_FOUND, error_message=ErrorMessage.GENERIC,
+                    detail=f"I couldn't find reliable results for '{q}'",
+                )
         d = answer.data
         hits = d.get("hits") or []
         if not d.get("answer") and not hits:
@@ -105,7 +129,17 @@ class SearchLookup:
         else:
             spoken, final = f"{hits[0]['title']}. {hits[0]['snippet']}", False  # let the narrate stage phrase raw snippets
         text = f"WEB SEARCH for '{q}' (source tavily{', cached' if answer.cached else ''}):\n{answer.text}"
+        d = {**d, "hits": [{k: v for k, v in h.items() if k != "match_text"} for h in hits]}
         return ToolObservation(
             text=text, spoken=spoken, source="tavily", cached=answer.cached, final=final,
             as_of=answer.fetched_at.isoformat(timespec="minutes") if answer.fetched_at else "", data=d,
         )
+
+
+    @staticmethod
+    def _on_topic(query: str, data: dict) -> bool:
+        """Do the result titles/snippets mention what the query is about? (No hits at all: nothing to judge.)"""
+        hits = data.get("hits") or []
+        if not hits:
+            return True
+        return results_look_relevant(query, [h.get("match_text") or h.get("snippet", "") for h in hits])

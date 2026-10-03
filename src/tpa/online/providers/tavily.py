@@ -70,8 +70,9 @@ class TavilyProvider:
                 not_configured=True,
             )
         topic = "news" if str(query.params.get("topic") or "").lower() == "news" else "general"
+        depth = "advanced" if str(query.params.get("depth") or "").lower() == "advanced" else "basic"
         body: dict = {
-            "query": q, "topic": topic, "search_depth": "basic", "max_results": _MAX_HITS,
+            "query": q, "topic": topic, "search_depth": depth, "max_results": _MAX_HITS,
             "include_answer": True, "include_raw_content": False,
         }
         if topic == "news":
@@ -88,6 +89,8 @@ class TavilyProvider:
                 "title": _clip(r.get("title") or "", 120),
                 "domain": (urlparse(r.get("url") or "").hostname or "").removeprefix("www."),
                 "snippet": _clip(r.get("content") or "", _SNIPPET_CHARS),
+                # longer text, never spoken or shown: only used to judge whether the hit is on topic
+                "match_text": _clip(f"{r.get('title') or ''} {r.get('content') or ''}", 900),
                 "published": _iso_date(r.get("published_date")),
             })
         lines = []
@@ -100,5 +103,5 @@ class TavilyProvider:
             provider_id="tavily", category=self.category, text="\n".join(lines) or "no results",
             sources=tuple(dict.fromkeys(h["domain"] for h in hits if h["domain"])) or (_HOST,),
             fetched_at=datetime.now(timezone.utc),
-            data={"query": q, "topic": topic, "answer": answer, "hits": hits},
+            data={"query": q, "topic": topic, "depth": depth, "answer": answer, "hits": hits},
         )
