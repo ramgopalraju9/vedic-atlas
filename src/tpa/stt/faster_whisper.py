@@ -52,8 +52,21 @@ class FasterWhisperProvider:
 
         def _do():
             pcm = np.frombuffer(audio.pcm, dtype=np.int16).astype(np.float32) / 32768.0
-            segments, info = self._ensure().transcribe(pcm, language="en", vad_filter=True)
-            text = "".join(seg.text for seg in segments).strip()
+            segments, info = self._ensure().transcribe(
+                pcm, language="en", vad_filter=True,
+                vad_parameters={"min_silence_duration_ms": 500},
+                # Whisper invents text on noise ("subscribe to our channel", "Bye. Bye. Bye..."), and
+                # conditioning on its own previous output makes it loop: turn that off and reject
+                # low-confidence / repetitive output.
+                condition_on_previous_text=False,
+                no_speech_threshold=0.6, log_prob_threshold=-1.0, compression_ratio_threshold=2.4,
+            )
+            # Whisper's own recommended rule: a segment that is probably silence AND low confidence is noise.
+            kept = [
+                seg for seg in segments
+                if not (getattr(seg, "no_speech_prob", 0.0) > 0.6 and getattr(seg, "avg_logprob", 0.0) < -1.0)
+            ]
+            text = "".join(seg.text for seg in kept).strip()
             return text, getattr(info, "language_probability", 1.0)
 
         import asyncio

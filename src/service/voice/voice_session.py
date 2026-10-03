@@ -36,6 +36,7 @@ from typing import Any, Callable
 from core.logging_config import logger
 from domain.entities.agent_context import AgentContext
 from domain.entities.utterance import Utterance
+from domain.policies.transcript_policy import artifact_reason
 from domain.ports.audio_capture_port import AudioCapturePort
 from domain.ports.stt_port import STTPort
 from domain.ports.tts_port import TTSPort
@@ -212,12 +213,57 @@ class VoiceSession:
 
         utterance = self._collector.push(frame)
         if utterance is not None:
-            await self._handle(utterance)
+            if not await self._run_turn(utterance):
+                return  # muted mid-turn: it was cancelled and dropped; stay passive
             if self._wake is not None:
                 # Extend the window so a quick follow-up needs no second trigger.
                 self._arm()
         elif self._wake is not None and self._armed_expired():
             self._disarm()
+
+    # -- Running a turn, with mute as an interrupt -------------------------------
+
+    async def _run_turn(self, utterance: Utterance) -> bool:
+        """Run one turn as a task and watch the mute switch while it runs.
+
+        Muting must mean *stop*: not just "no new audio", but also no further
+        thinking, no tool calls started and no reply spoken for something heard
+        before the mute. Returns False if the turn was cancelled by a mute.
+        """
+        cancel = asyncio.Event()
+        task = asyncio.create_task(self._handle(utterance, cancel), name="VoiceTurn")
+        try:
+            while True:
+                done, _ = await asyncio.wait({task}, timeout=0.1)
+                if done:
+                    task.result()  # re-raise a turn failure to the loop's error handler, as before
+                    return True
+                if self._gate.is_muted():
+                    await self._abort_turn(task, cancel)
+                    return False
+        except asyncio.CancelledError:
+            task.cancel()
+            raise
+
+    async def _abort_turn(self, task: asyncio.Task, cancel: asyncio.Event) -> None:
+        logger.info("[voice] muted mid-turn: cancelling the turn and stopping playback")
+        cancel.set()  # lets a streaming model stop generating
+        interrupt = getattr(self._speaker, "interrupt", None)
+        if callable(interrupt):
+            try:
+                interrupt()
+            except Exception as e:
+                logger.warning(f"[voice] could not interrupt playback: {e}")
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+        self._speaking = False
+        self._collector.reset()
+        self._reset_speaker_scoring()
+        self._disarm(silent=True)
+        self._emit("turn_cancelled", {"reason": "muted"})
 
     # -- Wake-word gating -------------------------------------------------
 
@@ -318,7 +364,7 @@ class VoiceSession:
 
     # -- One turn ---------------------------------------------------------
 
-    async def _handle(self, utterance: Utterance) -> None:
+    async def _handle(self, utterance: Utterance, cancel: asyncio.Event | None = None) -> None:
         logger.info(f"[voice] utterance {utterance.duration_sec:.1f}s -> transcribing")
         self._emit("utterance", {"duration_sec": round(utterance.duration_sec, 2)})
 
@@ -331,6 +377,14 @@ class VoiceSession:
         # Re-check: the user may have muted while we were transcribing.
         if self._gate.is_muted():
             logger.info("[voice] muted during transcription - dropping turn")
+            return
+
+        # Speech-to-text invents text on noise ("subscribe to our channel", "Bye. Bye. Bye..."):
+        # that is not something the user said, so it must not become a turn.
+        reason = artifact_reason(text, utterance.duration_sec)
+        if reason is not None:
+            logger.info(f"[voice] dropping probable STT artefact ({reason}): {text[:80]!r}")
+            self._emit("artifact_ignored", {"reason": reason})
             return
 
         # Resolve who (if anyone enrolled) said this, then clear the running
@@ -363,7 +417,7 @@ class VoiceSession:
         if self._speak_replies and self._tts is not None:
             # Stream + speak per sentence so the first words play while the rest
             # of the reply is still generating (low time-to-first-audio).
-            reply = await self._stream_and_speak(ctx)
+            reply = await self._stream_and_speak(ctx, cancel)
         else:
             result = await self._supervisor.execute(ctx)
             reply = (result.response or "").strip()
@@ -400,7 +454,7 @@ class VoiceSession:
         finally:
             await self._after_speaking()
 
-    async def _stream_and_speak(self, ctx: AgentContext) -> str:
+    async def _stream_and_speak(self, ctx: AgentContext, cancel: asyncio.Event | None = None) -> str:
         """Stream the reply and speak each sentence as it completes.
 
         Speaking on sentence boundaries plays the first words while the rest of
@@ -413,7 +467,7 @@ class VoiceSession:
         buffer = ""
         spoke_anything = False
         try:
-            async for chunk in self._supervisor.execute_stream(ctx):
+            async for chunk in self._supervisor.execute_stream(ctx, cancel_event=cancel):
                 if not chunk:
                     continue
                 parts.append(chunk)

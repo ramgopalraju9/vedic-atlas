@@ -423,6 +423,16 @@ def _build_voice_session(cfg: AppConfig, *, audio, capture_gate, supervisor, eve
         logger.warning(f"[voice] not started - missing: {', '.join(missing)}")
         return None
 
+    wake = _build_wake_word(cfg)
+    if wake is None and cfg.audio.wake_word_enabled and (cfg.audio.wake_engine or "none").lower() != "none":
+        # Fail closed. A wake word was configured, so "always listening" must never be the fallback.
+        logger.error(
+            f"[voice] wake engine '{cfg.audio.wake_engine}' is configured but could not be started - "
+            "voice listening is DISABLED rather than falling back to listening continuously "
+            "(set audio.wake_engine: none to opt in to always-on listening)"
+        )
+        return None
+
     from service.voice.utterance_collector import UtteranceCollector
     from service.voice.voice_session import VoiceSession
 
@@ -459,7 +469,7 @@ def _build_voice_session(cfg: AppConfig, *, audio, capture_gate, supervisor, eve
         speak_timeout_sec=cfg.audio.speak_timeout_sec,
         post_speak_settle_sec=cfg.audio.post_speak_settle_sec,
         echo_guard=cfg.audio.echo_guard,
-        wake_word=_build_wake_word(cfg),
+        wake_word=wake,
         wake_engine=cfg.audio.wake_engine,
         wake_window_sec=cfg.audio.wake_window_sec,
         speaker_id=speaker_id,

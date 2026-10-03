@@ -76,6 +76,29 @@ class SpeakerPlayback:
             self._idle.clear()
         self._queue.put_nowait((pcm_bytes, sample_rate))
 
+    def interrupt(self) -> None:
+        """Stop what is playing NOW and drop everything queued (used when the user mutes mid-reply)."""
+        dropped = 0
+        try:
+            while True:
+                item = self._queue.get_nowait()
+                if item is None:  # keep a pending stop() sentinel
+                    self._queue.put_nowait(None)
+                    break
+                dropped += 1
+        except queue.Empty:
+            pass
+        with self._lock:
+            self._pending = max(0, self._pending - dropped)
+            if self._pending == 0:
+                self._idle.set()
+        try:
+            import sounddevice as sd
+
+            sd.stop()  # makes the blocking sd.play() in the worker return; its `finally` settles the count
+        except Exception as e:
+            logger.warning(f"[speaker] interrupt: {e}")
+
     @property
     def is_playing(self) -> bool:
         return not self._idle.is_set()

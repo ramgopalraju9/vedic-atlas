@@ -142,6 +142,8 @@ class LlamaCppClient:
                 for chunk in self._llama.create_chat_completion(
                     messages=self._prompt_messages(prompt, system), stream=True, max_tokens=max_tokens
                 ):
+                    if cancel_event is not None and cancel_event.is_set():
+                        break  # cancelled (e.g. the user muted): stop burning CPU on a reply nobody will hear
                     delta = chunk["choices"][0]["delta"].get("content", "")
                     if delta:
                         loop.call_soon_threadsafe(queue.put_nowait, delta)

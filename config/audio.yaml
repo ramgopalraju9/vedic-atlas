@@ -1,10 +1,16 @@
 wake_word_enabled: true
-# Wake trigger: none (transcribe while unmuted) | hotkey (press a key to arm a
-# listening window) | porcupine (spoken wake word; needs PORCUPINE_ACCESS_KEY + .ppn).
-wake_engine: none
-wake_hotkey: <f9>
+# Wake trigger: openwakeword (spoken "Hey Veda", local ONNX model, no key) | none (transcribe
+# everything while unmuted) | hotkey | porcupine. With a wake engine configured, Veda is PASSIVE
+# until it hears the wake word, then listens for wake_window_sec (each handled turn extends it).
+# If the wake model cannot be loaded the voice loop does NOT start (it never falls back to
+# listening continuously).
+wake_engine: openwakeword
+wake_oww_model: hey_veda
+wake_oww_model_path: data/models/openwakeword/hey_veda.onnx
+# Detection score needed to trigger (0-1). Higher = fewer false triggers, more misses.
+# Measure with your own voice: python scripts/wake_test.py
+wake_threshold: 0.5
 wake_window_sec: 8.0
-wake_keyword_path: null
 daemon_trigger: auto
 hotkey: <f8>
 
