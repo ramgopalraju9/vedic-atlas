@@ -18,7 +18,7 @@ from exceptions.exception import AppException
 from service.lookup.lookup_service import LookupService
 
 _MAX_QUERY = 200
-_SPOKEN_CHARS = 260
+_SPOKEN_CHARS = 320
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -29,7 +29,13 @@ def _first_sentences(text: str, limit: int = _SPOKEN_CHARS) -> str:
         if out and len(out) + 1 + len(sentence) > limit:
             break
         out = f"{out} {sentence}".strip()
-    return out if len(out) <= limit else out[: limit - 1].rstrip() + "..."
+    if len(out) <= limit:
+        return out
+    cut = out[:limit]
+    boundary = max(cut.rfind(", "), cut.rfind("; "))  # a list item boundary, so we never stop mid-title
+    if boundary > limit // 2:
+        return cut[:boundary].rstrip(",; ") + ", and more."
+    return cut[: cut.rfind(" ")].rstrip(",; ") + "..."
 
 
 _GENERIC_SECOND_LEVEL = frozenset({"co", "com", "org", "gov", "ac", "net", "edu"})

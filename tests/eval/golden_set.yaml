@@ -57,3 +57,16 @@
 - {say: "write me a two line poem about the sea", agent: responder, tool: null}
 - {say: "I'm feeling a bit tired today", agent: responder, tool: null}
 - {say: "can you speak more slowly", agent: responder, tool: null}
+
+# ---- time-sensitive questions that must search (regression: "upcoming Tollywood movies" went to chat) ----
+- {say: "can you tell what are the upcoming movies releasing in the year 2026 october from tollywood?", agent: lookup, tool: web_search, args: {query: tollywood}}
+- {say: "any new telugu movies releasing this friday", agent: lookup, tool: web_search, args: {query: telugu}}
+- {say: "what's playing in theatres this week", agent: lookup, tool: web_search}
+- {say: "when does the next IPL match start", agent: lookup, tool: web_search, args: {query: IPL}}
+- {say: "which cricket matches are scheduled for November 2026", agent: lookup, tool: web_search, args: {query: cricket}}
+- {say: "what are the best phones released in 2026", agent: lookup, tool: web_search, args: {query: phones}}
+
+# ---- must NOT be hijacked by the broader search patterns ----
+- {say: "I'm so tired this week", agent: responder, tool: null}
+- {say: "tell me a story about a dragon", agent: responder, tool: null}
+- {say: "what is the best way to learn guitar", agent: responder, tool: null}

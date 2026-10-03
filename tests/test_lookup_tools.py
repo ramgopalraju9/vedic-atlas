@@ -410,3 +410,29 @@ def test_outlet_names_are_readable_aloud():
     assert [_outlet(d) for d in ["en.wikipedia.org", "isro.gov.in", "bbc.co.uk", "business-standard.com", "the-hindu.com", ""]] == [
         "wikipedia", "isro", "bbc", "business standard", "the hindu", "the web",
     ]
+
+
+# ---- news-topic gating and spoken clipping ---------------------------------------
+
+@pytest.mark.parametrize("question,sent_topic", [
+    ("what are the upcoming movies releasing in october from tollywood", "general"),
+    ("who is the prime minister of japan", "general"),
+    ("what's the latest news on isro", "news"),
+    ("any headlines today", "news"),
+])
+def test_news_topic_is_only_used_when_the_question_sounds_like_news(question, sent_topic):
+    lookup, http = build({"/search": TAVILY_OK})
+    skill = WebSearchSkill(SearchLookup(lookup), MANIFESTS["web_search"])
+    res = run(skill.execute(AgentContext(user_message=question), query="x", topic="news"))  # the model always asked for news
+    assert res.success and http.requests[0][2]["topic"] == sent_topic
+
+
+def test_long_answers_are_clipped_at_a_list_boundary_not_mid_title():
+    from service.lookup.search_lookup import _first_sentences
+
+    movies = ", ".join(f'"Film Number {i}" on October {i}' for i in range(1, 30))
+    spoken = _first_sentences(f"Upcoming releases include {movies}.")
+    assert len(spoken) <= 340 and spoken.endswith(", and more.")
+    assert spoken.count('"') % 2 == 0  # never cut inside a quoted title
+    short = "Two short sentences. Fit fine."
+    assert _first_sentences(short) == short

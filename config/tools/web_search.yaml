@@ -19,19 +19,27 @@ params:
 examples:
   - user: latest news on ISRO
     calls: [{tool: web_search, args: {query: ISRO latest news, topic: news}}]
-  - user: who won the cricket match yesterday
-    calls: [{tool: web_search, args: {query: cricket match result yesterday, topic: news}}]
   - user: who is the prime minister of Japan
-    calls: [{tool: web_search, args: {query: current prime minister of Japan}}]
+    calls: [{tool: web_search, args: {query: current prime minister of Japan, topic: general}}]
+  - user: upcoming Telugu movies releasing in November 2026
+    calls: [{tool: web_search, args: {query: upcoming Telugu movies releasing November 2026, topic: general}}]
 
 triggers:
   - '\b(latest|news|headlines|breaking|trending|score|scores|results?)\b'
   - '\b(search( the web| for| up)?|google|look up|find out|check online)\b'
   - '\bwho (won|is|was|are)\b|\bprice of\b|\bwhat happened\b'
+  # time-sensitive questions: releases, schedules, "upcoming", a recent/future year
+  - '\b(upcoming|releasing|release dates?|releases?|released|showtimes?|box office|trailers?|fixtures?|schedule|line-?up)\b'
+  - '\b20(2[5-9]|3\d)\b'
+  - '\b(what|which|any|who|where|how many|how much)\b.*\b(this|next) (week|month|year|weekend)\b'
+  - '\bwhen (is|are|does|do|will)\b.*\b(start|begin|release|open|launch|air|premiere|kick off)\b'
+  - '\bwhat(''s| is| are) (the )?(new|upcoming|current)\b'
 
 required_when:
   - '\b(latest|news|headlines|search( the web| for| up)?|google|look up|price of|what happened)\b'
   - '\bwho (won|is the (current|new))\b'
+  - '\b(upcoming|releasing|release dates?|showtimes?|box office)\b'
+  - '\b20(2[5-9]|3\d)\b'
 
 claims:
   - '\b(according to|reports? (say|that)|per (the )?(latest|news))\b'
