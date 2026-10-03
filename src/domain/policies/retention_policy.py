@@ -19,6 +19,10 @@ from datetime import datetime, timedelta
 
 AGENT_MEMORY_RETENTION_DAYS = 10
 
+# Completed to-do items are kept briefly (so "undo" and "what did I finish"
+# still work), then purged. Pending tasks never expire.
+COMPLETED_TASK_RETENTION_DAYS = 7
+
 
 def is_expired_agent_memory(created_at: datetime, now: datetime) -> bool:
     """True if a cross-agent memory-mesh row is past its retention window."""

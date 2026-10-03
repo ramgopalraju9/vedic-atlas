@@ -25,6 +25,7 @@ from domain.ports.memory_repository_port import MemoryRepositoryPort
 from service.agent.base_llm_agent import LLMAgent
 from service.agent.persona import VEDA_SYSTEM_PROMPT
 from service.agent.tool_calling import ToolCallingLoop
+from service.agent.tool_use_guard import TASK_GUARD
 from service.conversation.conversation_manager import ConversationManager
 from service.memory.semantic_recall import SemanticRecall
 
@@ -90,9 +91,9 @@ class ResponderAgent(LLMAgent):
             parts.append(knowledge_block)
         if ctx.system_context:
             parts.append(f"CURRENT CONTEXT:\n{ctx.system_context}")
-        mem_ctx = self._memory_context()
-        if mem_ctx:
-            parts.append(mem_ctx)
+        # Deliberately no cross-agent activity block here: it only holds internal
+        # routing records (supervisor/responder), which the model mistook for user
+        # tasks and echoed back. Activity is still recorded via _record_to_memory.
         history_block = self._render_history()
         if history_block:
             parts.append(history_block)
@@ -138,10 +139,27 @@ class ResponderAgent(LLMAgent):
         async for chunk in super().execute_stream(ctx, cancel_event=cancel_event):
             yield chunk
 
+    def _without_action_claims(self, turns):
+        """Drop "Task added…"-style exchanges (the assistant reply and the user
+        request before it). Shown as history they teach the model to answer in
+        that shape without calling the tool, which is how claims got made up."""
+        if self._tool_loop is None:
+            return turns
+        kept = []
+        for turn in turns:
+            if turn.role != "user" and TASK_GUARD.claims_action(turn.content or ""):
+                if kept and kept[-1].role == "user":
+                    kept.pop()
+                continue
+            kept.append(turn)
+        return kept
+
     def _render_history(self) -> str:
-        recent = self.conversation.turns[-self.max_history_turns:]
-        if not recent:
-            return ""
+        blocks: list[str] = []
+        summaries = self.conversation.get_summaries_block()
+        if summaries:
+            blocks.append(summaries)
+        recent = self._without_action_claims(self.conversation.turns[-self.max_history_turns:])
         lines = []
         for turn in recent:
             content = (turn.content or "").strip()
@@ -149,7 +167,9 @@ class ResponderAgent(LLMAgent):
                 continue
             prefix = "User" if turn.role == "user" else "Veda"
             lines.append(f"{prefix}: {content}")
-        return "RECENT CONVERSATION:\n" + "\n".join(lines) if lines else ""
+        if lines:
+            blocks.append("RECENT CONVERSATION:\n" + "\n".join(lines))
+        return "\n\n".join(blocks)
 
     async def on_completion(self, ctx: AgentContext, response: str) -> None:
         if not response:

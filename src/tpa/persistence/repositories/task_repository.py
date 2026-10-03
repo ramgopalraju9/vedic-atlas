@@ -6,6 +6,8 @@ domain Task entity before returning.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import delete as sa_delete, select, update
 
 from domain.entities.task import Task
@@ -16,7 +18,7 @@ from tpa.persistence.session import SessionLocal
 def _to_entity(row: TaskRow) -> Task:
     return Task(
         id=row.id, title=row.title, done=row.done, notes=row.notes,
-        due_at=row.due_at, created_at=row.created_at,
+        due_at=row.due_at, created_at=row.created_at, completed_at=row.completed_at,
     )
 
 
@@ -53,10 +55,21 @@ class SqliteTaskRepository:
 
     def set_done(self, task_id: int, done: bool = True) -> bool:
         with self._session() as s, s.begin():
-            res = s.execute(update(TaskRow).where(TaskRow.id == task_id).values(done=done))
+            res = s.execute(
+                update(TaskRow).where(TaskRow.id == task_id).values(
+                    done=done, completed_at=datetime.now() if done else None
+                )
+            )
             return res.rowcount > 0
 
     def delete(self, task_id: int) -> bool:
         with self._session() as s, s.begin():
             res = s.execute(sa_delete(TaskRow).where(TaskRow.id == task_id))
             return res.rowcount > 0
+
+    def purge_completed_before(self, cutoff: datetime) -> int:
+        with self._session() as s, s.begin():
+            res = s.execute(
+                sa_delete(TaskRow).where(TaskRow.done == True, TaskRow.completed_at < cutoff)  # noqa: E712
+            )
+            return int(res.rowcount or 0)

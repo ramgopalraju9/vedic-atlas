@@ -22,3 +22,4 @@ class TaskRow(Base):
     notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
     due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

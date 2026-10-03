@@ -53,19 +53,31 @@ class ConversationManager:
         limit = max(self.max_history * 2, 1)
         return self.repo.recent_turns(limit=limit, only_unsummarized=True)
 
+    def get_summaries_block(self, limit: int = 3) -> str:
+        """Older-session summaries (compacted by ConversationSummariser), oldest first."""
+        try:
+            gists = self.repo.recent_summaries(limit=limit)
+        except Exception as e:
+            logger.warning(f"[conversation] recent_summaries failed: {e}")
+            return ""
+        if not gists:
+            return ""
+        lines = ["EARLIER SESSIONS (compressed):"]
+        for g in reversed(gists):  # chronological
+            lines.append(f"- {g.created_at.date()}: {g.content}")
+        return "\n".join(lines)
+
     def get_context_summary(self) -> str:
         """Tiered recall: older-session summaries (compacted by
         ConversationSummariser) plus recent raw turns — matches the donor's
         `brain/conversation.py::get_context_summary` shape exactly."""
-        gists = self.repo.recent_summaries(limit=3)
+        summaries = self.get_summaries_block()
         recent = self.turns
-        if not gists and not recent:
+        if not summaries and not recent:
             return ""
         parts: list[str] = []
-        if gists:
-            parts.append("EARLIER SESSIONS (compressed):")
-            for g in reversed(gists):  # chronological
-                parts.append(f"- {g.created_at.date()}: {g.content}")
+        if summaries:
+            parts.append(summaries)
         if recent:
             parts.append("RECENT CONVERSATION:")
             for t in recent:

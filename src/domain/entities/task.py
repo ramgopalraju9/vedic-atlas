@@ -17,3 +17,4 @@ class Task:
     notes: str = ""
     due_at: datetime | None = None
     created_at: datetime = field(default_factory=datetime.now)
+    completed_at: datetime | None = None

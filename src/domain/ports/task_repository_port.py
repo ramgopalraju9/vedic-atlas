@@ -3,6 +3,7 @@
 New (Feature D). Keeps the task use cases independent of SQLAlchemy.
 """
 
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from domain.entities.task import Task
@@ -30,4 +31,8 @@ class TaskRepositoryPort(Protocol):
 
     def delete(self, task_id: int) -> bool:
         """Delete a task. Returns False if the id doesn't exist."""
+        ...
+
+    def purge_completed_before(self, cutoff: datetime) -> int:
+        """Delete tasks completed before `cutoff`. Returns the number removed."""
         ...

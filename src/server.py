@@ -680,6 +680,7 @@ def bootstrap(app: FastAPI) -> None:
     responder_tool_loop = None
     if cfg.agents.tools_enabled and cfg.agents.responder.skills:
         from service.agent.tool_calling import ToolCallingLoop
+        from service.agent.tool_use_guard import TASK_GUARD
         responder_tool_loop = ToolCallingLoop(
             client=inference_client,
             skill_runner=skill_runner,
@@ -687,6 +688,7 @@ def bootstrap(app: FastAPI) -> None:
             tool_names=list(cfg.agents.responder.skills),
             model=cfg.agents.responder.model,
             max_iterations=cfg.agents.max_tool_iterations,
+            guard=TASK_GUARD,
         )
     responder = ResponderAgent(
         client=inference_client, conversation=conversation, knowledge=knowledge,
@@ -766,6 +768,18 @@ async def _backfill_memory_index(app: FastAPI) -> None:
         logger.warning(f"[memory-index] backfill failed: {e}")
 
 
+async def _purge_completed_tasks_loop(task_service, interval_sec: float = 3600.0) -> None:
+    """Hourly: drop completed tasks older than the retention window."""
+    while True:
+        try:
+            removed = task_service.purge_completed()
+            if removed:
+                logger.info(f"[tasks] purged {removed} completed task(s)")
+        except Exception as e:
+            logger.warning(f"[tasks] purge failed: {e}")
+        await asyncio.sleep(interval_sec)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     cfg = load_full_config()
@@ -804,6 +818,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"ConversationSummariser failed to start: {e}")
 
+    app.state.task_purge_job = asyncio.create_task(_purge_completed_tasks_loop(app.state.task_service))
+
     if getattr(app.state, "memory_indexer", None) is not None and app.state.memory_indexer.enabled:
         asyncio.create_task(_backfill_memory_index(app))
 
@@ -821,6 +837,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"VoiceSession failed to stop cleanly: {e}")
 
+    app.state.task_purge_job.cancel()
     try:
         await app.state.conversation_summariser.stop()
     except Exception:

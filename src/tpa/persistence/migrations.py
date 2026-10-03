@@ -16,3 +16,21 @@ def init_tables() -> None:
     from tpa.persistence.models import agent_memory, conversation, memory_vector, task  # noqa: F401
 
     Base.metadata.create_all(engine)
+    _add_missing_columns()
+
+
+# create_all never alters an existing table, so columns added after a user's
+# DB was first created are applied here (SQLite ADD COLUMN, idempotent).
+_ADDED_COLUMNS = (("tasks", "completed_at", "DATETIME"),)
+
+
+def _add_missing_columns() -> None:
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table, column, ddl in _ADDED_COLUMNS:
+            if not insp.has_table(table):
+                continue
+            if column not in {c["name"] for c in insp.get_columns(table)}:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
