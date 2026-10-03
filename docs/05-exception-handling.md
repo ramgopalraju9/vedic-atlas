@@ -53,8 +53,16 @@ with an HTTP status — see `exceptions/handlers.py` for the mapping table."
 | `APPROVAL_TIMEOUT` | 408 |
 | `APPROVAL_REJECTED` | 403 |
 | `EGRESS_DENIED` | 403 |
+| `TOOL_UNAVAILABLE` | 503 |
 | `COMMAND_BLOCKED` | *(no entry — falls through to 500)* |
 | `PATH_BLOCKED` | *(no entry — falls through to 500)* |
+
+`TOOL_UNAVAILABLE` is raised as `exceptions.exception.ToolUnavailableError` (an `AppException`
+subclass) when an online tool's provider can't answer — HTTP error, timeout, rate limit or a missing
+API key. It carries `status` (the upstream HTTP status, if any) and `not_configured`, so the
+user-facing sentence can distinguish "it isn't set up" from "it didn't respond" and callers can
+treat 404/422 as "unsupported input" rather than an outage. Tools never surface the exception to
+the user: `ManifestSkill` converts it into a failed `SkillResult` with a plain spoken sentence.
 
 `ErrorMessage` (also in `core/enums.py`) holds the ~15 templated message
 strings consumed via `AppException`'s `error_message=...` + `**kwargs`

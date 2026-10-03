@@ -137,3 +137,4 @@ true interface into the system; the CLI is UX sugar on top of it.
 | [04-controller-layer.md](04-controller-layer.md) | Routes, SSE, CLI, the composition root (`server.py`), full bootstrap sequence |
 | [05-exception-handling.md](05-exception-handling.md) | `AppException`, error codes, the `AppResponse` envelope, HTTP status mapping |
 | [06-configuration.md](06-configuration.md) | Config loading, `config/*.yaml`, constants, logging, the full `AppConfig` schema |
+| [08-tool-harness.md](08-tool-harness.md) | How tool calls work on the small local model: manifests, staged turns, online tools (weather, currency, search), traces, evaluation |

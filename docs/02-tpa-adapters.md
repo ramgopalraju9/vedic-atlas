@@ -76,6 +76,12 @@ implements a port.
 
 - **`json_knowledge_store.py` — `JsonKnowledgeStore`**: flat JSON-file
   persistence for user-taught facts (`{"fact", "added"}` objects).
+- **`yaml_tool_manifest_store.py` — `YamlToolManifestStore`**: implements
+  `ToolManifestStorePort`; loads and validates `config/tools/*.yaml` through
+  `schemas/tool_manifest_schema.py`. An invalid or duplicate manifest raises
+  `AppException(CONFIG_ERROR)` at boot.
+- **`file_prompt_store.py` — `FilePromptStore`**: implements `PromptStorePort`;
+  reads versioned prompt text from `config/prompts/<name>.md`, cached after the first read.
 - **`persistence/session.py`**: SQLAlchemy engine + `SessionLocal` factory.
   SQLite by default (`DATABASE_URL` env var overrides), with
   `check_same_thread=False` so background threads (audio capture, ambient
@@ -96,7 +102,13 @@ implements a port.
   records older than `AGENT_MEMORY_RETENTION_DAYS` on every write).
 - **`persistence/migrations.py`**: `init_tables()` — creates tables via
   `Base.metadata.create_all(engine)` if they don't exist; called once at
-  boot in `server.py`'s `lifespan()`.
+  boot in `server.py`'s `lifespan()`. `create_all` never alters an existing
+  table, so columns added later (e.g. `tasks.completed_at`) are applied by
+  `_add_missing_columns()` (idempotent SQLite `ADD COLUMN`).
+- **`persistence/models/turn_trace.py` + `repositories/trace_repository.py`**:
+  `TurnTraceRow` / `SqliteTraceRepository` (implements `TraceRepositoryPort`) —
+  one row per tool turn (calls, results, timings, prompt tokens), purged after
+  `TURN_TRACE_RETENTION_DAYS` (14).
 
 ## `tpa/governance/`
 
@@ -164,6 +176,11 @@ exist in parallel hardware/software tiers, selected by config
   auto-download" check so `server.py` can validate all configured model
   paths up front at boot, rather than each adapter failing independently
   on first use.
+- **Constrained decoding**: both clients accept `json_schema` and `temperature`
+  on `complete()`. `LlamaCppClient` passes the schema as a llama.cpp grammar
+  (`response_format`), so output is guaranteed valid JSON for that schema;
+  `OllamaClient` uses Ollama's `format`. `LlamaCppClient.count_tokens(text)`
+  gives exact token counts with the model's own tokenizer (prompt budgets).
 - **`embedding_adapter.py` — `FastEmbedProvider`**: local ONNX embeddings
   via `fastembed` (BGE-small on laptop, MiniLM on Pi profiles — both
   ONNX-backed, no `torch` dependency, no cloud embedding API).
@@ -185,15 +202,31 @@ exist in parallel hardware/software tiers, selected by config
   provider validation) — so the two can never disagree about what's
   permitted.
 - **`http_client.py` — `AllowListedHttpClient`**: the *only* module in the
-  codebase allowed to make outbound internet HTTP calls. Enforces
-  `domain.policies.egress_policy.is_allowed()` on every request before it
-  leaves the process; raises `EgressDeniedError` otherwise.
-- **`providers/`**: `WeatherProvider` (Open-Meteo), `SearchProvider`
-  (DuckDuckGo Instant Answer — note: not a general web-search API, only
-  returns results DuckDuckGo can resolve directly), `FxProvider`
-  (Frankfurter exchange rates). All three are the reference shape for
-  `FactProviderPort` — adding a new fact category means writing one more
-  file shaped exactly like these.
+  codebase allowed to make outbound internet HTTP calls (`get`, `post_json`).
+  Enforces `domain.policies.egress_policy.is_allowed()` on every request before
+  it leaves the process; raises `EgressDeniedError` otherwise. Does **not**
+  follow redirects (a redirect could leave the allow-list). Upstream failures
+  (HTTP errors, timeouts, connection errors) are normalised to
+  `ToolUnavailableError(status=...)`. Every request logs
+  `[http] category= host= status= ms=` — never headers or bodies (they can
+  carry API keys and user text).
+- **`providers/`** — all implement `FactProviderPort`; structured results go
+  in `FactAnswer.data`, a compact fact-only string in `.text`:
+  - `weather.py` — `WeatherProvider`: Open-Meteo current conditions for a lat/lon
+    (temperature, feels-like, humidity, wind, WMO condition, local observation time).
+  - `geocode.py` — `GeocodingProvider` (category `geocode`): place name → ranked
+    candidates via Open-Meteo's geocoder.
+  - `fx.py` — `FxProvider`: Frankfurter (ECB, ~30 currencies) first; falls back to
+    `open.er-api.com` (166 currencies) when Frankfurter 404s or is down.
+    The converted figure is computed from the provider's rate, never by the model.
+  - `tavily.py` — `TavilyProvider` (category `search`): real web search. Key read
+    at call time from an injected callable (env var named by
+    `privacy.online.search_api_key_env`), never logged; a missing key raises
+    `ToolUnavailableError(not_configured=True)` without any network call.
+    Only the model-chosen query leaves the device.
+  The DuckDuckGo Instant Answer provider was removed — it only resolved
+  encyclopedic entities and returned nothing for news or "latest" questions.
+  Adding a fact category means writing one more file shaped like these.
 
 ## `tpa/stt/` and `tpa/tts/`
 
