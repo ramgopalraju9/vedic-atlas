@@ -95,7 +95,13 @@ same as any other client would.
   from `VEDA_SERVER_URL` env var (default `http://127.0.0.1:8000`).
   `ensure_up(allow_spawn=True)` auto-spawns the server as a subprocess
   (`python -m uvicorn server:app`, with `PYTHONPATH` set to `src/`) if
-  it's unreachable, then polls until ready. Wraps essentially every route
+  it's unreachable, then polls until ready. `ensure_up(restart=True)` first calls
+  `stop_server()`, which finds the process listening on the port (psutil), refuses to
+  touch anything that isn't recognisably a Veda server, tries `POST /api/admin/shutdown`
+  (clean voice/mic teardown), then terminates and, if needed, kills it. The REPL start
+  (bare `veda`) uses `restart=True` so a stale server is never reused; opt out with
+  `--no-restart` or `VEDA_RESTART_ON_START=0`. One-shot commands (`veda task`,
+  `veda doctor`, `veda "prompt"`) attach to a running server without restarting it. Wraps essentially every route
   above (`stream_chat`, `chat_one_shot`, persona/approval/task/status
   helpers).
 - **`commands.py`**: `cmd_approve` (interactive y/n/skip loop, or `--id`/

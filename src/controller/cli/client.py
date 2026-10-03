@@ -22,6 +22,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import urlparse
 
 import httpx
 
@@ -57,14 +58,89 @@ class VedaClient:
         except Exception:
             return False
 
-    def ensure_up(self, *, allow_spawn: bool = True, wait_secs: float = 30.0) -> None:
+    # ---------- stop / restart ----------
+
+    @property
+    def _port(self) -> int:
+        return urlparse(self.server_url).port or 8000
+
+    def _listener(self):
+        """The psutil.Process listening on this client's port, or None."""
+        import psutil
+
+        try:
+            for conn in psutil.net_connections(kind="inet"):
+                if conn.status == psutil.CONN_LISTEN and conn.laddr and conn.laddr.port == self._port and conn.pid:
+                    return psutil.Process(conn.pid)
+        except (psutil.AccessDenied, psutil.NoSuchProcess):
+            return None
+        return None
+
+    @staticmethod
+    def _is_veda_server(proc) -> bool:
+        """Only ever stop a process that is recognisably a Veda server."""
+        try:
+            cmd = " ".join(proc.cmdline()).lower()
+        except Exception:
+            return False
+        return "server:app" in cmd or ("veda" in cmd and " server" in cmd) or ("controller.cli" in cmd and "server" in cmd)
+
+    def stop_server(self, *, wait_secs: float = 10.0) -> int | None:
+        """Stop the Veda server on this client's port. Returns the stopped pid, or None if none was running.
+
+        Tries the graceful ``POST /api/admin/shutdown`` first (lets the voice
+        session and microphone shut down cleanly), then terminates, then kills.
+        Raises :class:`CliError` if the port is held by something that is not a
+        Veda server — that process is never touched.
+        """
+        import psutil
+
+        proc = self._listener()
+        if proc is None:
+            return None
+        if not self._is_veda_server(proc):
+            raise CliError(
+                f"Port {self._port} is in use by '{proc.name()}' (pid {proc.pid}), which is not a Veda server; "
+                f"leaving it alone. Use --server-url to pick another port."
+            )
+        pid = proc.pid
+        try:
+            self._http.post(f"{self.server_url}/api/admin/shutdown", timeout=3.0)
+        except Exception:
+            pass  # not responding / old build: fall through to terminate
+        try:
+            proc.wait(timeout=min(6.0, wait_secs))
+            return pid
+        except psutil.TimeoutExpired:
+            pass
+        except psutil.NoSuchProcess:
+            return pid
+        try:
+            for child in proc.children(recursive=True):
+                child.terminate()
+            proc.terminate()
+            proc.wait(timeout=wait_secs)
+        except psutil.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=wait_secs)
+        except psutil.NoSuchProcess:
+            pass
+        logger.info(f"Stopped existing Veda server (pid {pid}) on port {self._port}")
+        return pid
+
+    def ensure_up(self, *, allow_spawn: bool = True, wait_secs: float = 30.0, restart: bool = False) -> int | None:
         """Block until the server responds; spawn it if missing.
+
+        ``restart=True`` first stops any existing Veda server on the port, so a
+        fresh process (with the current code and config) is always the one served.
+        Returns the pid that was stopped by a restart, else None.
 
         Raises :class:`CliError` if the server can't be reached after the
         wait window (or ``allow_spawn=False`` and no server is running).
         """
+        stopped = self.stop_server() if (restart and allow_spawn) else None
         if self.is_up():
-            return
+            return stopped
         if not allow_spawn:
             raise CliError(
                 f"Veda server not reachable at {self.server_url}. "
@@ -74,8 +150,8 @@ class VedaClient:
         src_dir = repo_root / "src"
         env = os.environ.copy()
         env["PYTHONPATH"] = str(src_dir) + os.pathsep + env.get("PYTHONPATH", "")
-        host = "127.0.0.1"
-        port = "8000"
+        host = urlparse(self.server_url).hostname or "127.0.0.1"
+        port = str(self._port)
         log_path = repo_root / "data" / "veda-server.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_file = open(log_path, "wb")
@@ -107,7 +183,7 @@ class VedaClient:
         deadline = time.monotonic() + wait_secs
         while time.monotonic() < deadline:
             if self.is_up():
-                return
+                return stopped
             time.sleep(0.5)
         raise CliError(
             f"Spawned Veda server but it didn't come up within {wait_secs}s. "

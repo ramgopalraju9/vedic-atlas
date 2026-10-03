@@ -16,6 +16,7 @@ chat; ``veda server`` runs the FastAPI app.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from typing import Sequence
 
@@ -47,6 +48,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--server-url", help="Override server URL (default http://127.0.0.1:8000)")
     p.add_argument("--no-spawn", action="store_true", help="Don't auto-start the server when not reachable")
+    p.add_argument(
+        "--no-restart", action="store_true",
+        help="REPL start: reuse a running server instead of stopping it and starting a fresh one "
+             "(also: VEDA_RESTART_ON_START=0)",
+    )
 
     sub = p.add_subparsers(dest="cmd", required=False)
 
@@ -246,12 +252,21 @@ def _handle_default_chat(args: argparse.Namespace, prompt: str) -> int:
 
 
 def _handle_repl(args: argparse.Namespace) -> int:
+    # Starting Veda always serves the current code and config: any server already running on the
+    # port is stopped and a fresh one spawned. Opt out with --no-restart or VEDA_RESTART_ON_START=0.
+    restart = (
+        not args.no_spawn
+        and not getattr(args, "no_restart", False)
+        and os.environ.get("VEDA_RESTART_ON_START", "1").strip().lower() not in ("0", "false", "no")
+    )
     with open_client(server_url=args.server_url) as client:
         try:
-            client.ensure_up(allow_spawn=not args.no_spawn)
+            stopped = client.ensure_up(allow_spawn=not args.no_spawn, restart=restart)
         except CliError as e:
             print(str(e), file=sys.stderr)
             return 1
+        if stopped:
+            Console().print(f"[dim]stopped the previous Veda server (pid {stopped}); started a fresh one[/dim]")
         return Repl(client).run()
 
 
@@ -294,6 +309,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = parser.parse_args(raw)
     if not getattr(args, "func", None):
+        if sys.stdin.isatty() and not first_pos:  # flags only (e.g. `veda --no-restart`) -> still the REPL
+            return _handle_repl(args)
         parser.print_help()
         return 0
     try:
