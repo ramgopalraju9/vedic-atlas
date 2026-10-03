@@ -42,6 +42,22 @@ def _keywords(text: str) -> set[str]:
     return set(_WORD_RE.findall(text.lower())) - _STOPWORDS
 
 
+def _pick_by_triggers(message: str, candidates: tuple[AgentProfile, ...]) -> str | None:
+    """Deterministic routing: the agent whose declared trigger patterns match most.
+
+    Triggers come from tool manifests, so adding a tool adds its routing with
+    no code change. Ties go to the earlier-registered agent. None when no agent
+    declares a matching trigger (fall through to keyword overlap).
+    """
+    best_name: str | None = None
+    best_hits = 0
+    for profile in candidates:
+        hits = sum(1 for pattern in profile.triggers if re.search(pattern, message, re.IGNORECASE))
+        if hits > best_hits:
+            best_hits, best_name = hits, profile.name
+    return best_name
+
+
 def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str) -> str:
     """Return the best-matching agent name, or the default on no clear match.
 
@@ -52,6 +68,10 @@ def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str)
         return default
     if len(candidates) == 1:
         return candidates[0].name
+
+    triggered = _pick_by_triggers(message, candidates)
+    if triggered is not None:
+        return triggered
 
     message_words = _keywords(message)
     if not message_words:

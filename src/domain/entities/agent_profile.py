@@ -21,5 +21,6 @@ class AgentProfile:
     description: str
     model_alias: str
     skills: tuple[str, ...] = field(default_factory=tuple)
+    triggers: tuple[str, ...] = field(default_factory=tuple)  # regexes that route a message straight to this agent
     system_prompt_extra: str = ""
     enabled: bool = True

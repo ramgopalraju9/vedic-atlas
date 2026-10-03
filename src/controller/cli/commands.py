@@ -240,6 +240,65 @@ def cmd_listen(client: VedaClient) -> int:
     return 0
 
 
+# ---------- trace ----------
+
+def render_traces(console: Console, traces: list[dict]) -> None:
+    """Newest first: what was asked, which tool calls really ran, and how long it took."""
+    if not traces:
+        console.print("[dim]no tool turns recorded yet[/dim]")
+        return
+    for t in traces:
+        when = str(t.get("created_at", ""))[11:19]
+        flag = " [yellow]forced[/yellow]" if t.get("forced") else ""
+        console.print(
+            f"[dim]{when}[/dim] [bold]{t.get('agent')}[/bold] {t.get('decided')}{flag} "
+            f"[dim]{t.get('total_ms')} ms[/dim]  {str(t.get('user_message'))[:70]!r}"
+        )
+        for c in t.get("calls", []):
+            colour = "green" if c.get("ok") else "red"
+            console.print(
+                f"    [{colour}]{'OK ' if c.get('ok') else 'ERR'}[/{colour}] {c.get('tool')} "
+                f"{c.get('args')} [dim]{c.get('ms')} ms[/dim]"
+            )
+        if t.get("reply"):
+            console.print(f"    [dim]reply:[/dim] {str(t['reply'])[:110]}")
+        for note in t.get("notes", []):
+            console.print(f"    [yellow]note:[/yellow] {note}")
+
+
+def cmd_trace(client: VedaClient, limit: int = 10) -> int:
+    console = Console()
+    try:
+        render_traces(console, client.recent_traces(limit))
+        return 0
+    except Exception as e:
+        console.print(f"[red]trace failed:[/red] {e}")
+        return 1
+
+
+# ---------- doctor ----------
+
+def render_doctor(console: Console, report: dict) -> int:
+    """Print the online-tool health table. Returns 0 if all OK, else 1."""
+    for p in report.get("providers", []):
+        if p.get("ok"):
+            console.print(f"[green]OK  [/green] {p['name']:<12} {p['latency_ms']:>5} ms  [dim]{p['detail'][:90]}[/dim]")
+        elif not p.get("configured"):
+            console.print(f"[yellow]SKIP[/yellow] {p['name']:<12} [dim]{p['detail']}[/dim]")
+        else:
+            console.print(f"[red]FAIL[/red] {p['name']:<12} {p['latency_ms']:>5} ms  {p['detail'][:110]}")
+    return 0 if report.get("ok") else 1
+
+
+def cmd_doctor(client: VedaClient) -> int:
+    console = Console()
+    try:
+        return render_doctor(console, client.lookup_health())
+    except Exception as e:
+        console.print(f"[red]doctor failed:[/red] {e}")
+        return 1
+
+
 # ---------- tasks ----------
 
 def cmd_task(client: VedaClient, action: str, args: list[str]) -> int:

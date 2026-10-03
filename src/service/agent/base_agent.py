@@ -29,12 +29,14 @@ class BaseAgent(ABC):
         skills: list[str] | None = None,
         system_prompt: str = "",
         model: str | None = None,
+        triggers: list[str] | None = None,
     ):
         self.name = name
         self.description = description
         self.skills = skills or []
         self.system_prompt = system_prompt
         self.model = model
+        self.triggers = triggers or []  # regexes for deterministic routing (see routing_policy)
 
     @abstractmethod
     async def execute(self, ctx: AgentContext) -> AgentResult:

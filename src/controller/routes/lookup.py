@@ -9,7 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from controller.dependencies.providers import get_lookup_service
+from controller.dependencies.providers import get_lookup_health, get_lookup_service
+from service.lookup.health_service import LookupHealthService
 from service.lookup.lookup_service import EgressDeniedError, LookupService
 
 router = APIRouter()
@@ -24,6 +25,19 @@ class FactQueryBody(BaseModel):
 async def list_providers(lookup: LookupService = Depends(get_lookup_service)) -> dict:
     """Categories with a registered, allow-listed provider."""
     return {"categories": lookup.registry.list_enabled()}
+
+
+@router.get("/lookup/health")
+async def lookup_health(health: LookupHealthService = Depends(get_lookup_health)) -> dict:
+    """Live probe of every online tool dependency (weather, currency, search, ...)."""
+    results = await health.run()
+    return {
+        "ok": all(r.ok for r in results),
+        "providers": [
+            {"name": r.name, "ok": r.ok, "configured": r.configured, "latency_ms": r.latency_ms, "detail": r.detail}
+            for r in results
+        ],
+    }
 
 
 @router.post("/lookup/fetch")

@@ -225,7 +225,13 @@ class SensingConfig(BaseModel):
 class OnlineConfig(BaseModel):
     """privacy.online: sub-section — the network egress allow-list."""
 
-    allowlist: list[str] = ["api.open-meteo.com", "api.duckduckgo.com", "api.frankfurter.app"]
+    enabled: bool = True  # False = fully offline: no online tools are registered
+    allowlist: list[str] = [
+        "api.open-meteo.com", "geocoding-api.open-meteo.com", "api.frankfurter.dev", "open.er-api.com",
+        "api.tavily.com",
+    ]
+    default_place: str = "Hyderabad"  # used when the user asks for weather without naming a place
+    search_api_key_env: str = "TAVILY_API_KEY"  # env var holding the Tavily key (never stored in config)
 
 
 class PrivacyConfig(BaseModel):
@@ -311,8 +317,7 @@ class AgentsConfig(BaseModel):
         description="Device actions: open/close apps, volume, running processes",
         skills=["terminal", "file_ops"],
     )
-    tools_enabled: bool = False  # when true, the responder may call its skills
-    max_tool_iterations: int = 3
+    tools_enabled: bool = False  # when true, tool-owning specialist agents (from config/tools) are registered
 
 
 class SkillEntry(BaseModel):

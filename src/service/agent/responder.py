@@ -15,7 +15,7 @@ Donor: veda/agents/responder.py, read in full and adapted:
 """
 
 from datetime import datetime
-from typing import AsyncIterator
+from typing import AsyncIterator, Callable
 
 from domain.entities.agent_context import AgentContext
 from domain.entities.agent_result import AgentResult
@@ -24,8 +24,6 @@ from domain.ports.knowledge_store_port import KnowledgeStorePort
 from domain.ports.memory_repository_port import MemoryRepositoryPort
 from service.agent.base_llm_agent import LLMAgent
 from service.agent.persona import VEDA_SYSTEM_PROMPT
-from service.agent.tool_calling import ToolCallingLoop
-from service.agent.tool_use_guard import TASK_GUARD
 from service.conversation.conversation_manager import ConversationManager
 from service.memory.semantic_recall import SemanticRecall
 
@@ -42,7 +40,7 @@ class ResponderAgent(LLMAgent):
         max_history_turns: int = 20,
         memory: MemoryRepositoryPort | None = None,
         recall: "SemanticRecall | None" = None,
-        tool_loop: "ToolCallingLoop | None" = None,
+        claim_filter: Callable[[str], bool] | None = None,
     ):
         super().__init__(
             name="responder",
@@ -59,7 +57,7 @@ class ResponderAgent(LLMAgent):
         self.knowledge = knowledge
         self.max_history_turns = max_history_turns
         self._recall = recall
-        self._tool_loop = tool_loop
+        self._claim_filter = claim_filter
 
     def build_system_prompt(self, ctx: AgentContext) -> str:
         # Persona only: byte-identical every turn so the backend's KV prefix
@@ -117,37 +115,22 @@ class ResponderAgent(LLMAgent):
 
     async def execute(self, ctx: AgentContext) -> AgentResult:
         await self._prepare_semantic_context(ctx)
-        if self._tool_loop is not None:
-            self._mark_active(ctx)
-            system = self.build_system_prompt(ctx)
-            user = self.build_prompt(ctx)
-            response = (await self._tool_loop.run(ctx, system, user)) or (
-                "I couldn't complete that. Could you rephrase?"
-            )
-            await self.on_completion(ctx, response)
-            return AgentResult(agent_name=self.name, response=response, skill_calls=list(ctx.skill_results))
         return await super().execute(ctx)
 
     async def execute_stream(self, ctx: AgentContext, cancel_event=None) -> AsyncIterator[str]:
         await self._prepare_semantic_context(ctx)
-        if self._tool_loop is not None:
-            # Tool-calling is multi-step, so it can't token-stream; run it and
-            # emit the final answer in one chunk.
-            result = await self.execute(ctx)
-            yield result.response
-            return
         async for chunk in super().execute_stream(ctx, cancel_event=cancel_event):
             yield chunk
 
     def _without_action_claims(self, turns):
         """Drop "Task added…"-style exchanges (the assistant reply and the user
         request before it). Shown as history they teach the model to answer in
-        that shape without calling the tool, which is how claims got made up."""
-        if self._tool_loop is None:
+        that shape without calling a tool, which is how claims got made up."""
+        if self._claim_filter is None:
             return turns
         kept = []
         for turn in turns:
-            if turn.role != "user" and TASK_GUARD.claims_action(turn.content or ""):
+            if turn.role != "user" and self._claim_filter(turn.content or ""):
                 if kept and kept[-1].role == "user":
                     kept.pop()
                 continue

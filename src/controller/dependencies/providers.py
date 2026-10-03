@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     from domain.ports.memory_repository_port import MemoryRepositoryPort
     from service.agent.supervisor import SupervisorAgent
     from service.approval.approval_broker import ApprovalBroker
+    from domain.ports.trace_repository_port import TraceRepositoryPort
+    from service.lookup.health_service import LookupHealthService
     from service.lookup.lookup_service import LookupService
     from service.memory.knowledge_base import KnowledgeBase
     from service.sensing.event_bus import EventBus
@@ -55,6 +57,14 @@ def get_memory(request: Request) -> "MemoryRepositoryPort":
 
 def get_lookup_service(request: Request) -> "LookupService":
     return _require(request, "lookup_service", "lookup service")
+
+
+def get_trace_repo(request: Request) -> "TraceRepositoryPort":
+    return _require(request, "trace_repo", "trace repository")
+
+
+def get_lookup_health(request: Request) -> "LookupHealthService":
+    return _require(request, "lookup_health", "lookup health service")
 
 
 def get_governance(request: Request) -> "GovernanceProvider | None":

@@ -91,24 +91,36 @@ class LlamaCppClient:
         timeout: int | None = None,
         *,
         num_predict: int | None = None,
+        json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> str:
         # llama-cpp-python's create_chat_completion is synchronous/blocking —
         # run it off the event loop so it doesn't stall other coroutines.
         # service/inference/single_flight.py is what guarantees only one call
         # runs at a time (it did not exist when this file was first written).
+        kwargs: dict = {
+            "messages": self._prompt_messages(prompt, system),
+            "max_tokens": num_predict if num_predict is not None else self._num_predict,
+        }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if json_schema is not None:
+            # Grammar-constrained decoding: the model cannot emit anything that
+            # isn't valid JSON for this schema.
+            kwargs["response_format"] = {"type": "json_object", "schema": json_schema}
         try:
             result = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self._llama.create_chat_completion,
-                    messages=self._prompt_messages(prompt, system),
-                    max_tokens=num_predict if num_predict is not None else self._num_predict,
-                ),
+                asyncio.to_thread(self._llama.create_chat_completion, **kwargs),
                 timeout=timeout or self._timeout,
             )
         except asyncio.TimeoutError as exc:
             raise InferenceTimeoutError(f"llama.cpp request timed out: {exc}") from exc
         content = result["choices"][0]["message"]["content"]
         return self._strip_thinking(content) if not self._think else content
+
+    def count_tokens(self, text: str) -> int:
+        """Exact token count with this model's own tokenizer (used for prompt budgets)."""
+        return len(self._llama.tokenize(text.encode("utf-8"), add_bos=False))
 
     async def stream(
         self,

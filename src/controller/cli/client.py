@@ -223,6 +223,20 @@ class VedaClient:
         r.raise_for_status()
         return r.json()
 
+    # ---------- tool-turn traces ----------
+
+    def recent_traces(self, limit: int = 10) -> list[dict[str, Any]]:
+        r = self._http.get(f"{self.server_url}/api/trace", params={"limit": limit})
+        r.raise_for_status()
+        return r.json().get("traces", []) or []
+
+    # ---------- online tool health ----------
+
+    def lookup_health(self) -> dict[str, Any]:
+        r = self._http.get(f"{self.server_url}/api/lookup/health", timeout=30.0)
+        r.raise_for_status()
+        return r.json()
+
     # ---------- tasks ----------
 
     def list_tasks(self, include_done: bool = False) -> list[dict[str, Any]]:

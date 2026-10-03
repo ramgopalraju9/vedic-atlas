@@ -1,0 +1,30 @@
+name: get_weather
+agent: lookup
+description: Current weather for a place; leave place empty for the user's home city.
+reply_mode: template        # the tool builds the spoken sentence from the provider's numbers
+permission_level: auto
+requires_online: true
+cache_ttl_sec: 600
+hosts: [api.open-meteo.com, geocoding-api.open-meteo.com]
+
+params:
+  place:
+    type: string
+    description: city or place name; empty means home
+
+examples:
+  - user: what's the weather in Mumbai
+    calls: [{tool: get_weather, args: {place: Mumbai}}]
+  - user: is it going to rain today
+    calls: [{tool: get_weather, args: {}}]
+
+triggers:
+  - '\b(weather|temperature|forecast|humid(ity)?|windy|rain(ing|y)?|snow(ing)?|how (hot|cold|warm))\b'
+  - '\bwill it (rain|snow)\b'
+
+required_when:
+  - '\b(weather|temperature|forecast|humid(ity)?|will it (rain|snow)|how (hot|cold|warm))\b'
+
+claims:
+  - '\b\d+\s*(°|degrees?)\s*(c|celsius|f)?\b'
+  - '\b(it''s|it is) (currently )?(sunny|cloudy|raining|clear|hot|cold|humid|foggy|windy)\b'

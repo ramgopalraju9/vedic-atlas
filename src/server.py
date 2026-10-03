@@ -22,6 +22,7 @@ Batch 11 entry for the full reasoning on each):
 from __future__ import annotations
 
 import asyncio
+import os
 import platform
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -32,17 +33,23 @@ from controller.middleware.request_context import request_context
 from controller.routes import (
     admin, ambient, approval, chat, config as config_route, governance as governance_route,
     health, knowledge, lookup, memory as memory_route, persona, privacy, speakers, stream, system,
-    tasks as tasks_route, voice,
+    tasks as tasks_route, trace as trace_route, voice,
 )
 from core.config import ensure_dirs, load_full_config
 from core.constants import PROJECT_NAME, VERSION
+from core.env import load_env
 from core.logging_config import configure_logging, logger
+from domain.policies.token_budget_policy import PromptBudgets, estimate_tokens
 from domain.events.ambient_event import AmbientEvent
 from domain.events.event_kind import EventKind
 from domain.value_objects.urgency import Urgency
 from exceptions.handlers import register_exception_handlers
 from schemas.config_schemas import AppConfig
 from service.agent.registry import AgentRegistry
+from service.agent.tool_agent import ToolAgent
+from service.agent.tool_turn_runner import ToolTurnRunner
+from service.agent.tool_use_guard import ToolUseGuard
+from service.prompting.prompt_composer import PromptComposer
 from service.agent.responder import ResponderAgent
 from service.agent.supervisor import SupervisorAgent
 from service.agent.system import SystemAgent
@@ -59,7 +66,9 @@ from service.hooks.dispatcher import (
     create_permission_check_hook, create_rate_limit_hook,
 )
 from service.hooks.registry import HookRegistry
+from service.lookup.health_service import HealthProbe, LookupHealthService
 from service.lookup.lookup_service import LookupService
+from service.lookup.ttl_cache import TtlCache
 from service.lookup.registry import FactProviderRegistry
 from service.memory.knowledge_base import KnowledgeBase
 from service.privacy.capture_gate import CaptureGate
@@ -73,9 +82,13 @@ from tpa.governance.sqlite_audit_sink import NullAuditSink, SqliteAuditSink
 from tpa.inference.factory import build_inference_client
 from service.inference.graceful_degradation import GracefulDegradation
 from service.inference.single_flight import SingleFlight
+from tpa.filestore.file_prompt_store import FilePromptStore
+from tpa.persistence.repositories.trace_repository import SqliteTraceRepository
+from tpa.filestore.yaml_tool_manifest_store import YamlToolManifestStore
 from tpa.online.http_client import AllowListedHttpClient
 from tpa.online.providers.fx import FxProvider
-from tpa.online.providers.search import SearchProvider
+from tpa.online.providers.geocode import GeocodingProvider
+from tpa.online.providers.tavily import TavilyProvider
 from tpa.online.providers.weather import WeatherProvider
 from tpa.persistence.migrations import init_tables
 from tpa.persistence.repositories.agent_memory_repository import AgentMemoryRepository
@@ -528,16 +541,46 @@ def _build_embedding(cfg: AppConfig):
         return None
 
 
-def _build_lookup(cfg: AppConfig) -> LookupService:
+# Tool -> provider category, for per-category cache TTLs taken from the tool manifests.
+_TOOL_CATEGORY = {"get_weather": "weather", "convert_currency": "fx", "web_search": "search"}
+_GEOCODE_TTL_SEC = 24 * 3600
+
+
+def _build_lookup(cfg: AppConfig, tool_manifests: dict) -> tuple[LookupService, TavilyProvider]:
     allow_list = frozenset(cfg.privacy.online.allowlist)
     http_client = AllowListedHttpClient(allow_list=allow_list)
     registry = FactProviderRegistry(allow_list=allow_list)
-    for provider in (WeatherProvider(http_client), SearchProvider(http_client), FxProvider(http_client)):
+    key_env = cfg.privacy.online.search_api_key_env
+    search = TavilyProvider(http_client, api_key_provider=lambda: os.environ.get(key_env))
+    for provider in (WeatherProvider(http_client), GeocodingProvider(http_client), FxProvider(http_client), search):
         try:
             registry.register(provider)
         except ValueError as e:
             logger.warning(f"[lookup] provider '{provider.category}' not registered: {e}")
-    return LookupService(registry=registry, allow_list=allow_list)
+    ttl = {_TOOL_CATEGORY[n]: m.cache_ttl_sec for n, m in tool_manifests.items() if n in _TOOL_CATEGORY}
+    ttl["geocode"] = _GEOCODE_TTL_SEC
+    service = LookupService(registry=registry, allow_list=allow_list, cache=TtlCache(), ttl_by_category=ttl)
+    return service, search
+
+
+def _build_lookup_health(lookup: LookupService, search: TavilyProvider, key_env: str) -> LookupHealthService:
+    """Probes for `veda doctor`. One entry per online dependency."""
+    from domain.entities.fact_query import FactQuery
+
+    def _probe(category: str, params: dict, describe):
+        async def _check() -> str:
+            return describe(await lookup.fetch(FactQuery(category=category, params=params)))
+        return _check
+
+    return LookupHealthService([
+        HealthProbe("geocoding", _probe("geocode", {"name": "Hyderabad"}, lambda a: a.text.split(";")[0])),
+        HealthProbe("weather", _probe("weather", {"lat": 17.385, "lon": 78.487}, lambda a: a.text)),
+        HealthProbe("currency", _probe("fx", {"from": "USD", "to": "INR"}, lambda a: a.text)),
+        HealthProbe(
+            "web_search", _probe("search", {"query": "today's date", "topic": "general"}, lambda a: a.text.splitlines()[0][:100]),
+            configured=search.is_configured, missing_hint=f"set {key_env} in .env to enable web search",
+        ),
+    ])
 
 
 def _build_guardrails(cfg: AppConfig) -> tuple[HookRegistry, PermissionManager]:
@@ -665,11 +708,41 @@ def bootstrap(app: FastAPI) -> None:
     hooks, permissions = _build_guardrails(cfg)
     skill_registry, skill_runner = _build_skills(cfg, hooks)
     from service.skills.builtin.tasks import TasksSkill
+    tool_manifests = {m.name: m for m in YamlToolManifestStore().load_all()}
+    online = cfg.privacy.online
+    lookup_service = lookup_search = None
+    if online.enabled:
+        lookup_service, lookup_search = _build_lookup(cfg, tool_manifests)
+    else:
+        tool_manifests = {n: m for n, m in tool_manifests.items() if not m.requires_online}
+        logger.info("[lookup] online tools disabled (privacy.online.enabled=false)")
+    app.state.tool_manifests = tool_manifests
     skill_registry.register(TasksSkill(
         service=task_service,
+        manifest=tool_manifests["tasks"],
         permission_level=cfg.skills.tasks.permission_level,
         enabled=cfg.skills.tasks.enabled,
     ))
+    if lookup_service is not None:
+        from service.lookup.currency_lookup import CurrencyLookup
+        from service.lookup.place_resolver import PlaceResolver
+        from service.lookup.search_lookup import SearchLookup
+        from service.lookup.weather_lookup import WeatherLookup
+        from service.skills.builtin.currency import ConvertCurrencySkill
+        from service.skills.builtin.weather import GetWeatherSkill
+        from service.skills.builtin.web_search import WebSearchSkill
+
+        places = PlaceResolver(lookup_service, default_place=online.default_place)
+        for skill in (
+            GetWeatherSkill(WeatherLookup(lookup_service, places), tool_manifests["get_weather"]),
+            ConvertCurrencySkill(CurrencyLookup(lookup_service), tool_manifests["convert_currency"]),
+            WebSearchSkill(SearchLookup(lookup_service), tool_manifests["web_search"]),
+        ):
+            skill_registry.register(skill)
+    app.state.lookup_service = lookup_service
+    app.state.lookup_health = (
+        _build_lookup_health(lookup_service, lookup_search, online.search_api_key_env) if lookup_service else None
+    )
     app.state.hook_registry = hooks
     app.state.permission_manager = permissions
     app.state.skill_registry = skill_registry
@@ -677,23 +750,22 @@ def bootstrap(app: FastAPI) -> None:
 
     system_control = _build_system_control()
     agent_registry = AgentRegistry()
-    responder_tool_loop = None
-    if cfg.agents.tools_enabled and cfg.agents.responder.skills:
-        from service.agent.tool_calling import ToolCallingLoop
-        from service.agent.tool_use_guard import TASK_GUARD
-        responder_tool_loop = ToolCallingLoop(
-            client=inference_client,
-            skill_runner=skill_runner,
-            skill_registry=skill_registry,
-            tool_names=list(cfg.agents.responder.skills),
-            model=cfg.agents.responder.model,
-            max_iterations=cfg.agents.max_tool_iterations,
-            guard=TASK_GUARD,
-        )
+    trace_repo = SqliteTraceRepository()
+    app.state.trace_repo = trace_repo
+    guard = ToolUseGuard(tool_manifests.values())
+    count_tokens = getattr(inference_backend, "count_tokens", None) or estimate_tokens
+    composer = PromptComposer(
+        FilePromptStore(), list(tool_manifests.values()), budgets=PromptBudgets(), count_tokens=count_tokens,
+    )
+    tool_runner = ToolTurnRunner(
+        client=inference_client, composer=composer, skill_runner=skill_runner,
+        manifests=tool_manifests, guard=guard, conversation=conversation,
+        model=cfg.agents.responder.model,
+    )
     responder = ResponderAgent(
         client=inference_client, conversation=conversation, knowledge=knowledge,
         model=cfg.agents.responder.model, memory=memory_repo,
-        recall=semantic_recall, tool_loop=responder_tool_loop,
+        recall=semantic_recall, claim_filter=guard.claims_action,
     )
     system_agent = SystemAgent(
         client=inference_client, system_control=system_control,
@@ -701,6 +773,20 @@ def bootstrap(app: FastAPI) -> None:
     )
     agent_registry.register(responder)
     agent_registry.register(system_agent)
+    if cfg.agents.tools_enabled:
+        # One specialist per owning agent named in the tool manifests. Routing
+        # triggers, tools and guard rules all come from the manifests.
+        for owner in sorted({m.agent for m in tool_manifests.values()}):
+            owned = composer.tools_of_agent(owner)
+            agent_registry.register(ToolAgent(
+                name=owner,
+                description="; ".join(tool_manifests[n].description for n in owned),
+                tool_names=owned,
+                triggers=[t for n in owned for t in tool_manifests[n].triggers],
+                runner=tool_runner, fallback=responder, guard=guard,
+                conversation=conversation, memory=memory_repo,
+                model=cfg.agents.responder.model, traces=trace_repo,
+            ))
 
     supervisor = SupervisorAgent(
         agent_registry=agent_registry, client=inference_client, default_agent="responder",
@@ -714,7 +800,6 @@ def bootstrap(app: FastAPI) -> None:
     app.state.agent_registry = agent_registry
     app.state.supervisor = supervisor
 
-    app.state.lookup_service = _build_lookup(cfg)
     app.state.notifier = _build_notifier()
     app.state.egress_allow_list = frozenset(cfg.privacy.online.allowlist)
 
@@ -768,20 +853,28 @@ async def _backfill_memory_index(app: FastAPI) -> None:
         logger.warning(f"[memory-index] backfill failed: {e}")
 
 
-async def _purge_completed_tasks_loop(task_service, interval_sec: float = 3600.0) -> None:
-    """Hourly: drop completed tasks older than the retention window."""
+async def _housekeeping_loop(task_service, trace_repo, interval_sec: float = 3600.0) -> None:
+    """Hourly: drop completed tasks and old tool-turn traces past their retention windows."""
+    from datetime import datetime, timedelta
+
+    from domain.policies.retention_policy import TURN_TRACE_RETENTION_DAYS
+
     while True:
         try:
             removed = task_service.purge_completed()
             if removed:
                 logger.info(f"[tasks] purged {removed} completed task(s)")
+            old = trace_repo.purge_before(datetime.now() - timedelta(days=TURN_TRACE_RETENTION_DAYS))
+            if old:
+                logger.info(f"[trace] purged {old} old tool-turn trace(s)")
         except Exception as e:
-            logger.warning(f"[tasks] purge failed: {e}")
+            logger.warning(f"[housekeeping] failed: {e}")
         await asyncio.sleep(interval_sec)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    load_env()
     cfg = load_full_config()
     configure_logging(cfg.app.log_level)
     ensure_dirs()
@@ -818,7 +911,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"ConversationSummariser failed to start: {e}")
 
-    app.state.task_purge_job = asyncio.create_task(_purge_completed_tasks_loop(app.state.task_service))
+    app.state.task_purge_job = asyncio.create_task(_housekeeping_loop(app.state.task_service, app.state.trace_repo))
 
     if getattr(app.state, "memory_indexer", None) is not None and app.state.memory_indexer.enabled:
         asyncio.create_task(_backfill_memory_index(app))
@@ -867,7 +960,7 @@ logger.info(f"{PROJECT_NAME} v{VERSION} application initialized")
 
 for _mod in (
     admin, ambient, approval, chat, config_route, governance_route,
-    health, knowledge, lookup, memory_route, persona, privacy, speakers, stream, system, tasks_route, voice,
+    health, knowledge, lookup, memory_route, persona, privacy, speakers, stream, system, tasks_route, trace_route, voice,
 ):
     app.include_router(_mod.router, prefix="/api")
 

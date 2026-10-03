@@ -19,6 +19,7 @@ from prompt_toolkit.formatted_text import HTML
 from rich.console import Console
 
 from controller.cli.client import VedaClient
+from controller.cli.commands import render_doctor, render_traces
 from controller.cli.logo import render_banner, status_line
 from controller.cli.render import stream_to_terminal
 
@@ -36,6 +37,8 @@ _HELP = """
   /approve           list pending approvals (resolve interactively)
   /mute \u00b7 /unmute    close / open the microphone
   /listen            show mic state (muted / listening / turns)
+  /doctor            check the online tools (weather, search, currency)
+  /trace [n]         show what the tools actually did on the last n turns
   /task              list tasks · /task add <title> · /task done <id>
 """
 
@@ -107,6 +110,18 @@ class Repl:
             return True
         if cmd == "task":
             self._cmd_task(rest)
+            return True
+        if cmd == "trace":
+            try:
+                render_traces(self.console, self.client.recent_traces(int(rest) if rest.strip().isdigit() else 5))
+            except Exception as e:
+                self.console.print(f"[red]trace failed:[/red] {e}")
+            return True
+        if cmd == "doctor":
+            try:
+                render_doctor(self.console, self.client.lookup_health())
+            except Exception as e:
+                self.console.print(f"[red]doctor failed:[/red] {e}")
             return True
         self.console.print(f"[red]unknown command :{cmd}[/red] \u2014 try :help")
         return True

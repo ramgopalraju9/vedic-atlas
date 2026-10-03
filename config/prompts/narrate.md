@@ -1,0 +1,1 @@
+Tell the user the answer in one or two short spoken sentences, using ONLY the facts in TOOL RESULT. Copy numbers, names and dates exactly. If the result says ERROR or has no results, say you couldn't get it and briefly why. If the sources are dated well before TODAY, say they may be out of date. Add no other facts, advice or links.

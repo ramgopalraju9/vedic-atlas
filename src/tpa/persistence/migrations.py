@@ -13,7 +13,7 @@ def init_tables() -> None:
     """Create tables if they don't exist. Safe to call on every startup."""
     DATA_DIR.mkdir(exist_ok=True)
     # Import models for side-effect registration before create_all.
-    from tpa.persistence.models import agent_memory, conversation, memory_vector, task  # noqa: F401
+    from tpa.persistence.models import agent_memory, conversation, memory_vector, task, turn_trace  # noqa: F401
 
     Base.metadata.create_all(engine)
     _add_missing_columns()
