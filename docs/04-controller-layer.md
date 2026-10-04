@@ -147,7 +147,7 @@ adapter and the FastAPI app gets built. `_IS_WINDOWS = platform.system()
 | `_build_audio_capture(cfg, frame_length=None)` | `AudioCapturePort` | `SoundDeviceCapture`; `None` if `sounddevice` is missing or construction fails |
 | `_build_vad(cfg)` | `VoiceActivityPort` | `audio.vad.engine == "webrtc"` → `WebRtcVadDetector`, else `EnergyVadDetector` (default) |
 | `_build_stt(cfg)` | `STTPort` | `FasterWhisperProvider`; requires the model path to exist if configured — no download |
-| `_build_tts(cfg)` | `TTSPort` | `audio.tts_engine == "piper"` → `PiperProvider`; else `Pyttsx3Provider` |
+| `_build_tts(cfg)` | `TTSPort` | `audio.tts_engine`: `auto` (default) → `pyttsx3` on Windows, `piper` elsewhere; or an explicit `piper` / `pyttsx3`. Every requirement is checked at boot (the `piper` package, the voice file, `pyttsx3` being importable) and a problem is logged as an error with the fix and returns `None`, so voice stops at startup (`not started - missing: tts`) instead of staying silent. `tts_model_path` is resolved from the project root. Explicit `piper` with no voice falls back to `pyttsx3` on Windows only |
 | `_build_wake_word(cfg)` | `WakeWordPort` | Off if disabled; `"hotkey"` → `HotkeyWakeWord`; `"porcupine"` → needs `PORCUPINE_ACCESS_KEY` env var + a keyword path, validates 16kHz |
 | `_build_voice_session(cfg, *, audio, capture_gate, supervisor, event_bus)` | assembles `VoiceSession` | Off if `audio.voice_enabled` is `False`; refuses to start if mic, VAD, STT, TTS, or speaker is missing |
 | `_build_audit_sink(cfg)` | `AuditSinkPort` | `NullAuditSink` unless `governance.enabled` and `governance.audit.backend == "sqlite"` → `SqliteAuditSink` |

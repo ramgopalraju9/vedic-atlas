@@ -2,26 +2,107 @@
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+# ---------------------------------------------------------------------------
+# Install (editable is REQUIRED): the app finds config/ and data/ relative to
+# the source tree (core/constants.py), so a normal `pip install .` that copies
+# the code into site-packages would not find them.
+#
+#   python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+#   pip install -e .                  # everything the default setup needs
+#   pip install -e ".[embedding]"     # + optional extras (see below), comma separated
+#
+# Not installable from pip (copy them in, they are git-ignored): the models under
+# data/ -- the GGUF language model, data/models/whisper-base.en and
+# data/models/openwakeword/hey_veda.onnx (+ .onnx.data) -- and a Piper voice
+# (.onnx + .onnx.json) for text-to-speech on Linux/Pi.
+#
+# Linux / Raspberry Pi system packages needed first:
+#   sudo apt install build-essential cmake git libportaudio2 alsa-utils
+# (llama-cpp-python is compiled from source on most Pi setups; allow 10-30 min.)
+# ---------------------------------------------------------------------------
+
 [project]
 name = "veda"
 version = "0.1.0"
 description = "Veda - personal offline"
 requires-python = ">=3.12"
 dependencies = [
+    # --- server + CLI ---
     "fastapi>=0.110.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.0",
     "pyyaml>=6.0",
-    "python-dotenv>=1.0",
-    "httpx>=0.27",
+    "python-dotenv>=1.0",       # loads .env (TAVILY_API_KEY etc.)
+    "httpx>=0.27",              # online tools (weather, currency, search) + the CLI client + test client
     "numpy>=1.26",
     "sqlalchemy>=2.0",
-    "psutil>=5.9",
-    # CLI client
+    "psutil>=5.9",              # `veda` start stops a stale server (controller/cli/client.py)
     "rich>=13.0",
     "prompt_toolkit>=3.0",
+
+    # --- local language model (config/inference.yaml: backend=llama_cpp) ---
+    "llama-cpp-python>=0.3.0",  # needs a C/C++ toolchain + cmake where no wheel exists
+
+    # --- voice pipeline (config/audio.yaml) ---
+    "sounddevice>=0.4.6",       # microphone + speaker; needs PortAudio (apt: libportaudio2)
+    "faster-whisper>=1.0.0",    # speech-to-text (model staged at data/models/whisper-base.en)
+    "openwakeword>=0.6.0",      # "Hey Veda" wake word (wake_engine=openwakeword)
+    "onnxruntime>=1.17.0",      # runs the wake-word and Piper ONNX models
+    "piper-tts>=1.2.0",         # text-to-speech, cross-platform (tts_engine=piper; needs a voice .onnx)
+
+    # --- Windows only (skipped automatically elsewhere) ---
+    "pyttsx3>=2.90; sys_platform == 'win32'",     # Windows SAPI voices (tts_engine=pyttsx3)
+    "pywin32>=306; sys_platform == 'win32'",      # active-window info + system control
+    "pycaw>=20230407; sys_platform == 'win32'",   # volume control
 ]
 
+[project.optional-dependencies]
+# Semantic memory: embeds facts/summaries with BAAI/bge-small-en-v1.5 (ONNX). Without it
+# memory recall quietly stays off (config/embedding.yaml: enabled).
+embedding = ["fastembed>=0.3.0"]
+
+# More precise voice-activity detection (audio.vad.engine: webrtc). Needs a C toolchain on newer Pythons.
+vad-webrtc = ["webrtcvad>=2.0.10"]
+
+# Global hotkeys (mute key, push-to-talk wake). Needs a desktop session on Linux.
+hotkey = ["pynput>=1.7.6"]
+
+# Recognise who is speaking (audio.speaker_id.backend: resemblyzer). torch is several hundred MB.
+speaker-id-resemblyzer = ["resemblyzer>=0.1.4", "torch>=2.2.0"]
+
+# Picovoice engines: kept selectable by config, not the default (they need an account/key).
+speaker-id = ["pveagle>=3.0.0"]
+wake-porcupine = ["pvporcupine>=3.0.0"]
+
+# Raspberry Pi / hardware peripherals (mute switch, status LED, LCD, USB HID).
+hardware-gpio = ["RPi.GPIO>=0.7.1; sys_platform == 'linux'", "RPLCD>=1.3.1"]
+hardware-hid = ["hidapi>=0.14.0"]
+hardware-blinkstick = ["blinkstick>=1.2.0"]
+
+# One-time offline training of the "Hey Veda" model. Dev machine only; never needed on the Pi.
+wake-openwakeword-training = [
+    "openwakeword>=0.6.0",
+    "piper-tts>=1.2.0",
+    "torch>=2.2.0",
+    "torchaudio>=2.2.0",
+    "torchinfo>=1.8.0",
+    "torchmetrics>=1.0.0",
+    "datasets>=2.0.0,<4.0",     # 4.x needs torchcodec + FFmpeg for audio decoding
+    "onnxscript>=0.1.0",        # ONNX export
+    "scipy>=1.11",
+    "soundfile>=0.12",
+    "acoustics>=0.2.6",
+]
+
+# Tests: pytest -q --ignore=tests/test_vector_store.py
+dev = ["pytest>=8.0"]
 
 [project.scripts]
 veda = "controller.cli.__main__:main"
+
+[tool.setuptools]
+py-modules = ["server"]         # src/server.py is the uvicorn entry point ("server:app")
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["*.egg-info"]
