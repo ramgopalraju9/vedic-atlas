@@ -226,6 +226,14 @@ setup_venv_and_install() {
   export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-$(build_jobs)}"
   info "build parallelism: $CMAKE_BUILD_PARALLEL_LEVEL job(s)"
   ( cd "$ROOT" && run "$VENV/bin/pip" install --prefer-binary -e "$spec" )
+
+  # openwakeword declares tflite-runtime on Linux, which has no wheels for Python 3.12+ ("No matching
+  # distribution found for tflite-runtime"). Veda only runs the ONNX model, which never imports tflite,
+  # so install it without its dependencies (the ones it really needs are already in pyproject.toml).
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    info "wake word: installing openwakeword without its tflite-runtime dependency (not needed for ONNX)"
+    ( cd "$ROOT" && run "$VENV/bin/pip" install --no-deps --prefer-binary "openwakeword>=0.6.0" )
+  fi
 }
 
 # ---------------------------------------------------------------- 4. models
