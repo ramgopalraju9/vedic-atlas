@@ -84,9 +84,10 @@ class ResponderAgent(LLMAgent):
         parts: list[str] = []
         # Least-volatile context first so the cacheable prefix extends as far as
         # possible; every-turn blocks go last, right before the question.
-        knowledge_block = ctx.metadata.get("semantic_knowledge_context") or self.knowledge.get_context()
-        if knowledge_block:
-            parts.append(knowledge_block)
+        # Saved facts (the `remember` tool) are always included; recalled summaries are added when relevant.
+        for block in (self.knowledge.get_context(), ctx.metadata.get("semantic_knowledge_context")):
+            if block:
+                parts.append(block)
         if ctx.system_context:
             parts.append(f"CURRENT CONTEXT:\n{ctx.system_context}")
         # Deliberately no cross-agent activity block here: it only holds internal

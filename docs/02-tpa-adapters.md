@@ -2,7 +2,7 @@
 
 `src/tpa/` is the only layer permitted to import third-party SDKs and talk
 to the outside world: hardware (GPIO, HID, audio devices), local model
-runtimes (Ollama, llama.cpp, faster-whisper, Piper, fastembed), SQLite, and
+runtimes (Ollama, llama.cpp, faster-whisper, Piper, onnxruntime), SQLite, and
 the one allow-listed HTTP client. Every class here implements exactly one
 `domain.ports.*` Protocol (see [01-domain-layer.md](01-domain-layer.md)
 for the contracts) and nothing in `service/` ever imports from here
@@ -21,7 +21,7 @@ directly — adapters only reach `service/` by being constructed in
 | `IndicatorPort` | `GpioIndicator`, `BlinkStickIndicator`, `SoftwareIndicator` | `tpa/hardware/` |
 | `MuteSwitchPort` | `GpioMuteSwitch`, `HidMuteSwitch`, `KeyboardMuteFallback`, `SoftwareMuteSwitch` | `tpa/hardware/` |
 | `StatusDisplayPort` | `CharDisplay` | `tpa/hardware/` |
-| `EmbeddingPort` | `FastEmbedProvider` | `tpa/inference/` |
+| `EmbeddingPort` | `OnnxEmbeddingProvider` | `tpa/inference/` |
 | `InferencePort` | `OllamaClient`, `LlamaCppClient` (via `factory.build_inference_client`) | `tpa/inference/` |
 | `NotificationPort` | `DesktopNotifier` | `tpa/notifications/` |
 | — (sound alerts, no dedicated port) | `SoundPlayer` | `tpa/notifications/` |
@@ -181,9 +181,17 @@ exist in parallel hardware/software tiers, selected by config
   (`response_format`), so output is guaranteed valid JSON for that schema;
   `OllamaClient` uses Ollama's `format`. `LlamaCppClient.count_tokens(text)`
   gives exact token counts with the model's own tokenizer (prompt budgets).
-- **`embedding_adapter.py` — `FastEmbedProvider`**: local ONNX embeddings
-  via `fastembed` (BGE-small on laptop, MiniLM on Pi profiles — both
-  ONNX-backed, no `torch` dependency, no cloud embedding API).
+- **`embedding_adapter.py` — `OnnxEmbeddingProvider`**: runs the staged
+  `BAAI/bge-small-en-v1.5` ONNX model directly with `onnxruntime` + `tokenizers`
+  (the embedding is the `[CLS]` hidden state, L2-normalised; 384 dimensions;
+  `model_id` is the stable model name, not a path). It needs
+  `data/bge-small-en-v1.5/model.onnx` and `tokenizer.json` and **never downloads
+  at runtime**; a missing model raises `FileNotFoundError` naming the files and
+  `scripts/setup_pi.sh`, which `_build_embedding` turns into "semantic memory OFF"
+  rather than a crash. It replaced a `fastembed`-based adapter: fastembed passed a
+  folder path where it needs a model name (so a staged model still failed), and its
+  extra native packages (`mmh3`, `py-rust-stemmers`) are blocked by Windows
+  Application Control on some machines and are not needed for dense embeddings.
 
 ## `tpa/notifications/`
 

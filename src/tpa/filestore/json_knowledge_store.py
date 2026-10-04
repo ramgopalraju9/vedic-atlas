@@ -13,8 +13,14 @@ from datetime import datetime
 from pathlib import Path
 
 from core.constants import DATA_DIR
+from domain.policies.fact_policy import split_fact
 
 _DEFAULT_PATH = DATA_DIR / "knowledge.json"
+
+
+def _as_user_fact(fact: str) -> str:
+    """"favourite sweet: gulab jamun" -> "the user's favourite sweet: gulab jamun" (free-text facts unchanged)."""
+    return f"the user's {fact}" if split_fact(fact) else fact
 
 
 class JsonKnowledgeStore:
@@ -42,8 +48,11 @@ class JsonKnowledgeStore:
     def get_context(self) -> str:
         if not self._facts:
             return ""
-        lines = [f"- {f['fact']}" for f in self._facts]
-        return "THINGS I KNOW ABOUT THE USER:\n" + "\n".join(lines)
+        lines = [f"- {_as_user_fact(f['fact'])}" for f in self._facts]
+        return (
+            "THINGS THE USER HAS TOLD ME ABOUT THEMSELVES (these are the user's own facts, not mine; "
+            'when asked, answer with "your"):\n' + "\n".join(lines)
+        )
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)

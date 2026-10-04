@@ -11,6 +11,7 @@ that Port.
 
 from typing import Callable
 
+from domain.policies.fact_policy import format_fact, normalise_topic, split_fact
 from domain.ports.knowledge_store_port import KnowledgeStorePort
 
 
@@ -24,6 +25,36 @@ class KnowledgeBase:
     def add_fact(self, fact: str) -> None:
         self.store.add_fact(fact)
         self._notify()
+
+    def remember(self, topic: str, value: str) -> tuple[str, str | None]:
+        """Save "<topic>: <value>", replacing any earlier fact on the same topic.
+
+        Returns (the fact as stored, the previous value or None). The change is notified once the
+        new fact is in place.
+        """
+        key = normalise_topic(topic)
+        previous = None
+        for index, fact in enumerate(self.store.list_facts()):
+            parts = split_fact(fact)
+            if parts and parts[0] == key:
+                previous = parts[1]
+                self.store.remove_fact(index)
+                break
+        stored = format_fact(topic, value)
+        self.store.add_fact(stored)
+        self._notify()
+        return stored, previous
+
+    def forget(self, topic: str) -> str | None:
+        """Drop the fact on `topic`. Returns the forgotten fact, or None when there was none."""
+        key = normalise_topic(topic)
+        for index, fact in enumerate(self.store.list_facts()):
+            parts = split_fact(fact)
+            if parts and parts[0] == key:
+                self.store.remove_fact(index)
+                self._notify()
+                return fact
+        return None
 
     def remove_fact(self, index: int) -> bool:
         removed = self.store.remove_fact(index)

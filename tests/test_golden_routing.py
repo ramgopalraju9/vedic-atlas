@@ -32,7 +32,7 @@ def test_golden_set_is_well_formed():
     tools = {m.name for m in MANIFESTS} | {None}
     for item in GOLDEN:
         assert item["tool"] in tools, item
-        assert (item["tool"] is None) == (item["agent"] == "responder") or item["agent"] in {"tasks", "lookup", "system"}
+        assert (item["tool"] is None) == (item["agent"] == "responder") or item["agent"] in {"tasks", "lookup", "system", "memory"}
 
 
 RULE_ITEMS = [g for g in GOLDEN if not g.get("llm")]

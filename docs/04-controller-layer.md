@@ -152,7 +152,7 @@ adapter and the FastAPI app gets built. `_IS_WINDOWS = platform.system()
 | `_build_voice_session(cfg, *, audio, capture_gate, supervisor, event_bus)` | assembles `VoiceSession` | Off if `audio.voice_enabled` is `False`; refuses to start if mic, VAD, STT, TTS, or speaker is missing |
 | `_build_audit_sink(cfg)` | `AuditSinkPort` | `NullAuditSink` unless `governance.enabled` and `governance.audit.backend == "sqlite"` → `SqliteAuditSink` |
 | `_build_inference(cfg, governance)` | `InferencePort` | `build_inference_client(...)` wrapped in `SingleFlight(GracefulDegradation(...))`, hooked to `governance.record_success`/`record_failure` |
-| `_build_embedding(cfg)` | `EmbeddingPort` | Off unless `embedding.enabled` → `FastEmbedProvider` |
+| `_build_embedding(cfg)` | `EmbeddingPort` | Off unless `embedding.enabled` → `OnnxEmbeddingProvider` from `embedding.model_path` (default `data/bge-small-en-v1.5`); a missing model logs "semantic memory is OFF" and returns `None` |
 | `_build_lookup(cfg, tool_manifests)` | — | Builds `AllowListedHttpClient`, registers `WeatherProvider`/`GeocodingProvider`/`FxProvider`/`TavilyProvider` into a `FactProviderRegistry`, returns a `LookupService` (with a `TtlCache` and per-category TTLs from the manifests) plus the Tavily provider (for the health probe) |
 | `_build_lookup_health(lookup, search, key_env)` | — | Probes for `veda doctor` / `GET /lookup/health`: geocoding, weather, currency, web_search (skipped, with a hint, when the API key is missing) |
 | `_build_guardrails(cfg)` | — | Builds `PermissionManager`, `RateLimiter`, `InputValidator`, `OutputValidator`, `AuditLogger`; registers hooks onto a `HookRegistry` |

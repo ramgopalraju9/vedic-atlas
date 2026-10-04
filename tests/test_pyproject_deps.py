@@ -39,6 +39,13 @@ def test_windows_only_packages_are_skipped_on_the_pi():
     assert not (windows_only & installed_on(PI))
 
 
+def test_semantic_memory_needs_only_onnxruntime_and_tokenizers_not_fastembed():
+    # fastembed's extra native packages (mmh3, py-rust-stemmers) are blocked on some machines and are not needed
+    assert {"tokenizers", "onnxruntime"} <= installed_on(PI)
+    assert {"tokenizers", "onnxruntime"} <= installed_on(WINDOWS)
+    assert "fastembed" not in installed_on(PI) | installed_on(WINDOWS)
+
+
 def test_the_pi_gets_the_default_stack():
     assert {"llama-cpp-python", "faster-whisper", "sounddevice", "piper-tts", "onnxruntime", "fastapi"} <= installed_on(PI)
 

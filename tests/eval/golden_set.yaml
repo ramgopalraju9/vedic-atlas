@@ -66,6 +66,17 @@
 - {say: "which cricket matches are scheduled for November 2026", agent: lookup, tool: web_search, args: {query: cricket}}
 - {say: "what are the best phones released in 2026", agent: lookup, tool: web_search, args: {query: phones}}
 
+# ---- remember: lasting facts the user states about themselves --------------------------------------------
+- {say: "my favourite sweet is gulab jamun", agent: memory, tool: remember, args: {action: save, topic: sweet, value: gulab}}
+- {say: "my most fav noodles is maggiee", agent: memory, tool: remember, args: {action: save, topic: noodles, value: maggi}}
+- {say: "remember that I'm allergic to peanuts", agent: memory, tool: remember, args: {action: save, value: peanuts}}
+- {say: "my dog's name is Rex", agent: memory, tool: remember, args: {action: save, value: Rex}}
+- {say: "forget my favourite sweet", agent: memory, tool: remember, args: {action: forget, topic: sweet}}
+- {say: "what do you remember about me?", agent: memory, tool: remember, args: {action: list}}
+# questions about a saved fact are answered from the prompt, not by a tool call
+- {say: "what is my favourite food?", agent: responder, tool: null}
+- {say: "and my dessert?", agent: responder, tool: null}
+
 # ---- must NOT be hijacked by the broader search patterns ----
 - {say: "I'm so tired this week", agent: responder, tool: null}
 - {say: "tell me a story about a dragon", agent: responder, tool: null}
@@ -89,3 +100,6 @@
 - {say: "how do I make pasta", agent: responder, tool: null, llm: true}
 - {say: "can you help me write an email to my boss", agent: responder, tool: null, llm: true}
 - {say: "what is two plus two", agent: responder, tool: null, llm: true}
+# facts stated with no trigger words
+- {say: "I only eat vegetarian food", agent: memory, tool: remember, args: {action: save, value: vegetarian}, llm: true}
+- {say: "I really love the sweets, especially gulab jamun", agent: memory, tool: remember, args: {action: save, value: gulab}, llm: true}

@@ -322,6 +322,7 @@ class AgentsConfig(BaseModel):
     )
     tasks: AgentEntry = AgentEntry(description="The user's to-do list: add, list, complete, delete tasks")
     lookup: AgentEntry = AgentEntry(description="Live data from the web: weather, currency rates, news, current facts")
+    memory: AgentEntry = AgentEntry(description="Saves lasting facts the user states about themselves: favourites, allergies, names, routines")
     tools_enabled: bool = False  # when true, tool-owning specialist agents (from config/tools) are registered
     llm_routing: bool = False  # when true, messages the routing rules don't recognise are routed by a small LLM call
 

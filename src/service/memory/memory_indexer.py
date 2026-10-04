@@ -1,7 +1,7 @@
 """MemoryIndexer — embeds text and upserts it into the vector store.
 
 New (Feature B). No-op when no embedding provider is available (e.g.
-fastembed not installed), so the rest of the system is unaffected.
+embedding model not staged), so the rest of the system is unaffected.
 """
 
 from __future__ import annotations

@@ -354,8 +354,8 @@ their structured `FactAnswer.data` into `ToolObservation`s (`text` for logs/narr
   `KnowledgeStorePort` with an optional `on_change` callback.
 - **`memory_indexer.py` — `MemoryIndexer`**: writes embeddings into a
   `VectorStorePort`; `enabled` is `True` only if an `EmbeddingPort` was
-  provided, so the rest of the system is unaffected if `fastembed` isn't
-  installed.
+  provided, so the rest of the system is unaffected if the embedding model isn't
+  staged.
 - **`semantic_recall.py` — `SemanticRecall`**: query-time counterpart —
   embeds the query, searches the vector store, filters results below
   `min_score` (default `0.3`), formats as a "RELEVANT THINGS I REMEMBER:"

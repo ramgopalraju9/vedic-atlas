@@ -1,0 +1,52 @@
+# Lasting facts about the user (preferences, allergies, names, routines). Saved facts are always in the chat prompt.
+name: remember
+agent: memory
+description: Save, list or forget lasting facts about the user - preferences, allergies, names, routines. Never one-off or temporary things.
+reply_mode: template        # the confirmation is built from what was really saved; no second model call
+permission_level: notify
+
+params:
+  action:
+    type: string
+    required: true
+    enum: [save, forget, list]
+  topic:
+    type: string
+    description: short label for the fact, e.g. favourite sweet, allergy, dog's name
+  value:
+    type: string
+    description: the fact itself, e.g. gulab jamun (for save)
+
+examples:
+  - user: my favourite sweet is gulab jamun
+    calls: [{tool: remember, args: {action: save, topic: favourite sweet, value: gulab jamun}}]
+  - user: remember that I'm allergic to peanuts
+    calls: [{tool: remember, args: {action: save, topic: allergy, value: peanuts}}]
+  - user: my dog's name is Rex
+    calls: [{tool: remember, args: {action: save, topic: dog's name, value: Rex}}]
+  - user: forget my favourite sweet
+    calls: [{tool: remember, args: {action: forget, topic: favourite sweet}}]
+  - user: what do you remember about me?
+    calls: [{tool: remember, args: {action: list}}]
+
+# User text that should be routed to the memory agent. Statements only: a question such as
+# "what is my favourite food?" is answered from the saved facts already in the prompt.
+triggers:
+  - '\bremember (that|this|my|i|i''m|i am)\b'
+  - '\b(my|our)\s+(most\s+)?(fav\w*|favou?rite)\b.*\b(is|are|was)\b'
+  - '\bi(''m| am)\s+(allergic|vegetarian|vegan|lactose)\b'
+  - '\bmy\s+(\w+\s+)?(name|birthday|wife|husband|son|daughter|dog|cat|mother|mom|father|dad|sister|brother)(''s name)?\s+(is|are)\b'
+  - '\bforget\s+(that|what i (said|told)|my\b)'
+  - '\bwhat (do|did) you (remember|know) about me\b'
+
+# User text for which a tool call is mandatory (Veda must never claim to have saved something without doing it).
+required_when:
+  - '\bremember (that|this|my|i|i''m|i am)\b'
+  - '\bforget\s+(that|what i (said|told)|my\b)'
+  - '\bwhat (do|did) you (remember|know) about me\b'
+
+# Reply text that asserts something was saved or forgotten (must be backed by a real call).
+claims:
+  - '\b(i''ll|i will)\s+(remember|keep that in mind)\b'
+  - '\b(i''ve|i have)\s+(saved|noted|stored|memori[sz]ed|forgotten)\b'
+  - '\b(noted|saved|stored)\s+(that|it|this)\b'

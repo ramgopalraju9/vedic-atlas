@@ -14,6 +14,8 @@
 #        - language model   data/Qwen3-4B-Q4_K_M.gguf          (2.5 GB, Qwen3-4B Q4_K_M)
 #        - speech-to-text   data/models/whisper-base.en/       (faster-whisper base.en, 145 MB)
 #        - voice            data/models/piper/<voice>.onnx     (Piper en_US-lessac-medium, 63 MB)
+#        - memory           data/bge-small-en-v1.5/            (BGE-small embeddings, 134 MB: lets Veda recall
+#                                                               things you told it in earlier sessions)
 #   5. points config/audio.yaml at the Piper voice  (skip: --skip-config)
 #   6. creates .env from .env.example if there is none
 #   7. checks the install and tells you what is still missing
@@ -51,6 +53,9 @@ WHISPER_FILES=(config.json model.bin tokenizer.json vocabulary.txt)
 PIPER_BASE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/main"
 PIPER_VOICE="${PIPER_VOICE:-en_US-lessac-medium}"
 PIPER_DIR="$ROOT/data/models/piper"
+
+EMBED_BASE_URL="https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main"
+EMBED_DIR="$ROOT/data/bge-small-en-v1.5"
 
 WAKE_DIR="$ROOT/data/models/openwakeword"
 
@@ -302,6 +307,10 @@ download_models() {
     fetch "$WHISPER_BASE_URL/$f" "$WHISPER_DIR/$f"
   done
 
+  info "memory (BGE-small sentence embeddings)"
+  fetch "$EMBED_BASE_URL/onnx/model.onnx" "$EMBED_DIR/model.onnx"
+  fetch "$EMBED_BASE_URL/tokenizer.json" "$EMBED_DIR/tokenizer.json"
+
   info "voice (Piper $PIPER_VOICE)"
   local url
   url="$(piper_url "$PIPER_VOICE")"
@@ -362,7 +371,7 @@ import importlib, sys
 checks = {
     "fastapi": "web server", "llama_cpp": "language model", "faster_whisper": "speech-to-text",
     "sounddevice": "microphone/speaker", "openwakeword": "wake word", "piper": "text-to-speech",
-    "onnxruntime": "model runtime",
+    "onnxruntime": "model runtime", "tokenizers": "text tokenizer (semantic memory)",
 }
 failed = 0
 for module, what in checks.items():

@@ -26,6 +26,10 @@ lookup:
   enabled: true
   description: "Live data from the web: weather, currency rates, news, current facts"
 
+memory:
+  enabled: true
+  description: "Saves lasting facts the user states about themselves: favourites, allergies, names, routines"
+
 system:
   enabled: true
   model: null

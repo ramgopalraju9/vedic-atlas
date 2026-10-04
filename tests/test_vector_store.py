@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from tpa.persistence.session import Base
-from tpa.persistence.models import import memory_vector  # noqa: F401 (register table)
+from tpa.persistence.models import memory_vector  # noqa: F401 (register table)
 from tpa.persistence.vector_store import SqliteVectorStore
 from domain.value_objects.embedding import Embedding
 from service.memory.semantic_recall import SemanticRecall

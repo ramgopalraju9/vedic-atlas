@@ -60,6 +60,12 @@ dependencies = [
     "scikit-learn>=1.0",        # openwakeword runtime
     "tqdm>=4.0",                # openwakeword runtime
     "requests>=2.0",            # openwakeword runtime
+
+    # --- semantic memory: BAAI/bge-small-en-v1.5 run with onnxruntime (tpa/inference/embedding_adapter.py) ---
+    # Needs the staged model in data/bge-small-en-v1.5/ (model.onnx + tokenizer.json; scripts/setup_pi.sh fetches it).
+    # No fastembed: its extra native packages (mmh3, py-rust-stemmers) are blocked by Windows Application Control
+    # on some machines and are not needed for dense embeddings.
+    "tokenizers>=0.15",
     "piper-tts>=1.2.0",         # text-to-speech, cross-platform (tts_engine=piper; needs a voice .onnx)
 
     # --- Windows only (skipped automatically elsewhere) ---
@@ -69,10 +75,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Semantic memory: embeds facts/summaries with BAAI/bge-small-en-v1.5 (ONNX). Without it
-# memory recall quietly stays off (config/embedding.yaml: enabled).
-embedding = ["fastembed>=0.3.0"]
-
 # More precise voice-activity detection (audio.vad.engine: webrtc). Needs a C toolchain on newer Pythons.
 vad-webrtc = ["webrtcvad>=2.0.10"]
 

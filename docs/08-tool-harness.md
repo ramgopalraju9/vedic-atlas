@@ -1,4 +1,4 @@
-# 08 — Tool harness (tasks, weather, currency, web search)
+# 08 — Tool harness (tasks, weather, currency, web search, remember)
 
 How Veda calls tools reliably on a small quantized local model (Qwen3-4B Q4, CPU, n_ctx 4096).
 
@@ -33,11 +33,32 @@ user text -> Supervisor: manifest `triggers` / keyword rules (instant) -> agent;
 | Routing | `domain/policies/routing_policy.py` (`AgentProfile.triggers`) |
 | Staged turn | `service/agent/tool_turn_runner.py`, `service/agent/tool_agent.py`, `service/agent/tool_use_guard.py` |
 | Grounding | `domain/policies/grounding_policy.py` |
-| Skills | `service/skills/manifest_skill.py` + `builtin/{tasks,weather,currency,web_search}.py` |
+| Skills | `service/skills/manifest_skill.py` + `builtin/{tasks,weather,currency,web_search,remember}.py` |
 | Online lookups | `service/lookup/{lookup_service,place_resolver,weather_lookup,currency_lookup,search_lookup,ttl_cache}.py` |
 | Providers | `tpa/online/providers/{weather,geocode,fx,tavily}.py` via `tpa/online/http_client.py` (allow-list, no redirects, `[http]` log) |
 | Traces | `domain/entities/turn_trace.py`, `tpa/persistence/repositories/trace_repository.py`, `GET /api/trace`, `veda trace` |
 | Health | `service/lookup/health_service.py`, `GET /api/lookup/health`, `veda doctor` |
+
+## The remember tool
+`config/tools/remember.yaml` (owner agent `memory`) keeps lasting facts about the user: preferences, allergies, names,
+routines. Actions: `save` (topic + value), `forget` (topic), `list`.
+
+- **Stored as** one line per fact, `favourite sweet: gulab jamun`, in `data/knowledge.json` (the existing
+  `KnowledgeBase`; `domain/policies/fact_policy.py` defines the shape). The topic is the key: "my fav sweet",
+  "my favorite sweet" and "favourite sweet" are the same topic, so a new value *replaces* the old one and the reply says
+  what it replaced.
+- **Always in the chat prompt.** `ResponderAgent.build_prompt` includes every saved fact on every turn, then adds
+  semantically recalled conversation summaries when relevant (recall now searches summaries only, `config/embedding.yaml`).
+  So a question ("what's my favourite sweet?") is answered from the prompt and needs no tool call.
+- **Routing.** Statements ("my favourite sweet is X", "remember that I'm allergic to Z", "forget my favourite sweet",
+  "what do you remember about me?") match the manifest triggers; looser phrasings ("I only eat vegetarian food") go
+  through the LLM router. `required_when` forces a real call for the explicit forms, and `claims` stops a reply such as
+  "I'll remember that" when nothing was saved. Replies are templates built from what was written.
+- **Limits.** Max 40 facts (`MAX_FACTS`), topic <= 60 and value <= 200 characters. Passwords, PINs, card and account
+  numbers are refused. Nothing is saved unless the user said it: no automatic extraction from conversation.
+- **Known limit.** The LLM router sometimes sends a *question* about a saved fact ("what is my favourite food?") to
+  `memory`; the tool then lists all saved facts, which is grounded but not a direct answer. Measured on the golden set:
+  31/32 LLM-routed cases correct, 0 chat messages sent to a tool.
 
 ## Adding a tool
 1. Write `config/tools/<name>.yaml` (description <= 25 words, <= 6 examples, triggers, required_when).

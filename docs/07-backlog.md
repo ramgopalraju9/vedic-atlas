@@ -116,33 +116,28 @@ the Pi; only the final `hey_veda.onnx` leaves this directory).
 enrollment is inherently a live, in-person action regardless of backend
 — nothing to stage ahead of time for that part either way.
 
-## Memory — semantic recall layer dormant
+## Memory — semantic recall: enabled (hotfix, 2026-10-04)
 
-**Problem**: `config/embedding.yaml` has `enabled: true`, and the whole
-semantic-recall pipeline (`tpa/inference/embedding_adapter.py` →
-`FastEmbedProvider`, `tpa/persistence/vector_store.py` →
-`SqliteVectorStore`, `MemoryIndexer`/`SemanticRecall` in
-`service/memory/`) is wired into `ResponderAgent`, but `fastembed` isn't
-installed on this machine (`[embedding] unavailable: No module named
-'fastembed'` on every boot) and the `BAAI/bge-small-en-v1.5` ONNX model
-isn't staged at `data/bge-small-en-v1.5`.
+**Trigger**: the user told Veda their favourite sweet; a day later it could not recall it. The statement *was*
+stored (conversation turn, then a conversation summary), but only the newest 3 summaries reach the chat prompt and
+the meaning-based recall that should find older ones was off: `fastembed` was not installed, the embedding model
+was never staged, and the adapter passed a folder path where fastembed needs a model name.
 
-**Current behavior without it**: this degrades cleanly, not brokenly —
-taught facts (`/api/knowledge`, `JsonKnowledgeStore` at
-`data/knowledge.json`) and conversation history/summarization
-(`ConversationSummariser`) both work fully right now. What's missing is
-specifically *similarity-based* retrieval — the assistant can't yet pull
-up a fact or old summary by meaning when the user doesn't phrase it the
-same way it was taught.
+**Fixed**: `tpa/inference/embedding_adapter.py` now runs the staged BGE-small ONNX model directly with
+`onnxruntime` + `tokenizers` (no fastembed); `tokenizers` is a declared dependency; `scripts/setup_pi.sh` downloads
+`model.onnx` + `tokenizer.json` into `data/bge-small-en-v1.5/`. At startup `_backfill_memory_index` indexes all
+existing facts and summaries. Verified on the user's real database: all 12 summaries indexed, and "what is my fav
+sweet?", "which sweets do I like?", "do you remember what dessert I love" and "what did I say about gulab jamun?"
+(stored as "gamun") all rank the right summary first and Veda answers correctly.
 
-**Intended fix**: `pip install fastembed` (already scoped under the
-`embedding` optional-dependency group in `pyproject.toml`) + download the
-`BAAI/bge-small-en-v1.5` ONNX model to `data/bge-small-en-v1.5`, same
-staging pattern already used for the STT and LLM models this session.
-
-**Not done because**: no external blocker here (no account/key needed,
-just a model download) — this is the most "ready to just do" item on this
-list whenever the user wants it tackled.
+**Known limits (not fixed)**
+- Summaries are long and cover many topics, so their embeddings are blurry: unrelated questions still score 0.45-0.60
+  against some of them. `top_k: 3` / `min_score: 0.5` (down from 5 / 0.3) is a compromise between recalling the right
+  summary (0.53-0.72 on real data) and not stuffing the prompt with noise (each recalled summary costs about 100-150 tokens).
+- ~~Nothing saves a preference as a permanent fact.~~ Done: the `remember` tool (see `08-tool-harness.md`, "The remember
+  tool") saves "topic: value" facts that are always in the chat prompt. Facts are saved only when the user states or asks
+  for them; there is no automatic fact extraction from conversation yet (the summariser still only writes summaries).
+- The speech recogniser's spelling is what gets stored ("gulab gamun"); recall works through meaning, so this still matches.
 
 ## Summary — what needs what before it can be picked up
 
@@ -151,7 +146,7 @@ list whenever the user wants it tackled.
 | openWakeWord wake-word (Picovoice replacement) | implemented, trained, staged, boots real server — needs a retrain with more data for usable accuracy (currently ~50% recall + false positives) | first pass done — needs a better retrain |
 | Resemblyzer speaker recognition (Picovoice replacement) | implemented — install `resemblyzer`+`torch` (in progress), then live enrollment per person | code done — needs deps + verification, plus in-person enrollment |
 | Porcupine / Eagle (Picovoice originals) | kept in codebase, config-selectable; needs account + access key if ever switched back to | external account — parked, not planned |
-| Semantic memory recall (fastembed) | `pip install fastembed` + stage `bge-small-en-v1.5` model | none — pure staging work |
+| Semantic memory recall | done 2026-10-04 (see "Memory — semantic recall: enabled"); the `remember` tool for explicit facts is done; automatic fact extraction is still open | none |
 
 ## Tool harness — known gaps (see 08-tool-harness.md)
 

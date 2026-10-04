@@ -1,8 +1,8 @@
 """EmbeddingPort — turns text into a fixed-length vector for memory retrieval.
 
 New — the donor had no embedding concept (Memory & Recall is a new
-domain, see roadmap Epic 4). Per ADR-005: fastembed-backed adapters
-(BGE-small on laptop, MiniLM on Pi), never a cloud embedding API.
+domain, see roadmap Epic 4). Per ADR-005: a local ONNX model
+(BGE-small, run with onnxruntime), never a cloud embedding API.
 """
 
 from typing import Protocol, runtime_checkable

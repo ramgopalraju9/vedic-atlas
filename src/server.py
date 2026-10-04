@@ -572,21 +572,15 @@ def _build_embedding(cfg: AppConfig):
         return None
     try:
         from core.constants import PROJECT_ROOT
-        from tpa.inference.embedding_adapter import FastEmbedProvider
+        from tpa.inference.embedding_adapter import OnnxEmbeddingProvider
 
-        model_path = None
-        if ecfg.model_path:
-            path = Path(ecfg.model_path)
-            model_path = path if path.is_absolute() else PROJECT_ROOT / path
-        cache_dir = None
-        if ecfg.cache_dir:
-            path = Path(ecfg.cache_dir)
-            cache_dir = path if path.is_absolute() else PROJECT_ROOT / path
-        provider = FastEmbedProvider(model_id=ecfg.model_id, model_path=model_path, cache_dir=cache_dir)
-        logger.info(f"[embedding] model {provider.model_id!r} ready")
+        path = Path(ecfg.model_path or "data/bge-small-en-v1.5")
+        model_dir = path if path.is_absolute() else PROJECT_ROOT / path
+        provider = OnnxEmbeddingProvider(model_dir=model_dir, model_id=ecfg.model_id)
+        logger.info(f"[embedding] model {provider.model_id!r} ready ({model_dir.name})")
         return provider
     except Exception as e:
-        logger.warning(f"[embedding] unavailable: {e}")
+        logger.warning(f"[embedding] unavailable - semantic memory is OFF (recent history only): {e}")
         return None
 
 
@@ -772,6 +766,9 @@ def bootstrap(app: FastAPI) -> None:
         permission_level=cfg.skills.tasks.permission_level,
         enabled=cfg.skills.tasks.enabled,
     ))
+    from service.skills.builtin.remember import RememberSkill
+    if "remember" in tool_manifests:
+        skill_registry.register(RememberSkill(knowledge=knowledge, manifest=tool_manifests["remember"]))
     if lookup_service is not None:
         from service.lookup.currency_lookup import CurrencyLookup
         from service.lookup.place_resolver import PlaceResolver
