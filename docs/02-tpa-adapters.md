@@ -240,6 +240,7 @@ exist in parallel hardware/software tiers, selected by config
   via Piper's `.onnx` models — no donor equivalent; added per the privacy
   roadmap to replace the donor's `edge-tts` (a network call to Microsoft's
   Bing Speech backend, which would violate REQ-M-06).
+- **`piper.py` — `PiperProvider`**: reads the voice's own sample rate from `<voice>.onnx.json` (16000 for "low" voices, 22050 for "medium"), because playing at the wrong rate changes pitch and speed; falls back to 22050 if there is no config file. Needs a staged `.onnx` voice; nothing is downloaded.
 - **`pyttsx3_provider.py` — `Pyttsx3Provider`**: the offline SAPI/eSpeak
   fallback, ported from the donor's `_synth_pyttsx3_sync` — the only TTS
   path actually carried over from the donor (the other half, `_synth_edge`,
