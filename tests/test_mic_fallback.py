@@ -61,11 +61,26 @@ def test_tones_above_the_16k_nyquist_are_filtered_not_folded_back():
     assert np.abs(out[200:-200]).max() < 1500
 
 
+@pytest.mark.parametrize("rate", [48_000, 44_100])
+def test_block_edges_do_not_glitch(rate):
+    # A continuous tone must stay continuous across block boundaries: no sample-to-sample jump bigger than the
+    # tone itself allows (a zero-padded filter edge would show up as a click every 30 ms).
+    rs = Int16BlockResampler(rate, 16_000, FRAME)
+    source = _sine(rate, 0.6, freq=300, amp=8000)
+    out = np.concatenate([
+        np.frombuffer(rs.process(source[i:i + rs.in_frames].tobytes()), dtype=np.int16)
+        for i in range(0, len(source) - rs.in_frames + 1, rs.in_frames)
+    ]).astype(np.int32)
+    steady = out[FRAME * 2:]                                       # skip the first blocks (filter warm-up)
+    biggest_step = np.abs(np.diff(steady)).max()
+    assert biggest_step < 2 * np.pi * 300 / 16_000 * 8000 * 1.3    # the tone's own maximum slope, plus 30%
+
+
 # ---- the capture adapter -----------------------------------------------------------------------
 
 class _FakeStream:
-    def __init__(self, rate, blocksize, callback):
-        self.rate, self.blocksize, self.callback = rate, blocksize, callback
+    def __init__(self, rate, blocksize, callback, latency=None):
+        self.rate, self.blocksize, self.callback, self.latency = rate, blocksize, callback, latency
         self.started = False
 
     def start(self):
@@ -87,10 +102,10 @@ def _fake_sounddevice(monkeypatch, accepted_rates, default_rate=48_000):
     streams = []
     module = types.ModuleType("sounddevice")
 
-    def raw_input_stream(samplerate, channels, dtype, blocksize, device, callback):
+    def raw_input_stream(samplerate, channels, dtype, blocksize, device, callback, latency=None):
         if samplerate not in accepted_rates:
             raise RuntimeError(f"Error opening RawInputStream: Invalid sample rate [PaErrorCode -9997] ({samplerate})")
-        stream = _FakeStream(samplerate, blocksize, callback)
+        stream = _FakeStream(samplerate, blocksize, callback, latency)
         streams.append(stream)
         return stream
 
@@ -113,6 +128,7 @@ def test_a_48k_only_mic_is_opened_at_48k_and_delivers_16k_frames(monkeypatch):
     cap.start()
     stream = streams[-1]
     assert stream.rate == 48_000 and stream.started
+    assert stream.latency == "high"
     stream.feed()
     window = cap.read(timeout=0.1)
     assert window is not None and window.sample_rate == 16_000 and window.channels == 1

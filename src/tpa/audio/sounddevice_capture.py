@@ -85,6 +85,7 @@ class SoundDeviceCapture:
                 stream = sd.RawInputStream(
                     samplerate=rate, channels=CHANNELS, dtype=DTYPE,
                     blocksize=resampler.in_frames, device=self.device_index, callback=self._callback,
+                    latency="high",   # bigger device buffer: tolerates a late callback ("input overflow") on a slow Pi
                 )
             except Exception:
                 continue
