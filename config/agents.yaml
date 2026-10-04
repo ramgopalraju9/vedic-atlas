@@ -6,7 +6,7 @@ tools_enabled: true
 # Routing: manifest triggers and keyword overlap decide first (instant). With llm_routing on, a message
 # they don't recognise is routed by one tiny constrained model call (adds ~1-3 s to those turns)
 # instead of defaulting to plain chat. Set false to route by rules only.
-llm_routing: true
+llm_routing: false   # off for v1: on a Raspberry Pi the routing call takes 30 s+ (about 2 s on a laptop)
 
 supervisor:
   enabled: true

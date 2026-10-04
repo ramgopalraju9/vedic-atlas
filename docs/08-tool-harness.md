@@ -89,4 +89,5 @@ routines. Actions: `save` (topic + value), `forget` (topic), `list`.
   `LlamaCppClient` holds a thread lock around every decode, because a timed-out call's thread keeps running and a
   second decode on the same llama.cpp context crashes the server (the CLI then shows "peer closed connection ...
   incomplete chunked read"). The reply that follows a timed-out call therefore waits for it to finish. On a Pi where
-  the router is never fast enough, set `agents.llm_routing: false` in `config/agents.yaml`.
+  the router is never fast enough, set `agents.llm_routing: false` in `config/agents.yaml` (**this is the default in
+  `config/agents.yaml` for v1**; set it to `true` on a fast machine to route unusual phrasings with the model).
