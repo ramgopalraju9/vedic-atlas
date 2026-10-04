@@ -83,3 +83,10 @@ routines. Actions: `save` (topic + value), `forget` (topic), `list`.
 - Follow-up fragments ("and in Mumbai?") route via the LLM router, which sees the recent turns for messages of <= 6 words; this is not covered by the eval.
 - "I need to ..." creates a task by design, so "I need to open chrome" is routed to tasks.
 - CPU latency: ~3-15 s per tool turn (decide stage dominates); first request after boot is slower (cold prefix cache).
+- **Slow devices (Raspberry Pi).** The LLM router costs ~1-3 s on a laptop but can exceed its 30 s timeout on a Pi
+  (about 380 prompt tokens to read, cold). Two safeguards: a timeout makes the router pause itself for 10 minutes
+  (rules only, logged as `[route] llm routing took longer than 30s - too slow on this device`), and
+  `LlamaCppClient` holds a thread lock around every decode, because a timed-out call's thread keeps running and a
+  second decode on the same llama.cpp context crashes the server (the CLI then shows "peer closed connection ...
+  incomplete chunked read"). The reply that follows a timed-out call therefore waits for it to finish. On a Pi where
+  the router is never fast enough, set `agents.llm_routing: false` in `config/agents.yaml`.

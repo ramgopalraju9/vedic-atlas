@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import threading
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -63,6 +64,10 @@ class LlamaCppClient:
         self._timeout = timeout
         self._num_predict = num_predict
         self._think = think
+        # A llama.cpp context is not thread-safe. A call that timed out (asyncio.wait_for) is only abandoned by the
+        # event loop: its worker thread keeps decoding. This lock is held by that thread, so the next call waits for
+        # it instead of decoding on the same context at the same time (which crashes the whole server).
+        self._model_lock = threading.Lock()
 
     @property
     def name(self) -> str:
@@ -114,11 +119,12 @@ class LlamaCppClient:
             # Grammar-constrained decoding: the model cannot emit anything that
             # isn't valid JSON for this schema.
             kwargs["response_format"] = {"type": "json_object", "schema": json_schema}
+        def _run():
+            with self._model_lock:
+                return self._llama.create_chat_completion(**kwargs)
+
         try:
-            result = await asyncio.wait_for(
-                asyncio.to_thread(self._llama.create_chat_completion, **kwargs),
-                timeout=timeout or self._timeout,
-            )
+            result = await asyncio.wait_for(asyncio.to_thread(_run), timeout=timeout or self._timeout)
         except asyncio.TimeoutError as exc:
             raise InferenceTimeoutError(f"llama.cpp request timed out: {exc}") from exc
         content = result["choices"][0]["message"]["content"]
@@ -145,14 +151,15 @@ class LlamaCppClient:
 
         def _produce():
             try:
-                for chunk in self._llama.create_chat_completion(
-                    messages=self._prompt_messages(prompt, system), stream=True, max_tokens=max_tokens
-                ):
-                    if cancel_event is not None and cancel_event.is_set():
-                        break  # cancelled (e.g. the user muted): stop burning CPU on a reply nobody will hear
-                    delta = chunk["choices"][0]["delta"].get("content", "")
-                    if delta:
-                        loop.call_soon_threadsafe(queue.put_nowait, delta)
+                with self._model_lock:   # waits for any abandoned (timed-out) call still decoding
+                    for chunk in self._llama.create_chat_completion(
+                        messages=self._prompt_messages(prompt, system), stream=True, max_tokens=max_tokens
+                    ):
+                        if cancel_event is not None and cancel_event.is_set():
+                            break  # cancelled (e.g. the user muted): stop burning CPU on a reply nobody will hear
+                        delta = chunk["choices"][0]["delta"].get("content", "")
+                        if delta:
+                            loop.call_soon_threadsafe(queue.put_nowait, delta)
             finally:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
