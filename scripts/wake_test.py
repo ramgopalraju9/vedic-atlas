@@ -32,6 +32,9 @@ def main() -> int:
     args = ap.parse_args()
 
     import numpy as np
+    from tpa.wake_word.openwakeword_engine import require_feature_models
+
+    require_feature_models()   # a clear message if openwakeword's helper models were never downloaded
     from openwakeword.model import Model
 
     cfg = load_full_config().audio

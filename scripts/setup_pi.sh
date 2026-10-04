@@ -16,6 +16,8 @@
 #        - voice            data/models/piper/<voice>.onnx     (Piper en_US-lessac-medium, 63 MB)
 #        - memory           data/bge-small-en-v1.5/            (BGE-small embeddings, 134 MB: lets Veda recall
 #                                                               things you told it in earlier sessions)
+#        - wake helpers     inside the openwakeword package   (melspectrogram + embedding models, 2.4 MB: the
+#                                                               wake word cannot load without them)
 #   5. points config/audio.yaml at the Piper voice  (skip: --skip-config)
 #   6. creates .env from .env.example if there is none
 #   7. checks the install and tells you what is still missing
@@ -58,6 +60,10 @@ EMBED_BASE_URL="https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main"
 EMBED_DIR="$ROOT/data/bge-small-en-v1.5"
 
 WAKE_DIR="$ROOT/data/models/openwakeword"
+# openwakeword does not ship its two feature-extractor models in the pip package; without them the wake word
+# cannot load at all ("melspectrogram.onnx ... File doesn't exist"). They go inside the installed package.
+OWW_FEATURE_URL="https://github.com/dscripka/openWakeWord/releases/download/v0.5.1"
+OWW_FEATURE_FILES=(melspectrogram.onnx embedding_model.onnx)
 
 APT_PACKAGES=(build-essential cmake git wget curl ca-certificates pkg-config
               python3-dev python3-venv libportaudio2 portaudio19-dev alsa-utils)
@@ -316,6 +322,35 @@ download_models() {
   url="$(piper_url "$PIPER_VOICE")"
   fetch "$url" "$PIPER_DIR/$PIPER_VOICE.onnx"
   fetch "$url.json" "$PIPER_DIR/$PIPER_VOICE.onnx.json"
+
+  download_wake_feature_models
+}
+
+# Folder inside the installed openwakeword package where it looks for its feature models. find_spec does not
+# import the package (importing it pulls in scikit-learn, which is slow on a Pi).
+openwakeword_models_dir() {
+  "$VENV/bin/python" -c 'import importlib.util, os, sys
+spec = importlib.util.find_spec("openwakeword")
+if spec is None or not spec.origin:
+    sys.exit(1)
+print(os.path.join(os.path.dirname(spec.origin), "resources", "models"))' 2>/dev/null
+}
+
+download_wake_feature_models() {
+  info "wake word helper models (openwakeword feature extractors, 2.4 MB)"
+  local dir f
+  if (( DRY_RUN )); then
+    for f in "${OWW_FEATURE_FILES[@]}"; do info "[dry-run] would download $OWW_FEATURE_URL/$f into the openwakeword package"; done
+    return 0
+  fi
+  dir="$(openwakeword_models_dir)" || dir=""
+  if [[ -z "$dir" ]]; then
+    warn "openwakeword is not installed in $VENV, so its helper models were not downloaded (run without --skip-install)."
+    return 0
+  fi
+  for f in "${OWW_FEATURE_FILES[@]}"; do
+    fetch "$OWW_FEATURE_URL/$f" "$dir/$f"
+  done
 }
 
 check_wake_model() {

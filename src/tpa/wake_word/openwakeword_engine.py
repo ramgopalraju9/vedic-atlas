@@ -19,7 +19,28 @@ in practice (see config_schemas.py's AudioConfig.wake_oww_model_path).
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
+
+# The two feature extractors every openwakeword model runs through. The pip package does not ship them.
+FEATURE_MODEL_FILES = ("melspectrogram.onnx", "embedding_model.onnx")
+
+
+def require_feature_models(package_dir: Path | None = None) -> None:
+    """Fail with the fix, not an onnxruntime NO_SUCHFILE trace, when openwakeword's helper models are missing."""
+    if package_dir is None:
+        spec = importlib.util.find_spec("openwakeword")   # does not import the package
+        if spec is None or not spec.origin:
+            return   # not installed: the import below reports that
+        package_dir = Path(spec.origin).parent
+    models = package_dir / "resources" / "models"
+    missing = [name for name in FEATURE_MODEL_FILES if not (models / name).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            f"openwakeword's helper model(s) {', '.join(missing)} are missing from {models}. "
+            "Run scripts/setup_pi.sh (it downloads them), or: "
+            'python -c "import openwakeword; openwakeword.utils.download_models([\'none\'])"'
+        )
 
 
 class OpenWakeWordEngine:
@@ -37,6 +58,7 @@ class OpenWakeWordEngine:
             path = Path(model_path)
             if not path.exists():
                 raise FileNotFoundError(f"openwakeword model not found at {path}")
+        require_feature_models()
         from openwakeword.model import Model
 
         # None -> openwakeword's own bundled pretrained set; only used if a
