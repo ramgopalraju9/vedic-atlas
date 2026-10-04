@@ -138,4 +138,3 @@ true interface into the system; the CLI is UX sugar on top of it.
 | [05-exception-handling.md](05-exception-handling.md) | `AppException`, error codes, the `AppResponse` envelope, HTTP status mapping |
 | [06-configuration.md](06-configuration.md) | Config loading, `config/*.yaml`, constants, logging, the full `AppConfig` schema |
 | [08-tool-harness.md](08-tool-harness.md) | How tool calls work on the small local model: manifests, staged turns, online tools (weather, currency, search), traces, evaluation |
-| [voice/wake-word-training.md](voice/wake-word-training.md) | Training, retraining, deploying and tuning the "Hey Veda" wake-word model, with all dataset links (incl. the 17 GB negative-speech file) |
