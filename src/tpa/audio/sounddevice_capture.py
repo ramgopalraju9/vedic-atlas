@@ -18,6 +18,7 @@ from domain.value_objects.audio_window import AudioWindow
 SAMPLE_RATE = 16_000
 CHANNELS = 1
 DTYPE = "int16"
+_FALLBACK_RATES = (48_000, 44_100)   # tried after the device's own default rate when 16 kHz is refused
 
 
 class SoundDeviceCapture:
@@ -28,6 +29,7 @@ class SoundDeviceCapture:
         self.device_index = device_index
         self._queue: "queue.Queue[bytes]" = queue.Queue(maxsize=256)
         self._stream = None
+        self._resampler = None   # set only when the mic cannot be opened at 16 kHz
 
     @property
     def sample_rate(self) -> int:
@@ -43,6 +45,8 @@ class SoundDeviceCapture:
 
             logger.warning(f"[mic] {status}")
         data = bytes(indata)
+        if self._resampler is not None:
+            data = self._resampler.process(data)
         try:
             self._queue.put_nowait(data)
         except queue.Full:
@@ -55,11 +59,42 @@ class SoundDeviceCapture:
     def start(self) -> None:
         import sounddevice as sd
 
-        self._stream = sd.RawInputStream(
-            samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE,
-            blocksize=self.frame_length, device=self.device_index, callback=self._callback,
-        )
+        self._resampler = None
+        try:
+            self._stream = sd.RawInputStream(
+                samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE,
+                blocksize=self.frame_length, device=self.device_index, callback=self._callback,
+            )
+        except Exception as refused:
+            # Many USB microphones only accept 44.1 / 48 kHz when opened directly ("Invalid sample rate").
+            self._stream = self._open_at_native_rate(sd, refused)
         self._stream.start()
+
+    def _open_at_native_rate(self, sd, refused: Exception):
+        """Open the mic at a rate it accepts and convert every block to 16 kHz; re-raise `refused` if none works."""
+        from core.logging_config import logger
+        from tpa.audio.resampler import Int16BlockResampler
+
+        try:
+            default_rate = int(sd.query_devices(self.device_index, "input")["default_samplerate"])
+        except Exception:
+            default_rate = 0
+        for rate in dict.fromkeys(r for r in (default_rate, *_FALLBACK_RATES) if r > 0):
+            resampler = Int16BlockResampler(rate, SAMPLE_RATE, self.frame_length)
+            try:
+                stream = sd.RawInputStream(
+                    samplerate=rate, channels=CHANNELS, dtype=DTYPE,
+                    blocksize=resampler.in_frames, device=self.device_index, callback=self._callback,
+                )
+            except Exception:
+                continue
+            self._resampler = resampler
+            logger.warning(
+                f"[mic] cannot open at {SAMPLE_RATE} Hz ({str(refused).splitlines()[0]}); "
+                f"opened at {rate} Hz and converting to {SAMPLE_RATE} Hz"
+            )
+            return stream
+        raise refused
 
     def stop(self) -> None:
         if self._stream is not None:

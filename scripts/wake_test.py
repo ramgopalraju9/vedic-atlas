@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from core.config import load_full_config  # noqa: E402
+from tpa.audio.sounddevice_capture import SoundDeviceCapture  # noqa: E402
 
 
 def main() -> int:
@@ -31,7 +32,6 @@ def main() -> int:
     args = ap.parse_args()
 
     import numpy as np
-    import sounddevice as sd
     from openwakeword.model import Model
 
     cfg = load_full_config().audio
@@ -43,10 +43,15 @@ def main() -> int:
 
     print(f"model={model_path.name} threshold={threshold} - say 'Hey Veda' now, then normal sentences, then be quiet\n")
     peak, started, last_print, triggers, chunk = 0.0, time.time(), 0.0, 0, 1280
-    with sd.InputStream(samplerate=16000, channels=1, dtype="int16", blocksize=chunk, device=args.device) as stream:
+    # The same capture Veda uses, so a microphone that only accepts 44.1/48 kHz is converted to 16 kHz here too.
+    capture = SoundDeviceCapture(frame_length=chunk, device_index=args.device)
+    capture.start()
+    try:
         while time.time() - started < args.seconds:
-            data, _ = stream.read(chunk)
-            score = float(model.predict(np.asarray(data).reshape(-1)).get(name, 0.0))
+            window = capture.read(timeout=1.0)
+            if window is None:
+                continue
+            score = float(model.predict(np.frombuffer(window.pcm, dtype=np.int16)).get(name, 0.0))
             peak = max(peak, score)
             now = time.time()
             if score >= threshold:
@@ -57,6 +62,8 @@ def main() -> int:
                 last_print, peak = now, 0.0
             elif now - last_print > 0.5:
                 last_print, peak = now, 0.0
+    finally:
+        capture.stop()
     print(f"\ndone: {triggers} trigger chunk(s) at threshold {threshold}")
     return 0
 

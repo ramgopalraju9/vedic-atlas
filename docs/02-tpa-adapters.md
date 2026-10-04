@@ -48,6 +48,11 @@ implements a port.
   `sounddevice.RawInputStream`. `read()` wraps raw PCM in a domain
   `AudioWindow` so nothing above this adapter ever sees a vendor-specific
   buffer type. Fixed `SAMPLE_RATE=16_000`, `CHANNELS=1`, `DTYPE="int16"`.
+  Many USB microphones accept only 44.1/48 kHz when opened directly ("Invalid sample rate"), so if the 16 kHz
+  open is refused it re-opens at the device's own rate (device default, then 48000, then 44100) and converts every
+  block to 16 kHz with `tpa/audio/resampler.py` (`Int16BlockResampler`, scipy `resample_poly` with the previous
+  block as context); it logs `[mic] cannot open at 16000 Hz ...; opened at 48000 Hz and converting`. If no rate
+  works the original error is raised. Check a microphone with `python scripts/mic_check.py` (server stopped).
 - **`energy_vad.py` — `EnergyVadDetector`** (the default VAD): adaptive RMS
   energy thresholding — tracks a running noise floor from quiet frames,
   fires when a frame is meaningfully louder than ambient. Chosen as default
