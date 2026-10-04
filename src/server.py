@@ -243,21 +243,58 @@ def _build_stt(cfg: AppConfig):
         return None
 
 
+def _resolve_tts_engine(cfg: AppConfig) -> str:
+    """`auto` = Windows speech (pyttsx3) on Windows, Piper everywhere else."""
+    engine = (cfg.audio.tts_engine or "auto").strip().lower()
+    if engine == "auto":
+        return "pyttsx3" if _IS_WINDOWS else "piper"
+    return engine
+
+
 def _build_tts(cfg: AppConfig):
-    """TTS adapter chosen by config, or None."""
+    """TTS adapter chosen by config, or None.
+
+    Every requirement is checked HERE, at boot, so a missing voice or package is a clear
+    startup error ("voice not started - missing: tts") and not a silent device that logs
+    "TTS failed" on every reply.
+    """
+    engine = _resolve_tts_engine(cfg)
     try:
-        if cfg.audio.tts_engine == "piper":
-            from tpa.tts.piper import PiperProvider
+        if engine == "piper":
+            model = cfg.audio.tts_model_path
+            if not model:
+                if _IS_WINDOWS:
+                    logger.warning("[voice] tts_engine=piper has no tts_model_path; using Windows speech (pyttsx3) instead")
+                    engine = "pyttsx3"
+                else:
+                    raise ValueError(
+                        "Piper needs a voice: copy a Piper voice (.onnx and its .onnx.json) to the device and set "
+                        "audio.tts_model_path in config/audio.yaml, e.g. data/models/piper/en_US-lessac-medium.onnx"
+                    )
+            if engine == "piper":
+                import piper  # noqa: F401  (fail now, not on the first reply)
+                from core.constants import PROJECT_ROOT
+                from tpa.tts.piper import PiperProvider
 
-            if not cfg.audio.tts_model_path:
-                logger.warning("[voice] tts_engine=piper requires tts_model_path; falling back to pyttsx3")
-            else:
-                return PiperProvider(model_path=cfg.audio.tts_model_path)
-        from tpa.tts.pyttsx3_provider import Pyttsx3Provider
+                path = Path(model)
+                logger.info(f"[voice] TTS engine: piper ({path.name})")
+                return PiperProvider(model_path=path if path.is_absolute() else PROJECT_ROOT / path)
+        if engine == "pyttsx3":
+            import pyttsx3  # noqa: F401  (Windows speech; not installed on Linux/Pi)
+            from tpa.tts.pyttsx3_provider import Pyttsx3Provider
 
-        return Pyttsx3Provider(voice_hint=cfg.audio.tts_voice)
+            logger.info("[voice] TTS engine: pyttsx3 (Windows speech)")
+            return Pyttsx3Provider(voice_hint=cfg.audio.tts_voice)
+        raise ValueError(f"unknown audio.tts_engine {cfg.audio.tts_engine!r} (use auto | piper | pyttsx3)")
+    except ImportError as e:
+        hint = (
+            "pyttsx3 is Windows-only: set audio.tts_engine: piper (or auto) and give it a voice"
+            if engine == "pyttsx3" else "install it with: pip install piper-tts"
+        )
+        logger.error(f"[voice] TTS unavailable: {e}. {hint}. Voice replies are disabled until this is fixed.")
+        return None
     except Exception as e:
-        logger.info(f"[voice] TTS unavailable ({e})")
+        logger.error(f"[voice] TTS unavailable: {e}. Voice replies are disabled until this is fixed.")
         return None
 
 

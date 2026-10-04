@@ -189,7 +189,7 @@ class AudioConfig(BaseModel):
     stt_model: str = "base.en"
     stt_model_path: str | None = None
 
-    tts_engine: str = "pyttsx3"  # "pyttsx3" | "piper"
+    tts_engine: str = "auto"  # "auto" (pyttsx3 on Windows, piper elsewhere) | "pyttsx3" | "piper"
     tts_voice: str = "zira"
     tts_model_path: str | None = None  # required when tts_engine == "piper"
 

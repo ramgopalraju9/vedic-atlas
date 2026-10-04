@@ -10,6 +10,7 @@ consistent with every other model-loading adapter in this codebase.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -25,8 +26,18 @@ class PiperProvider:
                 "voice models. Run the installer's model-fetch step first."
             )
         self._model_path = path
-        self._sample_rate = sample_rate
+        self._sample_rate = self._rate_from_voice_config(path) or sample_rate
         self._voice = None
+
+    @staticmethod
+    def _rate_from_voice_config(model_path: Path) -> int | None:
+        """A Piper voice ships `<voice>.onnx.json` with its sample rate (16000 for "low", 22050 for "medium"
+        voices). Playing at the wrong rate changes pitch and speed, so read it instead of assuming."""
+        config = model_path.with_name(model_path.name + ".json")
+        try:
+            return int(json.loads(config.read_text(encoding="utf-8"))["audio"]["sample_rate"])
+        except Exception:
+            return None
 
     @property
     def sample_rate(self) -> int:

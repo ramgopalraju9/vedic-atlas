@@ -19,7 +19,10 @@ hotkey: <f8>
 stt_model: base.en
 stt_model_path: data/models/whisper-base.en
 
-tts_engine: pyttsx3       # pyttsx3 (Windows SAPI) | piper (cross-platform, needs .onnx)
+# auto = Windows speech (pyttsx3) on Windows, Piper on Linux/Pi. Piper needs a voice: put a Piper
+# .onnx (and its .onnx.json) on the device and set tts_model_path. A missing voice or package stops
+# voice at startup with a clear error instead of leaving replies silent.
+tts_engine: auto          # auto | pyttsx3 (Windows SAPI) | piper (cross-platform)
 tts_voice: zira
 tts_model_path: null
 
