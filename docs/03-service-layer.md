@@ -57,14 +57,28 @@ from its own routing candidates).
 Routing order in `_pick(ctx)`:
 
 1. 0 routable agents → `default_agent`. Exactly 1 → that one.
-2. **Keyword/description match**: `RouterPolicy.pick()` wraps the pure
-   `domain.policies.routing_policy.pick_agent`.
-3. **LLM fallback** (only if step 2 returns `None`): one `InferencePort.complete()`
-   call with a router system prompt listing every routable agent's
-   name+description, expecting one line of JSON `{"agent": "...", "reason": "..."}"`.
-4. **Memory fallback**: if the LLM call also fails, reuses
-   `memory.last_action(agent_name="supervisor")`'s last recorded target.
-5. **Final fallback**: `default_agent`.
+2. **Rules (instant, free)**: `RouterPolicy.match()` wraps the pure
+   `domain.policies.routing_policy.match_agent` — the agent whose manifest `triggers`
+   (regexes) match most, else keyword overlap with the agent descriptions. A miss is `None`
+   (`pick_agent` is the same rule with the default substituted).
+3. **LLM router** (`llm_router.py`, only when step 2 matched nothing and
+   `agents.llm_routing` is on): one `InferencePort.complete()` call with a ~300-token routing
+   prompt (`PromptComposer.route_stage`: each agent's one-line description from
+   `config/agents.yaml`, example phrases taken from the tool manifests, `config/prompts/router.md`),
+   constrained by a JSON schema whose `agent` is an enum of the real agent names
+   (`build_route_schema`), temperature 0, ~24 output tokens. Recent turns are included only for
+   short follow-ups (<= 6 words). Logged as `[route] llm -> <agent> (<ms>, <tokens>)`.
+4. **Default**: `default_agent` if the model call fails, times out or answers nonsense.
+
+`ctx.metadata["routed_via"]` records which path decided (`rules`, `llm (<ms>)`, `default`) and is
+written into the `TurnTrace` notes ("routed via llm (2336 ms)"). The old unconstrained LLM
+fallback and the "reuse the last specialist" memory fallback were removed: the former could never
+run (the policy never returned `None`) and the latter could keep sending chat to a tool agent.
+
+Measured on the real model (tests/eval/golden_set.yaml, `scripts/eval_tools.py --model --routing-only`):
+rules 51/51 on the trigger-word cases; the LLM router 27/28 on the 28 messages the rules do not
+match (every no-trigger weather/news/task/system phrasing right; one chat message sent to the tasks
+agent, which harmlessly hands it back to chat). Median routing call ~2 s with the prompt cache warm.
 
 `execute(ctx)` optionally consults `GovernanceProvider.check_action("route_to_agent", ...)`
 before delegating, records the routing decision to memory, and sets

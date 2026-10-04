@@ -156,7 +156,8 @@ list whenever the user wants it tackled.
 ## Tool harness — known gaps (see 08-tool-harness.md)
 
 - **Weather is current conditions only** — no forecast or rain probability (Open-Meteo's daily/hourly fields are unused).
-- **Follow-up fragments don't route** ("and in Mumbai?") — routing needs a full request; a sticky "last tool" hint is the likely fix.
+- **Follow-up fragments** ("and in Mumbai?") are routed by the LLM router using the recent turns; verified live for weather but not part of the eval set (the eval has no conversation history).
+- **LLM router misroutes** about 1 in 28 unmatched messages ("I feel like going for a walk" -> tasks); the tasks agent hands it back to chat, costing one extra model call.
 - **"I need to ..." always means a task** — "I need to open chrome" routes to the tasks agent, not the system agent.
 - **CLI `/task` parity** — `/task add` has no duplicate check, there is no `/task delete`, and `/task done` needs a numeric id (chat accepts a phrase).
 - **Summariser vs. live chat** — both share one model behind `SingleFlight`; a summarising tick delays a live reply. Yielding to chat is not implemented.

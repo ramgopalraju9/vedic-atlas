@@ -11,7 +11,8 @@ How Veda calls tools reliably on a small quantized local model (Qwen3-4B Q4, CPU
 
 ## Turn flow
 ```
-user text -> Supervisor (deterministic: manifest `triggers` -> agent; else chat)
+user text -> Supervisor: manifest `triggers` / keyword rules (instant) -> agent;
+              nothing matched -> LLM router (one constrained call, ~2 s warm) -> agent; failure -> chat
   -> ToolAgent (tasks | lookup)
      A. DECIDE   constrained JSON {"calls":[...]}  (persona_lite + this agent's tools + last 2 turns)
         FORCE    `required_when` matched but no call -> retry once with minItems=1
@@ -58,6 +59,6 @@ user text -> Supervisor (deterministic: manifest `triggers` -> agent; else chat)
 
 ## Known limits
 - Weather is current conditions only (no forecast/rain probability yet).
-- Follow-up fragments ("and in Mumbai?") don't route; only full requests do.
+- Follow-up fragments ("and in Mumbai?") route via the LLM router, which sees the recent turns for messages of <= 6 words; this is not covered by the eval.
 - "I need to ..." creates a task by design, so "I need to open chrome" is routed to tasks.
 - CPU latency: ~3-15 s per tool turn (decide stage dominates); first request after boot is slower (cold prefix cache).
