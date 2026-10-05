@@ -22,6 +22,7 @@ from domain.entities.agent_result import AgentResult
 from domain.ports.inference_port import InferencePort
 from domain.ports.knowledge_store_port import KnowledgeStorePort
 from domain.ports.memory_repository_port import MemoryRepositoryPort
+from domain.policies.reply_filler_policy import FillerStreamFilter, strip_filler
 from service.agent.base_llm_agent import LLMAgent
 from service.agent.persona import VEDA_SYSTEM_PROMPT
 from service.conversation.conversation_manager import ConversationManager
@@ -41,6 +42,7 @@ class ResponderAgent(LLMAgent):
         memory: MemoryRepositoryPort | None = None,
         recall: "SemanticRecall | None" = None,
         claim_filter: Callable[[str], bool] | None = None,
+        persona: str | None = None,
     ):
         super().__init__(
             name="responder",
@@ -48,7 +50,7 @@ class ResponderAgent(LLMAgent):
                 "General conversation, persona replies, Q&A, small talk, and anything "
                 "the user wants to chat about. The safe default when no specialist fits."
             ),
-            system_prompt=VEDA_SYSTEM_PROMPT,
+            system_prompt=persona or VEDA_SYSTEM_PROMPT,
             client=client,
             model=model,
             memory=memory,
@@ -62,7 +64,7 @@ class ResponderAgent(LLMAgent):
     def build_system_prompt(self, ctx: AgentContext) -> str:
         # Persona only: byte-identical every turn so the backend's KV prefix
         # cache is reused. Volatile context lives in build_prompt — PERF_BRIEF §5.2.
-        return VEDA_SYSTEM_PROMPT
+        return self.system_prompt
 
     @staticmethod
     def _time_context() -> str:
@@ -116,12 +118,22 @@ class ResponderAgent(LLMAgent):
 
     async def execute(self, ctx: AgentContext) -> AgentResult:
         await self._prepare_semantic_context(ctx)
-        return await super().execute(ctx)
+        result = await super().execute(ctx)
+        result.response = strip_filler(result.response)
+        return result
 
     async def execute_stream(self, ctx: AgentContext, cancel_event=None) -> AsyncIterator[str]:
         await self._prepare_semantic_context(ctx)
+        # Stock "let me know if you need anything else" sentences are dropped as they stream, so they are
+        # neither spoken nor left in the text the user sees.
+        filler_filter = FillerStreamFilter()
         async for chunk in super().execute_stream(ctx, cancel_event=cancel_event):
-            yield chunk
+            text = filler_filter.feed(chunk)
+            if text:
+                yield text
+        tail = filler_filter.finish()
+        if tail:
+            yield tail
 
     def _without_action_claims(self, turns):
         """Drop "Task added…"-style exchanges (the assistant reply and the user
@@ -147,6 +159,8 @@ class ResponderAgent(LLMAgent):
         lines = []
         for turn in recent:
             content = (turn.content or "").strip()
+            if turn.role != "user":
+                content = strip_filler(content)  # older saved replies may still end with the stock offer
             if not content:
                 continue
             prefix = "User" if turn.role == "user" else "Veda"
@@ -156,6 +170,8 @@ class ResponderAgent(LLMAgent):
         return "\n\n".join(blocks)
 
     async def on_completion(self, ctx: AgentContext, response: str) -> None:
+        # Saved history is replayed into later prompts; a filler line left in it gets copied into every reply.
+        response = strip_filler(response)
         if not response:
             return
         self.conversation.add_turn("user", ctx.user_message)

@@ -1,6 +1,6 @@
 name: convert_currency
 agent: lookup
-description: Convert an amount between two currencies at the latest exchange rate.
+description: Convert an amount between two CURRENCIES (dollars, rupees, euros...) at the latest exchange rate. Not for gold, silver, fuel, stocks or crypto prices.
 reply_mode: template
 permission_level: auto
 requires_online: true

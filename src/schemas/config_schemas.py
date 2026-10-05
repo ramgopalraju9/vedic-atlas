@@ -47,7 +47,7 @@ Section-by-section changes from the donor:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -58,6 +58,12 @@ class AppSectionConfig(BaseModel):
     name: str = "Veda"
     port: int = 8000
     max_history: int = 30
+    # How many compressed earlier-session summaries go into every chat prompt. Each is ~100-250 tokens, and
+    # prompt prefill dominates CPU latency, so small devices set this to 0-1.
+    chat_summaries: int = 3
+    # Persona system prompt for plain chat: "full" (persona.py, ~560 tokens) or "compact" (config/prompts/persona_chat.md,
+    # ~250 tokens). The persona is re-read on every chat turn, so small CPU devices use the compact one.
+    chat_persona: Literal["full", "compact"] = "full"
     log_level: str = "INFO"
 
 

@@ -15,10 +15,17 @@ params:
   topic:
     type: string
     enum: [general, news]
+    description: use news for anything latest, recent, headlines, breaking or scores; general otherwise
 
 examples:
   - user: latest news on ISRO
     calls: [{tool: web_search, args: {query: ISRO latest news, topic: news}}]
+  - user: what is the price of gold today
+    calls: [{tool: web_search, args: {query: gold price today in India, topic: general}}]
+  - user: whats the current gold rate
+    calls: [{tool: web_search, args: {query: gold rate today in India per 10 grams, topic: general}}]
+  - user: silver rate today
+    calls: [{tool: web_search, args: {query: silver rate today in India per kg, topic: general}}]
   - user: who is the prime minister of Japan
     calls: [{tool: web_search, args: {query: current prime minister of Japan, topic: general}}]
   - user: upcoming Telugu movies releasing in November 2026
@@ -28,16 +35,18 @@ triggers:
   - '\b(latest|news|headlines|breaking|trending|score|scores|results?)\b'
   - '\b(search( the web| for| up)?|google|look up|find out|check online)\b'
   - '\bwho (won|is|was|are)\b|\bprice of\b|\bwhat happened\b'
+  - '\b(gold|silver|platinum|petrol|diesel|sensex|nifty|bitcoin|crypto|stock)\b.*\b(rate|price|today)\b|\b(rate|price)\b.*\b(gold|silver|platinum|petrol|diesel|sensex|nifty|bitcoin)\b'
   # time-sensitive questions: releases, schedules, "upcoming", a recent/future year
   - '\b(upcoming|releasing|release dates?|releases?|released|showtimes?|box office|trailers?|fixtures?|schedule|line-?up)\b'
   - '\b20(2[5-9]|3\d)\b'
   - '\b(what|which|any|who|where|how many|how much)\b.*\b(this|next) (week|month|year|weekend)\b'
   - '\bwhen (is|are|does|do|will)\b.*\b(start|begin|release|open|launch|air|premiere|kick off)\b'
-  - '\bwhat(''s| is| are) (the )?(new|upcoming|current)\b'
+  - '\bwhat(''s| is| are) (the )?(new|upcoming|current)\b(?! (tasks?|to-?do|reminders?|list)\b)'
 
 required_when:
   - '\b(latest|news|headlines|search( the web| for| up)?|google|look up|price of|what happened)\b'
   - '\bwho (won|is the (current|new))\b'
+  - '\b(gold|silver|platinum|petrol|diesel|sensex|nifty|bitcoin)\b.*\b(rate|price)\b|\b(rate|price)\b.*\b(gold|silver|platinum|petrol|diesel|sensex|nifty|bitcoin)\b'
   - '\b(upcoming|releasing|release dates?|showtimes?|box office)\b'
   - '\b20(2[5-9]|3\d)\b'
 

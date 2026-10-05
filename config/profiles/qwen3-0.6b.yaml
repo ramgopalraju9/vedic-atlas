@@ -1,0 +1,13 @@
+# Fast-device profile: Qwen3-0.6B. Use with  VEDA_PROFILE=qwen3-0.6b
+# (PowerShell: $env:VEDA_PROFILE="qwen3-0.6b"). Keys override config/<section>.yaml; unset = the base (4B) values.
+inference:
+  model_path: data/Qwen3-0.6B-Q4_K_M.gguf
+  n_ctx: 2048
+  num_predict: 80
+app:
+  max_history: 4       # prompt prefill dominates CPU latency; voice turns rarely need more
+  chat_summaries: 0    # earlier-session summaries were ~450 tokens of unrelated text in every chat prompt
+  chat_persona: compact  # ~250-token persona instead of the full ~560-token one
+embedding:
+  top_k: 1             # semantic recall: at most one memory, and only a strong match
+  min_score: 0.55      # right memories score 0.53-0.72 on bge-small, so a higher floor would miss some

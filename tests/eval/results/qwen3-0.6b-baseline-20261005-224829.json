@@ -1,0 +1,3354 @@
+{
+  "summary": {
+    "label": "qwen3-0.6b-baseline",
+    "model_path": "data/Qwen3-0.6B-Q4_K_M.gguf",
+    "n_ctx": 2048,
+    "profile": "qwen3-0.6b",
+    "timestamp": "2026-10-05T22:48:29",
+    "cases": 178,
+    "routing_correct": 162,
+    "decide_tool_correct": 124,
+    "decide_tool_and_args_correct": 113,
+    "decide_scored": 126,
+    "decide_ms_median": 1929,
+    "decide_ms_p95": 2928,
+    "prompt_tokens_median": 629,
+    "by_tool": {
+      "tasks": {
+        "n": 33,
+        "ok": 25
+      },
+      "get_weather": {
+        "n": 32,
+        "ok": 26
+      },
+      "convert_currency": {
+        "n": 30,
+        "ok": 24
+      },
+      "web_search": {
+        "n": 33,
+        "ok": 30
+      },
+      "chat(no tool)": {
+        "n": 42,
+        "ok": 41
+      },
+      "remember": {
+        "n": 8,
+        "ok": 6
+      }
+    }
+  },
+  "cases": [
+    {
+      "say": "I need to bring vegies",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "vegies"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "bring vegies"
+          }
+        }
+      ],
+      "decide_ms": 2903,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "I need to code",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "code"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "code"
+          }
+        }
+      ],
+      "decide_ms": 1372,
+      "prompt_tokens": 339
+    },
+    {
+      "say": "remind me to call mom tomorrow",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "call mom"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "call mom tomorrow"
+          }
+        }
+      ],
+      "decide_ms": 1628,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "add buy milk to my tasks",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "milk"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "decide_ms": 1398,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "don't forget to pay the electricity bill",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "electricity"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "pay electricity bill"
+          }
+        }
+      ],
+      "decide_ms": 1468,
+      "prompt_tokens": 343
+    },
+    {
+      "say": "yeah I bought the milk packets",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "complete",
+        "title": "milk"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "milk packets"
+          }
+        }
+      ],
+      "decide_ms": 1490,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "I finished the code review",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "complete",
+        "title": "code review"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "code review"
+          }
+        }
+      ],
+      "decide_ms": 1862,
+      "prompt_tokens": 340
+    },
+    {
+      "say": "I already paid the electricity bill",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "complete",
+        "title": "electricity"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "electricity bill"
+          }
+        },
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "electricity bill"
+          }
+        }
+      ],
+      "decide_ms": 2770,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "what are my tasks?",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "decide_ms": 1089,
+      "prompt_tokens": 340
+    },
+    {
+      "say": "what do I need to do today?",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list",
+            "include_done": true
+          }
+        }
+      ],
+      "decide_ms": 1282,
+      "prompt_tokens": 343
+    },
+    {
+      "say": "show my to-do list",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "decide_ms": 1024,
+      "prompt_tokens": 340
+    },
+    {
+      "say": "what tasks have I completed?",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list",
+        "include_done": true
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list",
+            "include_done": true
+          }
+        }
+      ],
+      "decide_ms": 1536,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "forget the bank thing",
+      "expect_agent": "tasks",
+      "routed": "system",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "delete",
+        "title": "bank"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [],
+      "decide_ms": 348,
+      "prompt_tokens": 157
+    },
+    {
+      "say": "delete the task about the dentist",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "delete",
+        "title": "dentist"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "dentist"
+          }
+        }
+      ],
+      "decide_ms": 1611,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "what's the weather in Mumbai?",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Mumbai"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "decide_ms": 3467,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "how's the weather in Delhi right now",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Delhi"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Delhi"
+          }
+        }
+      ],
+      "decide_ms": 1419,
+      "prompt_tokens": 632
+    },
+    {
+      "say": "is it going to rain today?",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "decide_ms": 1355,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "what's the temperature outside",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "decide_ms": 1716,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "how hot is it in Chennai",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Chennai"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Chennai"
+          }
+        }
+      ],
+      "decide_ms": 1659,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "weather forecast for London",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "London"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "London"
+          }
+        }
+      ],
+      "decide_ms": 1290,
+      "prompt_tokens": 628
+    },
+    {
+      "say": "is it humid in Kolkata?",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Kolkata"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Kolkata"
+          }
+        }
+      ],
+      "decide_ms": 1601,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "how much is 100 dollars in rupees?",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 100,
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2298,
+      "prompt_tokens": 636
+    },
+    {
+      "say": "convert 5000 yen to euros",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 5000,
+        "from": "JPY",
+        "to": "EUR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 5000,
+            "from": "JPY",
+            "to": "EUR"
+          }
+        }
+      ],
+      "decide_ms": 2194,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "what's the dollar rate",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 1,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2001,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "convert 50 pounds to dollars",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 50,
+        "from": "GBP",
+        "to": "USD"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 50,
+            "from": "GBP",
+            "to": "USD"
+          }
+        }
+      ],
+      "decide_ms": 1959,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "what is the exchange rate for euro to rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "EUR",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "EUR",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2391,
+      "prompt_tokens": 634
+    },
+    {
+      "say": "how many dirhams is 200 dollars",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 200,
+        "from": "USD",
+        "to": "AED"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 200,
+            "from": "USD",
+            "to": "DZD"
+          }
+        }
+      ],
+      "decide_ms": 2232,
+      "prompt_tokens": 635
+    },
+    {
+      "say": "latest news on ISRO",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "ISRO"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "latest news on ISRO",
+            "topic": "news"
+          }
+        }
+      ],
+      "decide_ms": 2243,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "who won the cricket match yesterday",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "cricket match winner yesterday on 05 oct 2026"
+          }
+        }
+      ],
+      "decide_ms": 3027,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "search for the best biryani in Hyderabad",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "biryani"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "best biryani in Hyderabad 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2431,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "who is the prime minister of Japan",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "Japan"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "current prime minister of Japan",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2084,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "what happened in the stock market today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "stock market happened today",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2326,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "google the price of petrol",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "petrol"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "price of petrol today in India",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2017,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "any news about the new iPhone",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "iPhone"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "new iphone 2026 news",
+            "topic": "news"
+          }
+        }
+      ],
+      "decide_ms": 2143,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "look up the capital of Australia",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "Australia"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "capital of Australia 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2138,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "tell me a joke",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "how are you today?",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "what's your name?",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "good morning",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "thanks, that was helpful",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "explain recursion in one sentence",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "write me a two line poem about the sea",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "I'm feeling a bit tired today",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "can you speak more slowly",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "can you tell what are the upcoming movies releasing in the year 2026 october from tollywood?",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "movies"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "upcoming movies releasing in the year 2026 october from tollywood",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 3419,
+      "prompt_tokens": 648
+    },
+    {
+      "say": "any new telugu movies releasing this friday",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "telugu"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "upcoming Telugu movies releasing on Friday, 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 3113,
+      "prompt_tokens": 632
+    },
+    {
+      "say": "what's playing in theatres this week",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "upcoming theatres this week 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2653,
+      "prompt_tokens": 632
+    },
+    {
+      "say": "when does the next IPL match start",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "IPL"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "next IPL match start date 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2240,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "which cricket matches are scheduled for November 2026",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "cricket"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "upcoming Telugu movies releasing November 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2465,
+      "prompt_tokens": 636
+    },
+    {
+      "say": "what are the best phones released in 2026",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "phones"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "best phones released in 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2377,
+      "prompt_tokens": 636
+    },
+    {
+      "say": "my favourite sweet is gulab jamun",
+      "expect_agent": "memory",
+      "routed": "memory",
+      "expect_tool": "remember",
+      "expect_args": {
+        "action": "save",
+        "topic": "sweet",
+        "value": "gulab"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "favourite sweet",
+            "value": "gulab jamun"
+          }
+        }
+      ],
+      "decide_ms": 3033,
+      "prompt_tokens": 364
+    },
+    {
+      "say": "my most fav noodles is maggiee",
+      "expect_agent": "memory",
+      "routed": "memory",
+      "expect_tool": "remember",
+      "expect_args": {
+        "action": "save",
+        "topic": "noodles",
+        "value": "maggi"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "favourite noodles",
+            "value": "maggiee"
+          }
+        }
+      ],
+      "decide_ms": 2058,
+      "prompt_tokens": 364
+    },
+    {
+      "say": "remember that I'm allergic to peanuts",
+      "expect_agent": "memory",
+      "routed": "memory",
+      "expect_tool": "remember",
+      "expect_args": {
+        "action": "save",
+        "value": "peanuts"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "allergy",
+            "value": "peanuts"
+          }
+        }
+      ],
+      "decide_ms": 1786,
+      "prompt_tokens": 363
+    },
+    {
+      "say": "my dog's name is Rex",
+      "expect_agent": "memory",
+      "routed": "memory",
+      "expect_tool": "remember",
+      "expect_args": {
+        "action": "save",
+        "value": "Rex"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "dog's name",
+            "value": "Rex"
+          }
+        }
+      ],
+      "decide_ms": 2037,
+      "prompt_tokens": 362
+    },
+    {
+      "say": "forget my favourite sweet",
+      "expect_agent": "memory",
+      "routed": "memory",
+      "expect_tool": "remember",
+      "expect_args": {
+        "action": "forget",
+        "topic": "sweet"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "forget",
+            "topic": "favourite sweet"
+          }
+        }
+      ],
+      "decide_ms": 1615,
+      "prompt_tokens": 360
+    },
+    {
+      "say": "what do you remember about me?",
+      "expect_agent": "memory",
+      "routed": "memory",
+      "expect_tool": "remember",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "decide_ms": 1011,
+      "prompt_tokens": 363
+    },
+    {
+      "say": "what is my favourite food?",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "and my dessert?",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "I'm so tired this week",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "tell me a story about a dragon",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "what is the best way to learn guitar",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "do I need an umbrella in Pune tomorrow",
+      "expect_agent": "lookup",
+      "routed": "responder",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Pune"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "is it chilly in Shimla right now",
+      "expect_agent": "lookup",
+      "routed": "responder",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Shimla"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "which team is top of the IPL table",
+      "expect_agent": "lookup",
+      "routed": "responder",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "IPL"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "is bitcoin going up today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "bitcoin"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "bitcoin price today 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2269,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "when is Diwali this year",
+      "expect_agent": "lookup",
+      "routed": "responder",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "Diwali"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "add dentist on friday",
+      "expect_agent": "tasks",
+      "routed": "responder",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "dentist"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "make a note to buy gifts",
+      "expect_agent": "tasks",
+      "routed": "responder",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "gifts"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "cross off the gym thing",
+      "expect_agent": "tasks",
+      "routed": "responder",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "complete",
+        "title": "gym"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "what's eating my CPU",
+      "expect_agent": "system",
+      "routed": "system",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [],
+      "decide_ms": 379,
+      "prompt_tokens": 158
+    },
+    {
+      "say": "tell me about the history of Rome",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "who wrote Hamlet",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "I feel like going for a walk",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "how do I make pasta",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "can you help me write an email to my boss",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "what is two plus two",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "I only eat vegetarian food",
+      "expect_agent": "memory",
+      "routed": "responder",
+      "expect_tool": "remember",
+      "expect_args": {
+        "action": "save",
+        "value": "vegetarian"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "I really love the sweets, especially gulab jamun",
+      "expect_agent": "memory",
+      "routed": "responder",
+      "expect_tool": "remember",
+      "expect_args": {
+        "action": "save",
+        "value": "gulab"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "what is the current weather",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "decide_ms": 1615,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "weather today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "decide_ms": 1428,
+      "prompt_tokens": 626
+    },
+    {
+      "say": "will it rain tomorrow in Pune",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Pune"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Pune"
+          }
+        }
+      ],
+      "decide_ms": 1395,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "is it hot in Jaipur today",
+      "expect_agent": "lookup",
+      "routed": "responder",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Jaipur"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "what's the temperature in Bangalore",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Bangalore"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Bangalore"
+          }
+        }
+      ],
+      "decide_ms": 1373,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "how cold is it in Shimla",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Shimla"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Shimla"
+          }
+        }
+      ],
+      "decide_ms": 1458,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "weather in New York",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "New York"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "New York"
+          }
+        }
+      ],
+      "decide_ms": 1493,
+      "prompt_tokens": 628
+    },
+    {
+      "say": "what is the weather like in Tokyo",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Tokyo"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "decide_ms": 1715,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "do I need an umbrella today",
+      "expect_agent": "lookup",
+      "routed": "responder",
+      "expect_tool": "get_weather",
+      "expect_args": null,
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "is it sunny in Goa",
+      "expect_agent": "lookup",
+      "routed": "responder",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Goa"
+      },
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "what's the humidity in Hyderabad",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Hyderabad"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Hyderabad"
+          }
+        }
+      ],
+      "decide_ms": 1574,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "how windy is it in Chennai",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Chennai"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Chennai"
+          }
+        }
+      ],
+      "decide_ms": 1594,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "tell me the weather in Paris",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Paris"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Paris"
+          }
+        }
+      ],
+      "decide_ms": 1342,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "forecast for tomorrow in Lucknow",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Lucknow"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Lucknow"
+          }
+        }
+      ],
+      "decide_ms": 1406,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "weather in Dubai right now",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Dubai"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Dubai"
+          }
+        }
+      ],
+      "decide_ms": 1629,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "is it cloudy outside",
+      "expect_agent": "lookup",
+      "routed": "responder",
+      "expect_tool": "get_weather",
+      "expect_args": null,
+      "scored": false,
+      "ok": false
+    },
+    {
+      "say": "what's the temperature in Visakhapatnam",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Visakhapatnam"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Visakhapatnam"
+          }
+        }
+      ],
+      "decide_ms": 1818,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "weather update for Ahmedabad",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Ahmedabad"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Ahmedabad"
+          }
+        }
+      ],
+      "decide_ms": 1576,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "how's the weather",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "decide_ms": 1553,
+      "prompt_tokens": 628
+    },
+    {
+      "say": "current temperature in Mumbai",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Mumbai"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "decide_ms": 1284,
+      "prompt_tokens": 628
+    },
+    {
+      "say": "is it raining in Kochi",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Kochi"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Kochi"
+          }
+        }
+      ],
+      "decide_ms": 1488,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "weather in Sydney",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Sydney"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Sydney"
+          }
+        }
+      ],
+      "decide_ms": 1469,
+      "prompt_tokens": 627
+    },
+    {
+      "say": "what is the weather today in Hyderabad?",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "get_weather",
+      "expect_args": {
+        "place": "Hyderabad"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Hyderabad"
+          }
+        }
+      ],
+      "decide_ms": 1511,
+      "prompt_tokens": 632
+    },
+    {
+      "say": "convert 100 US dollars to Indian rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 100,
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 1989,
+      "prompt_tokens": 635
+    },
+    {
+      "say": "how much is 1 euro in rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 1,
+        "from": "EUR",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 1,
+            "from": "EUR",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2053,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "what's 500 rupees in dollars",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 500,
+        "from": "INR",
+        "to": "USD"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 500,
+            "from": "INR",
+            "to": "USD"
+          }
+        }
+      ],
+      "decide_ms": 2191,
+      "prompt_tokens": 634
+    },
+    {
+      "say": "convert 20 pounds to rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 20,
+        "from": "GBP",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 20,
+            "from": "GBP",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2180,
+      "prompt_tokens": 632
+    },
+    {
+      "say": "how many rupees is 10 dollars",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 10,
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 10,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2381,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "what is the euro rate",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "EUR",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 1000,
+            "from": "EUR",
+            "to": "USD"
+          }
+        }
+      ],
+      "decide_ms": 2187,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "pound to rupee rate",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "GBP",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 5000,
+            "from": "GBP",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2144,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "exchange rate dollar to yen",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "USD",
+        "to": "JPY"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "JPY"
+          }
+        }
+      ],
+      "decide_ms": 2040,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "convert 1000 rupees to dirhams",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 1000,
+        "from": "INR",
+        "to": "AED"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 1000,
+            "from": "INR",
+            "to": "DZD"
+          }
+        }
+      ],
+      "decide_ms": 2432,
+      "prompt_tokens": 636
+    },
+    {
+      "say": "how much is 250 euros in dollars",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 250,
+        "from": "EUR",
+        "to": "USD"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 250,
+            "from": "EUR",
+            "to": "USD"
+          }
+        }
+      ],
+      "decide_ms": 2144,
+      "prompt_tokens": 634
+    },
+    {
+      "say": "what's the yen rate today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "JPY"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 5000,
+            "from": "JPY",
+            "to": "EUR"
+          }
+        }
+      ],
+      "decide_ms": 2357,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "convert 75 dollars to euros",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 75,
+        "from": "USD",
+        "to": "EUR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 75,
+            "from": "USD",
+            "to": "EUR"
+          }
+        }
+      ],
+      "decide_ms": 2019,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "100 dollars in rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 100,
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2182,
+      "prompt_tokens": 632
+    },
+    {
+      "say": "how many dollars is 5000 rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 5000,
+        "from": "INR",
+        "to": "USD"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 5000,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2357,
+      "prompt_tokens": 635
+    },
+    {
+      "say": "dirham to rupee exchange rate",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "AED",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 5000,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2126,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "convert 3 pounds to euros",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 3,
+        "from": "GBP",
+        "to": "EUR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 3,
+            "from": "GBP",
+            "to": "EUR"
+          }
+        }
+      ],
+      "decide_ms": 1852,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "what is 1 dollar in rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 1,
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 1,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 1879,
+      "prompt_tokens": 632
+    },
+    {
+      "say": "how much is 40 euros in pounds",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 40,
+        "from": "EUR",
+        "to": "GBP"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 40,
+            "from": "EUR",
+            "to": "GBP"
+          }
+        }
+      ],
+      "decide_ms": 1835,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "convert 10000 yen to rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 10000,
+        "from": "JPY",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 10000,
+            "from": "JPY",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2453,
+      "prompt_tokens": 635
+    },
+    {
+      "say": "usd to inr",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 1997,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "what's the forex rate for dollars",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "from": "USD"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 1000000,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2581,
+      "prompt_tokens": 631
+    },
+    {
+      "say": "currency conversion 60 dollars to rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 60,
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 60,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 1899,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "how much is a thousand dollars in rupees",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 1000,
+        "from": "USD",
+        "to": "INR"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 1000,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "decide_ms": 2285,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "convert 15 dirhams to dollars",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "convert_currency",
+      "expect_args": {
+        "amount": 15,
+        "from": "AED",
+        "to": "USD"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 15,
+            "from": "DZD",
+            "to": "USD"
+          }
+        }
+      ],
+      "decide_ms": 2277,
+      "prompt_tokens": 633
+    },
+    {
+      "say": "whats the current gold rate?",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "gold"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "gold rate today in India",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 1884,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "silver rate today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "silver"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "silver rate today in India",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 1755,
+      "prompt_tokens": 627
+    },
+    {
+      "say": "gold price today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "gold"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "gold price today in India",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 1750,
+      "prompt_tokens": 627
+    },
+    {
+      "say": "petrol price in Hyderabad",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "petrol"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "petrol price in Hyderabad 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2244,
+      "prompt_tokens": 628
+    },
+    {
+      "say": "diesel price today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "diesel"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "diesel price today in India",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 1865,
+      "prompt_tokens": 627
+    },
+    {
+      "say": "search the web for the latest news about ISRO",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "ISRO"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "latest news about ISRO",
+            "topic": "news"
+          }
+        }
+      ],
+      "decide_ms": 1791,
+      "prompt_tokens": 634
+    },
+    {
+      "say": "what are the headlines today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "headlines today 2026 oct 2026"
+          }
+        }
+      ],
+      "decide_ms": 2637,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "who won the IPL final",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "IPL"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "IPL final winner 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2638,
+      "prompt_tokens": 629
+    },
+    {
+      "say": "who is the president of France",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "France"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "president of France 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2144,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "price of bitcoin today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "bitcoin"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "bitcoin price today",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 1682,
+      "prompt_tokens": 628
+    },
+    {
+      "say": "latest news about Tesla",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "Tesla"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "latest news about Tesla",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 1668,
+      "prompt_tokens": 628
+    },
+    {
+      "say": "who won the football world cup",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "world cup"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "football world cup 2026 winner",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2241,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "sensex today",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "sensex"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "sensex today 2026"
+          }
+        }
+      ],
+      "decide_ms": 2096,
+      "prompt_tokens": 627
+    },
+    {
+      "say": "latest cricket score",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "latest cricket score on 05 oct 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2647,
+      "prompt_tokens": 627
+    },
+    {
+      "say": "look up the population of India",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "population"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "population of India on 2026-10-05"
+          }
+        }
+      ],
+      "decide_ms": 2465,
+      "prompt_tokens": 630
+    },
+    {
+      "say": "google when is Diwali this year",
+      "expect_agent": "lookup",
+      "routed": "lookup",
+      "expect_tool": "web_search",
+      "expect_args": {
+        "query": "Diwali"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "diwali date this year 2026",
+            "topic": "general"
+          }
+        }
+      ],
+      "decide_ms": 2315,
+      "prompt_tokens": 632
+    },
+    {
+      "say": "what are the current tasks I have?",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "decide_ms": 1818,
+      "prompt_tokens": 343
+    },
+    {
+      "say": "list my tasks",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "decide_ms": 1035,
+      "prompt_tokens": 338
+    },
+    {
+      "say": "what's pending on my list",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "decide_ms": 1137,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "do I have any tasks",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "decide_ms": 1889,
+      "prompt_tokens": 340
+    },
+    {
+      "say": "what's on my to-do list?",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "list"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "decide_ms": 2928,
+      "prompt_tokens": 343
+    },
+    {
+      "say": "add call the plumber to my list",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "plumber"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "call the plumber"
+          }
+        }
+      ],
+      "decide_ms": 2686,
+      "prompt_tokens": 342
+    },
+    {
+      "say": "I need to renew my passport",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "passport"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "renew passport"
+          }
+        }
+      ],
+      "decide_ms": 2719,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "remind me to water the plants",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "plants"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "water plants"
+          }
+        }
+      ],
+      "decide_ms": 2678,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "put groceries on my to-do list",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "groceries"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "put groceries on my to-do list"
+          }
+        }
+      ],
+      "decide_ms": 3119,
+      "prompt_tokens": 342
+    },
+    {
+      "say": "I have to submit the report by Friday",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "report"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "report submission"
+          }
+        }
+      ],
+      "decide_ms": 1806,
+      "prompt_tokens": 343
+    },
+    {
+      "say": "don't let me forget the meeting",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "add",
+        "title": "meeting"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "don't let me forget the meeting"
+          }
+        },
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "don't let me forget the meeting"
+          }
+        }
+      ],
+      "decide_ms": 3150,
+      "prompt_tokens": 342
+    },
+    {
+      "say": "mark the milk task as done",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "complete",
+        "title": "milk"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "milk packets"
+          }
+        }
+      ],
+      "decide_ms": 1668,
+      "prompt_tokens": 341
+    },
+    {
+      "say": "I called the bank",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "complete",
+        "title": "bank"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "called the bank"
+          }
+        }
+      ],
+      "decide_ms": 1704,
+      "prompt_tokens": 339
+    },
+    {
+      "say": "I picked up the parcel",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "complete",
+        "title": "parcel"
+      },
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "picked up the parcel"
+          }
+        }
+      ],
+      "decide_ms": 1583,
+      "prompt_tokens": 340
+    },
+    {
+      "say": "delete the groceries task",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "delete",
+        "title": "groceries"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "groceries"
+          }
+        }
+      ],
+      "decide_ms": 1371,
+      "prompt_tokens": 339
+    },
+    {
+      "say": "remove the passport task from my list",
+      "expect_agent": "tasks",
+      "routed": "tasks",
+      "expect_tool": "tasks",
+      "expect_args": {
+        "action": "delete",
+        "title": "passport"
+      },
+      "scored": true,
+      "ok": true,
+      "got_calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "passport"
+          }
+        },
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "passport"
+          }
+        }
+      ],
+      "decide_ms": 2094,
+      "prompt_tokens": 342
+    },
+    {
+      "say": "what is the capital of France",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "tell me something interesting",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "hello",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "hi veda",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "who are you",
+      "expect_agent": "responder",
+      "routed": "lookup",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": true,
+      "ok": false,
+      "got_calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "decide_ms": 1580,
+      "prompt_tokens": 627
+    },
+    {
+      "say": "what can you do",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "how do I boil an egg",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "give me a motivational quote",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "what is 15 times 12",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "translate good morning to Hindi",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "I'm bored",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "sing me a song",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "what is machine learning",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "tell me a fun fact about space",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "good night",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "can you help me",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "hold on, hold on",
+      "expect_agent": "responder",
+      "routed": "system",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": true,
+      "ok": true,
+      "got_calls": [],
+      "decide_ms": 438,
+      "prompt_tokens": 158
+    },
+    {
+      "say": "that was awesome",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "never mind",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "say that again",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    },
+    {
+      "say": "what is photosynthesis",
+      "expect_agent": "responder",
+      "routed": "responder",
+      "expect_tool": null,
+      "expect_args": null,
+      "scored": false,
+      "ok": true
+    }
+  ]
+}

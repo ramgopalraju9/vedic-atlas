@@ -25,9 +25,10 @@ from core.logging_config import logger
 class ConversationManager:
     """Stores and retrieves conversation turns via a ConversationRepositoryPort."""
 
-    def __init__(self, repo: ConversationRepositoryPort, max_history: int = 30):
+    def __init__(self, repo: ConversationRepositoryPort, max_history: int = 30, summaries_limit: int = 3):
         self.repo = repo
         self.max_history = max_history
+        self.summaries_limit = summaries_limit
 
     def add_turn(self, role: str, content: str) -> None:
         """Insert a new turn. Session id resolves automatically via the repo."""
@@ -53,8 +54,11 @@ class ConversationManager:
         limit = max(self.max_history * 2, 1)
         return self.repo.recent_turns(limit=limit, only_unsummarized=True)
 
-    def get_summaries_block(self, limit: int = 3) -> str:
+    def get_summaries_block(self, limit: int | None = None) -> str:
         """Older-session summaries (compacted by ConversationSummariser), oldest first."""
+        limit = self.summaries_limit if limit is None else limit
+        if limit <= 0:
+            return ""
         try:
             gists = self.repo.recent_summaries(limit=limit)
         except Exception as e:

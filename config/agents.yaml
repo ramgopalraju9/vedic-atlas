@@ -24,7 +24,7 @@ tasks:
 
 lookup:
   enabled: true
-  description: "Live data from the web: weather, currency rates, news, current facts"
+  description: "Live data from the web: weather, currency rates, news headlines, prices and scores"
 
 memory:
   enabled: true

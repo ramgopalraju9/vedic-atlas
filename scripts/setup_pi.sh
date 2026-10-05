@@ -5,13 +5,14 @@
 #   bash scripts/setup_pi.sh                      # everything below
 #   bash scripts/setup_pi.sh --dry-run            # show what it would do, change nothing
 #   bash scripts/setup_pi.sh --extras embedding   # also install an optional extra from pyproject.toml
+#   bash scripts/setup_pi.sh --model 1.7b         # pick the language model: 0.6b | 1.7b | 4b (default 4b)
 #
 # What it does (safe to re-run; each step skips work that is already done):
 #   1. checks the machine (CPU, RAM, free disk, Python >= 3.12)
 #   2. installs system packages with apt            (skip: --skip-apt)
 #   3. creates .venv and runs `pip install -e .`    (skip: --skip-install)
 #   4. downloads the models with wget, resumable    (skip: --skip-models)
-#        - language model   data/Qwen3-4B-Q4_K_M.gguf          (2.5 GB, Qwen3-4B Q4_K_M)
+#        - language model   data/Qwen3-<size>-Q4_K_M.gguf      (--model: 0.6b ~0.4 GB, 1.7b ~1.1 GB, 4b ~2.5 GB)
 #        - speech-to-text   data/models/whisper-base.en/       (faster-whisper base.en, 145 MB)
 #        - voice            data/models/piper/<voice>.onnx     (Piper en_US-lessac-medium, 63 MB)
 #        - memory           data/bge-small-en-v1.5/            (BGE-small embeddings, 134 MB: lets Veda recall
@@ -29,8 +30,9 @@
 # Overridable with environment variables:
 #   PYTHON=/path/to/python3.12   which Python to build the venv with
 #   VENV=/some/dir               venv location (default: <repo>/.venv)
-#   LLM_URL=...                  another GGUF (the file is always saved as data/Qwen3-4B-Q4_K_M.gguf,
-#                                the name config/inference.yaml expects - change that file too if you rename it)
+#   MODEL=0.6b|1.7b|4b           same as --model
+#   LLM_URL=...                  another GGUF for the chosen model (it is saved under that model's usual file name,
+#                                the one its config/profiles/*.yaml (or config/inference.yaml for 4b) expects)
 #   PIPER_VOICE=en_US-amy-medium another Piper voice name from rhasspy/piper-voices
 #   CMAKE_ARGS=...               extra CMake flags for llama-cpp-python
 
@@ -45,8 +47,10 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${VENV:-$ROOT/.venv}"
 
-LLM_URL="${LLM_URL:-https://huggingface.co/bartowski/Qwen_Qwen3-4B-GGUF/resolve/main/Qwen_Qwen3-4B-Q4_K_M.gguf}"
-LLM_DEST="$ROOT/data/Qwen3-4B-Q4_K_M.gguf"
+# Language model: chosen with --model / MODEL, resolved by select_model() once the options are parsed.
+MODEL="${MODEL:-4b}"
+LLM_URL_OVERRIDE="${LLM_URL:-}"
+LLM_URL="" LLM_DEST="" PROFILE=""
 
 WHISPER_BASE_URL="https://huggingface.co/Systran/faster-whisper-base.en/resolve/main"
 WHISPER_DIR="$ROOT/data/models/whisper-base.en"
@@ -68,8 +72,8 @@ OWW_FEATURE_FILES=(melspectrogram.onnx embedding_model.onnx)
 APT_PACKAGES=(build-essential cmake git wget curl ca-certificates pkg-config
               python3-dev python3-venv libportaudio2 portaudio19-dev alsa-utils)
 
-MIN_DISK_GB=8        # llama-cpp-python build + venv + 2.7 GB of models
-MIN_RAM_MB=3500      # the 4B model needs about 3.5 GB
+MIN_DISK_GB=8        # llama-cpp-python build + venv + up to 2.7 GB of models
+MIN_RAM_MB=3500      # set per model by select_model() (rough: model file + context + speech/memory models)
 
 DRY_RUN=0 SKIP_APT=0 SKIP_INSTALL=0 SKIP_MODELS=0 SKIP_CONFIG=0 EXTRAS=""
 
@@ -115,8 +119,28 @@ Options:
   --skip-models      do not download models
   --skip-config      do not edit config/audio.yaml
   --extras LIST      pyproject extras to install, comma separated (e.g. embedding,hotkey)
+  --model SIZE       language model to download: 0.6b (fastest), 1.7b, or 4b (default, best answers, slowest)
   -h, --help         this text
 EOF
+}
+
+# Resolve the chosen model into its download URL, file, memory need and the config profile that runs it.
+# The 0.6b / 1.7b / 4b profiles live in config/profiles/ and are switched on with VEDA_PROFILE (see the summary).
+select_model() {
+  case "$MODEL" in
+    0.6b)
+      LLM_URL="https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf"
+      LLM_DEST="$ROOT/data/Qwen3-0.6B-Q4_K_M.gguf"; PROFILE="qwen3-0.6b"; MIN_RAM_MB=1500 ;;
+    1.7b)
+      LLM_URL="https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf"
+      LLM_DEST="$ROOT/data/Qwen3-1.7B-Q4_K_M.gguf"; PROFILE="qwen3-1.7b"; MIN_RAM_MB=2500 ;;
+    4b)
+      LLM_URL="https://huggingface.co/bartowski/Qwen_Qwen3-4B-GGUF/resolve/main/Qwen_Qwen3-4B-Q4_K_M.gguf"
+      LLM_DEST="$ROOT/data/Qwen3-4B-Q4_K_M.gguf"; PROFILE="qwen3-4b"; MIN_RAM_MB=3500 ;;
+    *) die "unknown model '$MODEL': use 0.6b, 1.7b or 4b" ;;
+  esac
+  [[ -n "$LLM_URL_OVERRIDE" ]] && LLM_URL="$LLM_URL_OVERRIDE"
+  return 0
 }
 
 # ---------------------------------------------------------------- 1. the machine
@@ -179,7 +203,7 @@ preflight() {
 
   mem_mb="$(awk '/MemTotal/ {printf "%d", $2 / 1024}' /proc/meminfo 2>/dev/null || echo 0)"
   if (( mem_mb > 0 && mem_mb < MIN_RAM_MB )); then
-    warn "only ${mem_mb} MB RAM; the default 4B model needs about ${MIN_RAM_MB} MB. Set LLM_URL to a smaller GGUF."
+    warn "only ${mem_mb} MB RAM; the ${MODEL} model needs about ${MIN_RAM_MB} MB. Try a smaller one: --model 1.7b or --model 0.6b."
   else
     info "RAM: ${mem_mb} MB"
   fi
@@ -436,10 +460,13 @@ summary() {
     Next:
       1. copy data/models/openwakeword/hey_veda.onnx and hey_veda.onnx.data from your PC (if not done)
       2. put TAVILY_API_KEY in $ROOT/.env for web search
-      3. start Veda:
+      3. start Veda with the profile that matches the model you downloaded ($MODEL):
              source $VENV/bin/activate
+             export VEDA_PROFILE=$PROFILE
              veda
          (the microphone starts muted; unmute from the prompt with /unmute)
+         To keep the profile for every login:  echo 'export VEDA_PROFILE=$PROFILE' >> ~/.bashrc
+         Without VEDA_PROFILE Veda runs the untrimmed base config, which is built for the 4b model.
       Check devices if voice is silent:  arecord -l   and   aplay -l
 EOF
 }
@@ -456,12 +483,15 @@ main() {
       --skip-config)  SKIP_CONFIG=1 ;;
       --extras)       shift; [[ $# -gt 0 ]] || die "--extras needs a value"; EXTRAS="$1" ;;
       --extras=*)     EXTRAS="${1#--extras=}" ;;
+      --model)        shift; [[ $# -gt 0 ]] || die "--model needs a value (0.6b, 1.7b or 4b)"; MODEL="$1" ;;
+      --model=*)      MODEL="${1#--model=}" ;;
       -h|--help)      usage; exit 0 ;;
       *)              usage >&2; die "unknown option: $1" ;;
     esac
     shift
   done
 
+  select_model
   (( DRY_RUN )) && info "DRY RUN: nothing will be changed"
   preflight
   install_system_packages

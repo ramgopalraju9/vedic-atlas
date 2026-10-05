@@ -705,7 +705,9 @@ def bootstrap(app: FastAPI) -> None:
     conversation_repo = ConversationRepository()
     app.state.conversation_repo = conversation_repo
     memory_repo = AgentMemoryRepository(conversation_repo=conversation_repo)
-    conversation = ConversationManager(repo=conversation_repo, max_history=cfg.app.max_history)
+    conversation = ConversationManager(
+        repo=conversation_repo, max_history=cfg.app.max_history, summaries_limit=cfg.app.chat_summaries,
+    )
     # Exposed so controller/routes/health.py can actually probe the DB;
     # without this its check silently reported False forever.
     app.state.db_session_factory = SessionLocal
@@ -812,6 +814,7 @@ def bootstrap(app: FastAPI) -> None:
         client=inference_client, conversation=conversation, knowledge=knowledge,
         model=cfg.agents.responder.model, memory=memory_repo,
         recall=semantic_recall, claim_filter=guard.claims_action,
+        persona=FilePromptStore().get("persona_chat") if cfg.app.chat_persona == "compact" else None,
     )
     system_agent = SystemAgent(
         client=inference_client, system_control=system_control,

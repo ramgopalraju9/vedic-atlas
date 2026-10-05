@@ -103,3 +103,117 @@
 # facts stated with no trigger words
 - {say: "I only eat vegetarian food", agent: memory, tool: remember, args: {action: save, value: vegetarian}, llm: true}
 - {say: "I really love the sweets, especially gulab jamun", agent: memory, tool: remember, args: {action: save, value: gulab}, llm: true}
+
+# =====================================================================================================
+# Extended set (added when trialling Qwen3-0.6B): ~30 per tool, incl. regressions seen on the small model.
+# =====================================================================================================
+
+# ---- weather (extended) ----
+- {say: "what is the current weather", agent: lookup, tool: get_weather}
+- {say: "weather today", agent: lookup, tool: get_weather}
+- {say: "will it rain tomorrow in Pune", agent: lookup, tool: get_weather, args: {place: Pune}}
+- {say: "is it hot in Jaipur today", agent: lookup, tool: get_weather, args: {place: Jaipur}}
+- {say: "what's the temperature in Bangalore", agent: lookup, tool: get_weather, args: {place: Bangalore}}
+- {say: "how cold is it in Shimla", agent: lookup, tool: get_weather, args: {place: Shimla}}
+- {say: "weather in New York", agent: lookup, tool: get_weather, args: {place: New York}}
+- {say: "what is the weather like in Tokyo", agent: lookup, tool: get_weather, args: {place: Tokyo}}
+- {say: "do I need an umbrella today", agent: lookup, tool: get_weather}
+- {say: "is it sunny in Goa", agent: lookup, tool: get_weather, args: {place: Goa}}
+- {say: "what's the humidity in Hyderabad", agent: lookup, tool: get_weather, args: {place: Hyderabad}}
+- {say: "how windy is it in Chennai", agent: lookup, tool: get_weather, args: {place: Chennai}}
+- {say: "tell me the weather in Paris", agent: lookup, tool: get_weather, args: {place: Paris}}
+- {say: "forecast for tomorrow in Lucknow", agent: lookup, tool: get_weather, args: {place: Lucknow}}
+- {say: "weather in Dubai right now", agent: lookup, tool: get_weather, args: {place: Dubai}}
+- {say: "is it cloudy outside", agent: lookup, tool: get_weather}
+- {say: "what's the temperature in Visakhapatnam", agent: lookup, tool: get_weather, args: {place: Visakhapatnam}}
+- {say: "weather update for Ahmedabad", agent: lookup, tool: get_weather, args: {place: Ahmedabad}}
+- {say: "how's the weather", agent: lookup, tool: get_weather}
+- {say: "current temperature in Mumbai", agent: lookup, tool: get_weather, args: {place: Mumbai}}
+- {say: "is it raining in Kochi", agent: lookup, tool: get_weather, args: {place: Kochi}}
+- {say: "weather in Sydney", agent: lookup, tool: get_weather, args: {place: Sydney}}
+- {say: "what is the weather today in Hyderabad?", agent: lookup, tool: get_weather, args: {place: Hyderabad}}
+
+# ---- currency (extended) ----
+- {say: "convert 100 US dollars to Indian rupees", agent: lookup, tool: convert_currency, args: {amount: 100, from: USD, to: INR}}
+- {say: "how much is 1 euro in rupees", agent: lookup, tool: convert_currency, args: {amount: 1, from: EUR, to: INR}}
+- {say: "what's 500 rupees in dollars", agent: lookup, tool: convert_currency, args: {amount: 500, from: INR, to: USD}}
+- {say: "convert 20 pounds to rupees", agent: lookup, tool: convert_currency, args: {amount: 20, from: GBP, to: INR}}
+- {say: "how many rupees is 10 dollars", agent: lookup, tool: convert_currency, args: {amount: 10, from: USD, to: INR}}
+- {say: "what is the euro rate", agent: lookup, tool: convert_currency, args: {from: EUR, to: INR}}
+- {say: "pound to rupee rate", agent: lookup, tool: convert_currency, args: {from: GBP, to: INR}}
+- {say: "exchange rate dollar to yen", agent: lookup, tool: convert_currency, args: {from: USD, to: JPY}}
+- {say: "convert 1000 rupees to dirhams", agent: lookup, tool: convert_currency, args: {amount: 1000, from: INR, to: AED}}
+- {say: "how much is 250 euros in dollars", agent: lookup, tool: convert_currency, args: {amount: 250, from: EUR, to: USD}}
+- {say: "what's the yen rate today", agent: lookup, tool: convert_currency, args: {from: JPY}}
+- {say: "convert 75 dollars to euros", agent: lookup, tool: convert_currency, args: {amount: 75, from: USD, to: EUR}}
+- {say: "100 dollars in rupees", agent: lookup, tool: convert_currency, args: {amount: 100, from: USD, to: INR}}
+- {say: "how many dollars is 5000 rupees", agent: lookup, tool: convert_currency, args: {amount: 5000, from: INR, to: USD}}
+- {say: "dirham to rupee exchange rate", agent: lookup, tool: convert_currency, args: {from: AED, to: INR}}
+- {say: "convert 3 pounds to euros", agent: lookup, tool: convert_currency, args: {amount: 3, from: GBP, to: EUR}}
+- {say: "what is 1 dollar in rupees", agent: lookup, tool: convert_currency, args: {amount: 1, from: USD, to: INR}}
+- {say: "how much is 40 euros in pounds", agent: lookup, tool: convert_currency, args: {amount: 40, from: EUR, to: GBP}}
+- {say: "convert 10000 yen to rupees", agent: lookup, tool: convert_currency, args: {amount: 10000, from: JPY, to: INR}}
+- {say: "usd to inr", agent: lookup, tool: convert_currency, args: {from: USD, to: INR}}
+- {say: "what's the forex rate for dollars", agent: lookup, tool: convert_currency, args: {from: USD}}
+- {say: "currency conversion 60 dollars to rupees", agent: lookup, tool: convert_currency, args: {amount: 60, from: USD, to: INR}}
+- {say: "how much is a thousand dollars in rupees", agent: lookup, tool: convert_currency, args: {amount: 1000, from: USD, to: INR}}
+- {say: "convert 15 dirhams to dollars", agent: lookup, tool: convert_currency, args: {amount: 15, from: AED, to: USD}}
+
+# ---- web search (extended; incl. commodity/fuel rates that were misrouted to currency) ----
+- {say: "whats the current gold rate?", agent: lookup, tool: web_search, args: {query: gold}}
+- {say: "silver rate today", agent: lookup, tool: web_search, args: {query: silver}}
+- {say: "gold price today", agent: lookup, tool: web_search, args: {query: gold}}
+- {say: "petrol price in Hyderabad", agent: lookup, tool: web_search, args: {query: petrol}}
+- {say: "diesel price today", agent: lookup, tool: web_search, args: {query: diesel}}
+- {say: "search the web for the latest news about ISRO", agent: lookup, tool: web_search, args: {query: ISRO}}
+- {say: "what are the headlines today", agent: lookup, tool: web_search}
+- {say: "who won the IPL final", agent: lookup, tool: web_search, args: {query: IPL}}
+- {say: "who is the president of France", agent: lookup, tool: web_search, args: {query: France}}
+- {say: "price of bitcoin today", agent: lookup, tool: web_search, args: {query: bitcoin}}
+- {say: "latest news about Tesla", agent: lookup, tool: web_search, args: {query: Tesla}}
+- {say: "who won the football world cup", agent: lookup, tool: web_search, args: {query: world cup}}
+- {say: "sensex today", agent: lookup, tool: web_search, args: {query: sensex}}
+- {say: "latest cricket score", agent: lookup, tool: web_search}
+- {say: "look up the population of India", agent: lookup, tool: web_search, args: {query: population}}
+- {say: "google when is Diwali this year", agent: lookup, tool: web_search, args: {query: Diwali}}
+
+# ---- tasks (extended; incl. "current tasks" that was hijacked by the web-search trigger) ----
+- {say: "what are the current tasks I have?", agent: tasks, tool: tasks, args: {action: list}}
+- {say: "list my tasks", agent: tasks, tool: tasks, args: {action: list}}
+- {say: "what's pending on my list", agent: tasks, tool: tasks, args: {action: list}}
+- {say: "do I have any tasks", agent: tasks, tool: tasks, args: {action: list}}
+- {say: "what's on my to-do list?", agent: tasks, tool: tasks, args: {action: list}}
+- {say: "add call the plumber to my list", agent: tasks, tool: tasks, args: {action: add, title: plumber}}
+- {say: "I need to renew my passport", agent: tasks, tool: tasks, args: {action: add, title: passport}}
+- {say: "remind me to water the plants", agent: tasks, tool: tasks, args: {action: add, title: plants}}
+- {say: "put groceries on my to-do list", agent: tasks, tool: tasks, args: {action: add, title: groceries}}
+- {say: "I have to submit the report by Friday", agent: tasks, tool: tasks, args: {action: add, title: report}}
+- {say: "don't let me forget the meeting", agent: tasks, tool: tasks, args: {action: add, title: meeting}}
+- {say: "mark the milk task as done", agent: tasks, tool: tasks, args: {action: complete, title: milk}}
+- {say: "I called the bank", agent: tasks, tool: tasks, args: {action: complete, title: bank}}
+- {say: "I picked up the parcel", agent: tasks, tool: tasks, args: {action: complete, title: parcel}}
+- {say: "delete the groceries task", agent: tasks, tool: tasks, args: {action: delete, title: groceries}}
+- {say: "remove the passport task from my list", agent: tasks, tool: tasks, args: {action: delete, title: passport}}
+
+# ---- plain chat (extended; must not trigger any tool) ----
+- {say: "what is the capital of France", agent: responder, tool: null}
+- {say: "tell me something interesting", agent: responder, tool: null}
+- {say: "hello", agent: responder, tool: null}
+- {say: "hi veda", agent: responder, tool: null}
+- {say: "who are you", agent: responder, tool: null}
+- {say: "what can you do", agent: responder, tool: null}
+- {say: "how do I boil an egg", agent: responder, tool: null}
+- {say: "give me a motivational quote", agent: responder, tool: null}
+- {say: "what is 15 times 12", agent: responder, tool: null}
+- {say: "translate good morning to Hindi", agent: responder, tool: null}
+- {say: "I'm bored", agent: responder, tool: null}
+- {say: "sing me a song", agent: responder, tool: null}
+- {say: "what is machine learning", agent: responder, tool: null}
+- {say: "tell me a fun fact about space", agent: responder, tool: null}
+- {say: "good night", agent: responder, tool: null}
+- {say: "can you help me", agent: responder, tool: null}
+- {say: "hold on, hold on", agent: responder, tool: null}
+- {say: "that was awesome", agent: responder, tool: null}
+- {say: "never mind", agent: responder, tool: null}
+- {say: "say that again", agent: responder, tool: null}
+- {say: "what is photosynthesis", agent: responder, tool: null}

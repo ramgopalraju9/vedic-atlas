@@ -51,7 +51,8 @@ class JsonKnowledgeStore:
         lines = [f"- {_as_user_fact(f['fact'])}" for f in self._facts]
         return (
             "THINGS THE USER HAS TOLD ME ABOUT THEMSELVES (these are the user's own facts, not mine; "
-            'when asked, answer with "your"):\n' + "\n".join(lines)
+            'when asked, answer with "your". Only mention them when the user\'s question is about them):\n'
+            + "\n".join(lines)
         )
 
     def _save(self) -> None:

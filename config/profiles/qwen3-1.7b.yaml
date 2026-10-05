@@ -1,0 +1,13 @@
+# Middle profile: Qwen3-1.7B. Use with  VEDA_PROFILE=qwen3-1.7b
+# Same trimmed-prompt settings as qwen3-0.6b; only the model differs, so timings compare like for like.
+inference:
+  model_path: data/Qwen3-1.7B-Q4_K_M.gguf
+  n_ctx: 2048
+  num_predict: 80
+app:
+  max_history: 4
+  chat_summaries: 0
+  chat_persona: compact  # ~250-token persona instead of the full ~560-token one
+embedding:
+  top_k: 1
+  min_score: 0.55

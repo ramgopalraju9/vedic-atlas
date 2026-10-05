@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import statistics
 import sys
 import time
@@ -92,6 +93,9 @@ def main() -> int:
     ap.add_argument("--min-accuracy", type=float, default=0.85)
     ap.add_argument("--routing-only", action="store_true", help="with --model: only evaluate routing, skip the decide stage")
     ap.add_argument("--golden", default=str(ROOT / "tests" / "eval" / "golden_set.yaml"))
+    ap.add_argument("--save", action="store_true",
+                    help="with --model: write per-case results to tests/eval/results/<label>-<timestamp>.json")
+    ap.add_argument("--label", default=None, help="name for the saved run (default: the model file name)")
     args = ap.parse_args()
 
     items = yaml.safe_load(Path(args.golden).read_text(encoding="utf-8"))
@@ -103,6 +107,9 @@ def main() -> int:
 
     route_ok = [i["_routed"] == i["agent"] for i in items]
     rule_items = [i for i in items if not i.get("llm")]
+    for i in rule_items:
+        if i["_routed"] != i["agent"]:
+            print(f"  RULE MISROUTE {i['say']!r}: rules gave {i['_rule']}, expected {i['agent']}")
     print(f"rules only: {sum(i['_routed'] == i['agent'] for i in rule_items)}/{len(rule_items)} of the trigger-word cases; "
           f"{sum(route_ok)}/{len(items)} overall (the {len(items) - len(rule_items)} no-trigger cases need the LLM router)")
     accuracy = sum(i["_routed"] == i["agent"] for i in rule_items) / max(1, len(rule_items))
@@ -168,8 +175,13 @@ def main() -> int:
         outputs = asyncio.run(_decide_all(items, manifests, composer, runner))
 
         tool_ok, arg_ok, scored, latencies, tokens = 0, 0, 0, [], []
+        records = []
         for item, out in zip(items, outputs):
+            record = {"say": item["say"], "expect_agent": item["agent"], "routed": item["_routed"],
+                      "expect_tool": item["tool"], "expect_args": item.get("args")}
+            records.append(record)
             if out is None:
+                record.update(scored=False, ok=item["_routed"] == item["agent"])
                 continue
             scored += 1
             latencies.append(out["ms"])
@@ -187,6 +199,7 @@ def main() -> int:
                 good_args = good_tool and _args_match(item.get("args"), chosen["args"])
                 arg_ok += good_args
                 good = good_args
+            record.update(scored=True, ok=bool(good), got_calls=calls, decide_ms=out["ms"], prompt_tokens=out["tokens"])
             if not good:
                 print(f"  DECIDE MISS {item['say']!r}: expected {want_tool} {item.get('args')}, got {calls}")
         print(f"decide stage: tool {tool_ok}/{scored}, tool+args {arg_ok}/{scored}")
@@ -195,6 +208,35 @@ def main() -> int:
             f"decide latency ms: median {int(statistics.median(latencies))}, p95 {int(sorted(latencies)[int(len(latencies) * 0.95) - 1])}"
         )
         accuracy = min(accuracy, arg_ok / max(1, scored))
+
+        if args.save:
+            import json
+            from datetime import datetime
+
+            label = args.label or model_path.stem
+            by_tool: dict[str, dict] = {}
+            for r in records:
+                key = r["expect_tool"] or "chat(no tool)"
+                t = by_tool.setdefault(key, {"n": 0, "ok": 0})
+                t["n"] += 1
+                t["ok"] += bool(r["ok"])
+            summary = {
+                "label": label, "model_path": str(cfg.inference.model_path),
+                "n_ctx": cfg.inference.n_ctx, "profile": os.environ.get("VEDA_PROFILE", ""),
+                "timestamp": datetime.now().isoformat(timespec="seconds"), "cases": len(items),
+                "routing_correct": sum(i["_routed"] == i["agent"] for i in items),
+                "decide_tool_correct": tool_ok, "decide_tool_and_args_correct": arg_ok, "decide_scored": scored,
+                "decide_ms_median": int(statistics.median(latencies)),
+                "decide_ms_p95": int(sorted(latencies)[int(len(latencies) * 0.95) - 1]),
+                "prompt_tokens_median": int(statistics.median(tokens)),
+                "by_tool": by_tool,
+            }
+            out_dir = ROOT / "tests" / "eval" / "results"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / f"{label}-{datetime.now():%Y%m%d-%H%M%S}.json"
+            out_path.write_text(json.dumps({"summary": summary, "cases": records}, indent=2, ensure_ascii=False), encoding="utf-8")
+            print(f"saved: {out_path.relative_to(ROOT)}")
+            print("per tool (ok/n): " + ", ".join(f"{k} {v['ok']}/{v['n']}" for k, v in sorted(by_tool.items())))
 
     print(f"overall accuracy: {accuracy:.0%} (gate {args.min_accuracy:.0%})")
     return 0 if accuracy >= args.min_accuracy else 1

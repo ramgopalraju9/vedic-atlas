@@ -11,6 +11,8 @@ Pydantic defaults.
 
 from __future__ import annotations
 
+import os
+
 import yaml
 
 from core.constants import AUDIT_DIR, CONFIG_DIR, DATA_DIR, TEMP_DIR
@@ -24,12 +26,30 @@ _SECTION_FILES = (
 _full_config_cache: AppConfig | None = None
 
 
-def _read_section(name: str) -> dict:
-    path = CONFIG_DIR / f"{name}.yaml"
+def _read_yaml(path) -> dict:
     if not path.exists():
         return {}
     with open(path, "r") as f:
         return yaml.safe_load(f) or {}
+
+
+def _read_section(name: str) -> dict:
+    return _read_yaml(CONFIG_DIR / f"{name}.yaml")
+
+
+def _profile_overlay() -> dict:
+    """Per-model settings kept apart from the base config, so switching model never edits the base values.
+
+    `VEDA_PROFILE=qwen3-0.6b` merges config/profiles/qwen3-0.6b.yaml (top-level keys are section names,
+    e.g. `inference:` / `app:`) over the base files; unset means the base config unchanged.
+    """
+    profile = os.environ.get("VEDA_PROFILE", "").strip()
+    if not profile:
+        return {}
+    path = CONFIG_DIR / "profiles" / f"{profile}.yaml"
+    if not path.exists():
+        raise FileNotFoundError(f"VEDA_PROFILE={profile!r} but {path} does not exist")
+    return _read_yaml(path)
 
 
 def load_full_config() -> AppConfig:
@@ -43,6 +63,8 @@ def load_full_config() -> AppConfig:
         return _full_config_cache
 
     raw = {name: _read_section(name) for name in _SECTION_FILES}
+    for name, overrides in _profile_overlay().items():
+        raw[name] = {**raw.get(name, {}), **(overrides or {})}
     _full_config_cache = AppConfig(**{k: v for k, v in raw.items() if v})
     return _full_config_cache
 

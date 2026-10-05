@@ -1,0 +1,14 @@
+# Trimmed-prompt profile for the original Qwen3-4B. Use with  VEDA_PROFILE=qwen3-4b
+# Same prompt-size settings as the 0.6B / 1.7B profiles (prompt prefill dominates CPU latency); the model path is
+# the base one, so without VEDA_PROFILE the 4B runs with the untrimmed base config exactly as before.
+inference:
+  model_path: data/Qwen3-4B-Q4_K_M.gguf
+  n_ctx: 2048
+  num_predict: 80
+app:
+  max_history: 4       # recent turns replayed into each chat prompt (base: 30)
+  chat_summaries: 0    # earlier-session summaries in every chat prompt (base: 3, ~450 tokens)
+  chat_persona: compact  # ~250-token persona instead of the full ~560-token one
+embedding:
+  top_k: 1             # semantic recall: at most one memory (base: 3)
+  min_score: 0.55
