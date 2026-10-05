@@ -4,7 +4,7 @@ wake_word_enabled: true
 # until it hears the wake word, then listens for wake_window_sec (each handled turn extends it).
 # If the wake model cannot be loaded the voice loop does NOT start (it never falls back to
 # listening continuously).
-wake_engine: none           # v1: no wake word - while unmuted, everything is transcribed. Set to openwakeword to require "Hey Veda".
+wake_engine: openwakeword           # require "Hey Veda" (trained model: data/models/openwakeword/hey_veda.onnx + .onnx.data). Set to none to transcribe everything while unmuted.
 wake_oww_model: hey_veda
 wake_oww_model_path: data/models/openwakeword/hey_veda.onnx
 # Detection score needed to trigger (0-1). Higher = fewer false triggers, more misses.
