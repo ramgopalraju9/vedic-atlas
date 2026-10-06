@@ -16,11 +16,12 @@ import os
 import yaml
 
 from core.constants import AUDIT_DIR, CONFIG_DIR, DATA_DIR, TEMP_DIR
+from core.env import load_env
 from schemas.config_schemas import AppConfig
 
 _SECTION_FILES = (
     "app", "inference", "embedding", "audio", "sensing", "privacy",
-    "governance", "guardrails", "agents", "skills",
+    "governance", "guardrails", "agents", "routing", "skills",
 )
 
 _full_config_cache: AppConfig | None = None
@@ -37,13 +38,24 @@ def _read_section(name: str) -> dict:
     return _read_yaml(CONFIG_DIR / f"{name}.yaml")
 
 
+def active_profile() -> str:
+    """The profile name from VEDA_PROFILE, or "" for the base config.
+
+    Read from the process environment or from PROJECT_ROOT/.env (a real environment variable wins over .env).
+    The .env file is loaded here, before the first config read, so every entry point (veda, uvicorn,
+    `veda server`, scripts) sees the same profile.
+    """
+    load_env()
+    return os.environ.get("VEDA_PROFILE", "").strip()
+
+
 def _profile_overlay() -> dict:
     """Per-model settings kept apart from the base config, so switching model never edits the base values.
 
     `VEDA_PROFILE=qwen3-0.6b` merges config/profiles/qwen3-0.6b.yaml (top-level keys are section names,
     e.g. `inference:` / `app:`) over the base files; unset means the base config unchanged.
     """
-    profile = os.environ.get("VEDA_PROFILE", "").strip()
+    profile = active_profile()
     if not profile:
         return {}
     path = CONFIG_DIR / "profiles" / f"{profile}.yaml"

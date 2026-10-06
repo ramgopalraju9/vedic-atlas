@@ -27,9 +27,11 @@ from domain.ports.inference_port import InferencePort
 class SingleFlight:
     """Serialising decorator over an InferencePort."""
 
-    def __init__(self, inner: InferencePort):
+    def __init__(self, inner: InferencePort, lock: asyncio.Lock | None = None):
         self._inner = inner
-        self._lock = asyncio.Lock()
+        # Pass ONE lock to every model that runs on this CPU (main LLM + router model): they then take turns,
+        # exactly like calls to a single model do, instead of fighting over the same cores.
+        self._lock = lock or asyncio.Lock()
 
     @property
     def name(self) -> str:

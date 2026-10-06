@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import os
 import platform
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -35,7 +36,7 @@ from controller.routes import (
     health, knowledge, lookup, memory as memory_route, persona, privacy, speakers, stream, system,
     tasks as tasks_route, trace as trace_route, voice,
 )
-from core.config import ensure_dirs, load_full_config
+from core.config import active_profile, ensure_dirs, load_full_config
 from core.constants import PROJECT_NAME, VERSION
 from core.env import load_env
 from core.logging_config import configure_logging, logger
@@ -525,7 +526,7 @@ def _build_audit_sink(cfg: AppConfig):
     return SqliteAuditSink(PROJECT_ROOT / gcfg.audit.db_path)
 
 
-def _build_inference(cfg: AppConfig, governance):
+def _build_inference(cfg: AppConfig, governance, lock: asyncio.Lock | None = None, thread_lock=None):
     """Returns (wrapped_client, raw_backend).
 
     The raw backend is returned alongside because boot-time helpers
@@ -555,15 +556,53 @@ def _build_inference(cfg: AppConfig, governance):
         think=icfg.think,
         timeout=icfg.timeout,
         prompt_cache_mb=icfg.prompt_cache_mb,
+        model_lock=thread_lock,
     )
     on_success = (lambda name: governance.record_success(name)) if governance else None
     on_failure = (lambda name: governance.record_failure(name)) if governance else None
     # SingleFlight is innermost so the serialisation guarantee holds even
     # when GracefulDegradation retries or switches backends.
     wrapped = GracefulDegradation(
-        primary=SingleFlight(primary), on_success=on_success, on_failure=on_failure
+        primary=SingleFlight(primary, lock=lock), on_success=on_success, on_failure=on_failure
     )
     return wrapped, primary
+
+
+def _build_router(cfg: AppConfig, main_client, composer, conversation, lock: asyncio.Lock, thread_lock=None):
+    """The model that routes messages, or None (keyword mode, or the router model could not be set up).
+
+    A dedicated small model (routing.model.model_path) gets its own llama.cpp instance that shares the main
+    model's lock; `model_path: null` makes the main LLM route too. Any problem here degrades to keyword rules.
+    """
+    rcfg = cfg.routing
+    if rcfg.mode == "keyword":
+        return None
+    m = rcfg.model
+    client, model_name = main_client, cfg.agents.supervisor.model
+    if m.model_path:
+        from core.constants import PROJECT_ROOT
+        path = Path(m.model_path)
+        path = path if path.is_absolute() else PROJECT_ROOT / path
+        if not path.exists():
+            logger.error(f"[route] router model not found at {path}; routing by keyword rules only")
+            return None
+        try:
+            client = SingleFlight(
+                build_inference_client(
+                    backend="llama_cpp", llama_cpp_model_path=str(path), n_ctx=m.n_ctx, n_threads=m.n_threads,
+                    timeout=m.timeout_sec, num_predict=m.num_predict, think=False, prompt_cache_mb=m.prompt_cache_mb,
+                    model_lock=thread_lock,
+                ),
+                lock=lock,
+            )
+        except Exception as e:
+            logger.error(f"[route] could not load the router model ({type(e).__name__}: {e}); routing by keyword rules only")
+            return None
+        model_name = None
+    return LlmRouter(
+        client=client, composer=composer, model=model_name, num_predict=m.num_predict,
+        timeout_sec=m.timeout_sec, queue_wait_sec=m.queue_wait_sec, history=lambda: conversation.turns,
+    )
 
 
 def _build_embedding(cfg: AppConfig):
@@ -683,7 +722,9 @@ def bootstrap(app: FastAPI) -> None:
     governance = build_governance(cfg.governance, audit_sink)
     app.state.governance = governance
 
-    inference_client, inference_backend = _build_inference(cfg, governance)
+    inference_lock = asyncio.Lock()  # shared by the main LLM and the router model: one inference at a time
+    inference_thread_lock = threading.Lock()  # same guarantee inside the worker threads (survives an abandoned call)
+    inference_client, inference_backend = _build_inference(cfg, governance, inference_lock, inference_thread_lock)
     app.state.inference_client = inference_client
     app.state.inference_backend = inference_backend
     app.state.embedding_provider = _build_embedding(cfg)
@@ -841,12 +882,21 @@ def bootstrap(app: FastAPI) -> None:
                 model=cfg.agents.responder.model, traces=trace_repo,
             ))
 
-    llm_router = None
-    if cfg.agents.llm_routing:
+    # Routing: config/routing.yaml decides keyword | hybrid | model. The old `agents.llm_routing: true` flag still
+    # works when routing.mode is left at "keyword": it means "keyword rules, then the main LLM for unmatched messages".
+    routing_mode = cfg.routing.mode
+    llm_router = _build_router(cfg, inference_client, composer, conversation, inference_lock, inference_thread_lock)
+    if cfg.agents.llm_routing and routing_mode == "keyword":
+        logger.warning("[route] agents.llm_routing is deprecated; set routing.mode in config/routing.yaml instead")
         llm_router = LlmRouter(
             client=inference_client, composer=composer, model=cfg.agents.supervisor.model,
             num_predict=min(cfg.inference.routing_num_predict, 24), history=lambda: conversation.turns,
         )
+        routing_mode = None  # legacy behaviour
+    elif routing_mode != "keyword" and llm_router is None:
+        logger.error(f"[route] routing.mode={routing_mode} but no router model is available; using keyword rules")
+        routing_mode = "keyword"
+    app.state.llm_router = llm_router
     supervisor = SupervisorAgent(
         agent_registry=agent_registry, client=inference_client, default_agent="responder",
         model=cfg.agents.supervisor.model, debounce_window_sec=cfg.sensing.debounce_window_sec,
@@ -854,6 +904,7 @@ def bootstrap(app: FastAPI) -> None:
         proactivity=cfg.sensing.proactivity, memory=memory_repo, governance=governance,
         conversation=conversation,
         routing_num_predict=cfg.inference.routing_num_predict, llm_router=llm_router,
+        routing_mode=routing_mode, router_on_failure=cfg.routing.on_failure,
     )
     agent_registry.register(supervisor)
     app.state.agent_registry = agent_registry
@@ -936,6 +987,12 @@ async def lifespan(app: FastAPI):
     load_env()
     cfg = load_full_config()
     configure_logging(cfg.app.log_level)
+    logger.info(
+        f"[config] profile={active_profile() or 'base (none set)'} model={cfg.inference.model_path} "
+        f"n_ctx={cfg.inference.n_ctx} max_history={cfg.app.max_history} chat_summaries={cfg.app.chat_summaries} "
+        f"chat_persona={cfg.app.chat_persona} routing={cfg.routing.mode}"
+        + (f" router_model={cfg.routing.model.model_path or 'main LLM'}" if cfg.routing.mode != "keyword" else "")
+    )
     ensure_dirs()
     init_tables()
 
@@ -957,6 +1014,9 @@ async def lifespan(app: FastAPI):
             logger.info("[inference] warmed up")
         except Exception as e:
             logger.warning(f"[inference] warmup skipped: {e}")
+
+    if cfg.inference.warmup_on_boot:
+        await app.state.supervisor.warm_router()
 
     # Must start inside the running loop — the gate captures it so a
     # mute transition raised on a hardware thread can still reach the bus.

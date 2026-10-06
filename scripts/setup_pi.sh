@@ -462,11 +462,11 @@ summary() {
       2. put TAVILY_API_KEY in $ROOT/.env for web search
       3. start Veda with the profile that matches the model you downloaded ($MODEL):
              source $VENV/bin/activate
-             export VEDA_PROFILE=$PROFILE
              veda
          (the microphone starts muted; unmute from the prompt with /unmute)
-         To keep the profile for every login:  echo 'export VEDA_PROFILE=$PROFILE' >> ~/.bashrc
-         Without VEDA_PROFILE Veda runs the untrimmed base config, which is built for the 4b model.
+         Set the profile once in $ROOT/.env:   VEDA_PROFILE=$PROFILE
+         (or export it in the shell, which wins over .env). Veda logs "[config] profile=..." at startup.
+         Without a profile Veda runs the untrimmed base config, which is built for the 4b model.
       Check devices if voice is silent:  arecord -l   and   aplay -l
 EOF
 }

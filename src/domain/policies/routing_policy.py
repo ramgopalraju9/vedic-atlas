@@ -19,6 +19,7 @@ ever touching the model.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from domain.entities.agent_profile import AgentProfile
 
@@ -56,6 +57,59 @@ def _pick_by_triggers(message: str, candidates: tuple[AgentProfile, ...]) -> str
         if hits > best_hits:
             best_hits, best_name = hits, profile.name
     return best_name
+
+
+# ---- how sure is a keyword match? (used by the "hybrid" routing mode) -------------------------------------
+
+# Cues that the user is correcting or cancelling: a trigger word in such a sentence is a mention, not a request
+# ("i didn't ask about the weather", "forget it", "instead of the news"). Keyword matching cannot read these.
+_NEGATION_RES = (
+    re.compile(r"\b(?:didn'?t|did not|don'?t|do not|never|not)\b.{0,30}\b(?:ask|asked|want|wanted|mean|meant|say|said|talk|talking|need|about)\b", re.IGNORECASE),
+    re.compile(r"\b(?:instead|rather than|never ?mind|forget (?:it|that)|ignore (?:that|it)|stop)\b", re.IGNORECASE),
+)
+
+
+@dataclass(frozen=True)
+class RuleMatch:
+    """Everything the keyword rules know about one message, not just their pick."""
+
+    agent: str | None                  # the agent the rules would route to (None = nothing matched)
+    via: str                           # "trigger" | "overlap" | "none"
+    trigger_hits: tuple[tuple[str, int], ...]  # agents with at least one trigger hit, and their hit counts
+    negated: bool                      # the message contains a correction/cancel cue
+
+
+def match_agent_detail(message: str, candidates: tuple[AgentProfile, ...]) -> RuleMatch:
+    """Like `match_agent`, but also reports how the decision was reached (for the confidence check)."""
+    negated = any(r.search(message) for r in _NEGATION_RES)
+    hits = tuple(
+        (p.name, n)
+        for p in candidates
+        if (n := sum(1 for pattern in p.triggers if re.search(pattern, message, re.IGNORECASE))) > 0
+    )
+    agent = match_agent(message, candidates)
+    if hits:
+        via = "trigger"
+    elif agent is not None:
+        via = "overlap"
+    else:
+        via = "none"
+    return RuleMatch(agent=agent, via=via, trigger_hits=hits, negated=negated)
+
+
+def is_confident(match: RuleMatch) -> bool:
+    """True when a keyword match can be trusted without asking the model.
+
+    Sure: a trigger pattern (not a loose word overlap) pointed at exactly ONE agent and the sentence holds no
+    correction/cancel cue. Anything else is confusion: nothing matched, only a weak word overlap, two agents
+    claimed the message ("current tasks" hit both tasks and web search), or the user is negating something.
+    """
+    return (
+        match.agent is not None
+        and match.via == "trigger"
+        and len(match.trigger_hits) == 1
+        and not match.negated
+    )
 
 
 def pick_agent(message: str, candidates: tuple[AgentProfile, ...], default: str) -> str:

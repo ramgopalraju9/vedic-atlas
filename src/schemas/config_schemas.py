@@ -364,6 +364,33 @@ class SkillsConfig(BaseModel):
     custom_skills_dir: str = "data/custom_skills"
 
 
+class RouterModelConfig(BaseModel):
+    """routing.model: the small dedicated model that picks the specialist agent (llama.cpp, GGUF)."""
+
+    # A path = a separate small model (e.g. Qwen3-0.6B) that only routes. null = the main LLM does the routing too.
+    model_path: str | None = "data/Qwen3-0.6B-Q4_K_M.gguf"
+    n_ctx: int = 2560             # the fixed router prompt (persona + ~65 examples) is ~1.6k tokens; room for history + message
+    n_threads: int | None = None
+    timeout_sec: float = 8.0      # how long the model may RUN for one routing call (queue time is not counted)
+    queue_wait_sec: float = 30.0  # how long a routing call may wait behind the main model before it is skipped
+    num_predict: int = 16         # the answer is {"agent": "<name>"}
+    prompt_cache_mb: int = 64     # the long fixed router prompt is evaluated once and reused
+
+
+class RoutingConfig(BaseModel):
+    """routing: section - how a message is mapped to a specialist agent.
+
+    keyword: manifest trigger regexes + word overlap only (instant; the model is never loaded).
+    model:   the router model decides every message; keyword rules are only the fallback if it fails.
+    hybrid:  keyword rules decide when SURE (one agent's trigger matched, no correction cue); the router
+             model decides everything else (no match, a weak match, two agents claiming it, a negation).
+    """
+
+    mode: Literal["keyword", "hybrid", "model"] = "keyword"
+    on_failure: Literal["keyword", "chat"] = "keyword"  # when the router cannot answer: use the rules, or go to chat
+    model: RouterModelConfig = RouterModelConfig()
+
+
 class AppConfig(BaseModel):
     """Complete application configuration combining all sections."""
 
@@ -376,4 +403,5 @@ class AppConfig(BaseModel):
     governance: GovernanceConfig = GovernanceConfig()
     guardrails: GuardrailsConfig = GuardrailsConfig()
     agents: AgentsConfig = AgentsConfig()
+    routing: RoutingConfig = RoutingConfig()
     skills: SkillsConfig = SkillsConfig()

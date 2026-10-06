@@ -105,18 +105,21 @@ def test_an_unrecognised_message_is_routed_by_the_constrained_llm_call():
     agent, via = _route(_supervisor(client), "do I need an umbrella in Pune tomorrow")
     assert agent == "lookup" and via.startswith("llm")
     call = client.calls[0]
-    assert call["schema"]["properties"]["agent"]["enum"] == ["responder", "system", "tasks", "lookup"]
+    # chat is listed last: a small model leans toward the first option it sees
+    assert call["schema"]["properties"]["agent"]["enum"] == ["system", "tasks", "lookup", "responder"]
     assert call["temperature"] == 0.0 and call["n"] <= 64
-    assert "MESSAGE: do I need an umbrella in Pune tomorrow" in call["prompt"]
+    assert "Message: do I need an umbrella in Pune tomorrow" in call["prompt"]
 
 
-def test_the_routing_prompt_is_small_and_teaches_the_manifest_examples():
+def test_the_routing_prompt_names_every_agent_and_tool_and_carries_worked_examples():
     client = _Client(answer=json.dumps({"agent": "responder"}))
     _route(_supervisor(client), "a message nothing matches xyzzy")
     system = client.calls[0]["system"]
-    assert '"I need to bring vegies" -> tasks' in system          # from tasks.yaml
-    assert '"what\'s the weather in Mumbai" -> lookup' in system  # from weather.yaml
     assert "- lookup: " in system and "- system: " in system
+    for m in MANIFESTS:                                   # the router is told which tools each specialist owns
+        assert m.name in system
+    assert 'Message: who is the CEO of Apple\nAnswer: {"agent": "lookup"}' in system
+    assert 'Message: I need to book a dentist visit\nAnswer: {"agent": "tasks"}' in system
     from domain.policies.token_budget_policy import PromptBudgets, estimate_tokens
     assert estimate_tokens(system) < PromptBudgets().route
 

@@ -18,10 +18,43 @@ Donor: veda/voice/stt.py's WhisperSTT, read in full and adapted:
 
 from __future__ import annotations
 
+import sys
+import types
 from pathlib import Path
 
+from core.logging_config import logger
 from domain.value_objects.audio_window import AudioWindow
 from domain.value_objects.transcript import Transcript
+
+
+def allow_unavailable_av() -> bool:
+    """Let faster-whisper import even when PyAV's native files cannot be loaded. True when a stand-in was installed.
+
+    faster-whisper imports PyAV (`av`) at import time, but only uses it to decode audio *files*. Veda passes a
+    float32 array, so decoding never runs. On Windows with Smart App Control, one of PyAV's compiled files
+    (av/sidedata/sidedata.pyd) can be blocked ("DLL load failed ... An Application Control policy has blocked
+    this file"), and that import error would otherwise take the whole voice loop down on the first utterance.
+    """
+    try:
+        import av  # noqa: F401
+        return False
+    except ImportError as exc:
+        reason = str(exc)
+    for name in [m for m in sys.modules if m == "av" or m.startswith("av.")]:
+        del sys.modules[name]  # drop the half-imported package
+
+    stub = types.ModuleType("av")
+
+    def _unavailable(attr: str):
+        raise AttributeError(
+            f"PyAV is unavailable on this machine ({reason}), so audio files cannot be decoded (looked up av.{attr}). "
+            "Veda only transcribes in-memory audio, which does not need it."
+        )
+
+    stub.__getattr__ = _unavailable  # type: ignore[attr-defined]  # PEP 562: only called for names the stub lacks
+    sys.modules["av"] = stub
+    logger.warning(f"[stt] PyAV cannot be loaded ({reason}); continuing without it (only needed for audio files)")
+    return True
 
 
 class FasterWhisperProvider:
@@ -34,6 +67,7 @@ class FasterWhisperProvider:
 
     def _ensure(self):
         if self._model is None:
+            allow_unavailable_av()
             from faster_whisper import WhisperModel
 
             kwargs = {"device": "cpu", "compute_type": "int8"}

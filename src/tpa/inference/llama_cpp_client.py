@@ -46,6 +46,7 @@ class LlamaCppClient:
         num_predict: int = 512,
         think: bool = False,
         prompt_cache_mb: int = 0,
+        model_lock: threading.Lock | None = None,
     ):
         path = Path(model_path)
         if not path.exists():
@@ -67,7 +68,10 @@ class LlamaCppClient:
         # A llama.cpp context is not thread-safe. A call that timed out (asyncio.wait_for) is only abandoned by the
         # event loop: its worker thread keeps decoding. This lock is held by that thread, so the next call waits for
         # it instead of decoding on the same context at the same time (which crashes the whole server).
-        self._model_lock = threading.Lock()
+        # Pass ONE lock to every llama.cpp instance on this CPU (main LLM + router model). It is a THREAD lock on
+        # purpose: a call abandoned by a timeout keeps decoding in its worker thread after the asyncio-level lock
+        # (SingleFlight) has been released, and only this lock stops the next call from starting on top of it.
+        self._model_lock = model_lock or threading.Lock()
 
     @property
     def name(self) -> str:

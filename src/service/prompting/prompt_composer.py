@@ -20,6 +20,7 @@ trimmed so the trace can show it.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable, Sequence
@@ -132,20 +133,35 @@ class PromptComposer:
         }
         return ComposedPrompt(system=system, prompt=volatile, tokens=total, sections=sections, trimmed=trimmed)
 
+    def _tools_clause(self, agent: str) -> str:
+        """" Tools: name (what it does); ..." for the tools this agent owns, so the router knows what each can do."""
+        owned = [m for m in self._manifests.values() if m.agent == agent]
+        if not owned:
+            return ""
+
+        def short(text: str) -> str:  # first sentence, cut at a word: the router needs "what", not the usage caveats
+            first = re.split(r"\.\s|;\s", " ".join(text.split()), maxsplit=1)[0].rstrip(".")
+            if len(first) > 60:
+                first = first[:60].rsplit(" ", 1)[0]
+            first = re.sub(r"\s*\([^)]*$", "", first)  # drop a parenthesis the cut left open
+            return first.rstrip(" ,;:-")
+
+        return ". Tools: " + "; ".join(f"{m.name} - {short(m.description)}" for m in owned) + "."
+
     def route_stage(
         self, agents: Sequence[tuple[str, str]], user_message: str, history: Sequence[Turn] = ()
     ) -> ComposedPrompt:
         """Routing prompt: each agent with its one-line description, plus example phrases taken from
         the tool manifests (so adding a tool teaches the router about it with no code change)."""
-        agent_lines = "\n".join(f"- {name}: {desc}" for name, desc in agents)
+        agent_lines = "\n".join(f"- {name}: {desc}{self._tools_clause(name)}" for name, desc in agents)
         example_lines = []
         for name, _ in agents:
             seen = 0
             for m in self._manifests.values():
                 if m.agent != name:
                     continue
-                for ex in m.examples[:2]:
-                    if seen >= 4:
+                for ex in m.examples[:1]:  # one per tool: the fixed examples in router.md cover the hard cases
+                    if seen >= 3:
                         break
                     example_lines.append(f'"{ex.user}" -> {name}')
                     seen += 1
@@ -158,7 +174,7 @@ class PromptComposer:
         trimmed: list[str] = []
         while True:
             hist = self._history_lines(history, keep)
-            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [f"MESSAGE: {self._clip(user_message, _USER_MSG_CHARS)}"])
+            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [f"Message: {self._clip(user_message, _USER_MSG_CHARS)}\nAnswer:"])
             total = self._count(system) + self._count(volatile)
             if total <= self.budgets.route or keep == 0:
                 break

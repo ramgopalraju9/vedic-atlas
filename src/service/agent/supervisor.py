@@ -40,6 +40,8 @@ from domain.value_objects.urgency import Urgency
 from domain.ports.governance_port import GovernanceProvider
 from domain.ports.inference_port import InferencePort
 from domain.ports.memory_repository_port import MemoryRepositoryPort
+from domain.ports.router_port import RouterPort
+from domain.policies.routing_policy import is_confident, match_agent_detail
 from service.agent.base_agent import BaseAgent
 from service.agent.registry import AgentRegistry
 from service.agent.router_policy import RouterPolicy
@@ -67,7 +69,9 @@ class SupervisorAgent(BaseAgent):
         router: RouterPolicy | None = None,
         conversation=None,
         routing_num_predict: int = 64,
-        llm_router=None,
+        llm_router: RouterPort | None = None,
+        routing_mode: str | None = None,
+        router_on_failure: str = "keyword",
     ):
         super().__init__(name="supervisor", description="Routes user requests to the correct specialist agent.", model=model)
         self.agent_registry = agent_registry
@@ -78,7 +82,11 @@ class SupervisorAgent(BaseAgent):
         self.router = router or RouterPolicy()
         self.conversation = conversation  # ConversationManager, optional — used only to mirror ambient summaries into history
         self.routing_num_predict = routing_num_predict
-        self.llm_router = llm_router  # LlmRouter | None — decides messages the rules did not recognise
+        self.llm_router = llm_router  # RouterPort | None — the model that routes (see routing_mode)
+        # keyword | hybrid | model (config/routing.yaml). None = the legacy behaviour: rules first, and the model
+        # only for a message no rule recognised (what `agents.llm_routing: true` always did).
+        self.routing_mode = routing_mode
+        self.router_on_failure = router_on_failure if router_on_failure in {"keyword", "chat"} else "keyword"
         self._rate_limit_max = rate_limit_max
         self._rate_limit_window_sec = rate_limit_window_sec
         self.proactivity = proactivity if proactivity in {"conservative", "medium", "chatty"} else "medium"
@@ -101,7 +109,14 @@ class SupervisorAgent(BaseAgent):
     # -- Routing ---------------------------------------------------------
 
     async def _pick(self, ctx: AgentContext) -> BaseAgent:
-        """Deterministic rules first (instant), then an LLM router for what they did not recognise."""
+        """Choose the specialist for a message, by `routing_mode` (config/routing.yaml):
+
+        keyword - the manifest trigger rules and word overlap only; no model call.
+        model   - the router model decides every message; the keyword rules are the fallback if it cannot answer.
+        hybrid  - the keyword rules decide when SURE (one agent's trigger matched, no correction cue); the router
+                  model decides everything else.
+        None    - legacy: rules first, the router model only for a message no rule recognised.
+        """
         routable = self.agent_registry.list_routable(exclude={self.name})
         if not routable:
             ctx.metadata["routed_via"] = "default"
@@ -117,20 +132,76 @@ class SupervisorAgent(BaseAgent):
             )
             for a in routable
         )
+        agents = [(a.name, a.description) for a in routable]
+        mode = self.routing_mode
+        ctx.metadata["routing_mode"] = mode or "legacy"
+
+        if mode == "model":
+            routed = await self._route_by_model(ctx, agents)
+            return routed or self._route_after_model_failure(ctx, profiles)
+
+        if mode == "hybrid":
+            detail = match_agent_detail(ctx.user_message, profiles)
+            if is_confident(detail) and self.agent_registry.is_registered(detail.agent):
+                logger.info(f"[route] mode=hybrid via=rules(sure) agent={detail.agent}")
+                ctx.metadata["routed_via"] = "rules"
+                return self.agent_registry.get(detail.agent)
+            routed = await self._route_by_model(ctx, agents)
+            return routed or self._route_after_model_failure(ctx, profiles)
+
         chosen = self.router.match(ctx.user_message, profiles)
         if chosen and self.agent_registry.is_registered(chosen):
             logger.info(f"Supervisor rule-routed to '{chosen}'")
             ctx.metadata["routed_via"] = "rules"
             return self.agent_registry.get(chosen)
 
-        if self.llm_router is not None:
-            decision = await self.llm_router.route(ctx.user_message, [(a.name, a.description) for a in routable])
-            if decision is not None and self.agent_registry.is_registered(decision.agent):
-                ctx.metadata["routed_via"] = f"llm ({decision.ms} ms)"
-                return self.agent_registry.get(decision.agent)
+        if mode is None:  # legacy
+            routed = await self._route_by_model(ctx, agents)
+            if routed is not None:
+                return routed
 
         ctx.metadata["routed_via"] = "default"
         return self.agent_registry.get(self.default_agent)
+
+    async def _route_by_model(self, ctx: AgentContext, agents: list[tuple[str, str]]) -> BaseAgent | None:
+        """The router model's pick, or None when there is no router or it could not answer."""
+        if self.llm_router is None:
+            return None
+        decision = await self.llm_router.route(ctx.user_message, agents)
+        if decision is None or not self.agent_registry.is_registered(decision.agent):
+            return None
+        ctx.metadata["routed_via"] = f"llm ({decision.ms} ms)"
+        logger.info(f"[route] mode={ctx.metadata.get('routing_mode')} via=llm agent={decision.agent} ms={decision.ms}")
+        return self.agent_registry.get(decision.agent)
+
+    def _route_after_model_failure(self, ctx: AgentContext, profiles: tuple[AgentProfile, ...]) -> BaseAgent:
+        """The router model gave no answer: use the keyword rules (or chat), as `routing.on_failure` says."""
+        if self.router_on_failure == "keyword":
+            chosen = self.router.match(ctx.user_message, profiles)
+            if chosen and self.agent_registry.is_registered(chosen):
+                logger.warning(f"[route] router model gave no answer; keyword rules -> '{chosen}'")
+                ctx.metadata["routed_via"] = "fallback-rules"
+                return self.agent_registry.get(chosen)
+        logger.warning(f"[route] router model gave no answer; default agent '{self.default_agent}'")
+        ctx.metadata["routed_via"] = "fallback-default"
+        return self.agent_registry.get(self.default_agent)
+
+    def routing_status(self) -> dict:
+        """What routing is doing right now, for /api/health: the mode, whether a router model is loaded, and whether
+        its slow-device pause is active (in which case every message is being routed by the keyword fallback)."""
+        paused = self.llm_router.paused_for_sec() if self.llm_router is not None else 0.0
+        return {
+            "mode": self.routing_mode or "legacy",
+            "router_model": self.llm_router is not None,
+            "router_paused_for_sec": int(paused),
+        }
+
+    async def warm_router(self) -> None:
+        """Warm the router model's prompt cache at boot (no-op without a router)."""
+        if self.llm_router is None:
+            return
+        routable = self.agent_registry.list_routable(exclude={self.name})
+        await self.llm_router.warmup([(a.name, a.description) for a in routable])
 
     # -- Execute ---------------------------------------------------------
 

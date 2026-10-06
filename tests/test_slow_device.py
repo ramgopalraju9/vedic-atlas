@@ -111,6 +111,9 @@ class _SlowClient:
 
     async def complete(self, prompt, system="", model=None, timeout=None, **kwargs):
         self.calls += 1
+        if timeout is not None and self.delay > timeout:  # a real client enforces `timeout` on the time it RUNS
+            await asyncio.sleep(timeout)
+            raise InferenceTimeoutError("model too slow")
         await asyncio.sleep(self.delay)
         return '{"agent": "tasks"}'
 
