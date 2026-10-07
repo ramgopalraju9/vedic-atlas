@@ -1,7 +1,7 @@
 """ControlDecoder — the ONE model call that decides what a turn does (docs/10 §4.1).
 
 Prompt: persona_lite + every tool + rules (static, one cached prefix) / ACTIVE + RECENT + TODAY + USER (volatile).
-Output: grammar-constrained `{"needs_live_data", "calls", "clarification"}`, so the model cannot emit malformed
+Output: grammar-constrained `{"needs_live_data", "calls"}` + optional `"clarification"`, so the model cannot emit malformed
 JSON, an unknown tool or an invalid argument. The decoder never raises: a failed call or unusable output becomes
 an INVALID decision, which `dispatch_policy.resolve` turns into a fail-closed reply.
 """
@@ -34,7 +34,7 @@ def parse_decision(raw: str) -> ControlDecision:
     """Strict parse: anything off-shape is INVALID rather than guessed at (a truncated reply is the usual cause)."""
     try:
         data = json.loads(raw)
-        calls, live, clar = data["calls"], data["needs_live_data"], data["clarification"]
+        calls, live, clar = data["calls"], data["needs_live_data"], data.get("clarification")
     except (TypeError, ValueError, KeyError):
         return ControlDecision(valid=False, note=f"unparseable: {str(raw)[:120]!r}")
     if not isinstance(calls, list) or not isinstance(live, bool) or not (clar is None or isinstance(clar, str)):

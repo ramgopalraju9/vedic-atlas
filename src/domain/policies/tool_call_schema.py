@@ -45,7 +45,9 @@ def build_control_schema(
     manifests: list[ToolManifest], *, max_calls: int = MAX_CALLS, key_order: tuple[str, ...] = CONTROL_KEYS
 ) -> dict[str, Any]:
     """JSON-schema for the unified control decode:
-    `{"needs_live_data": bool, "calls": [...], "clarification": str | null}`.
+    `{"needs_live_data": bool, "calls": [...]}` plus an OPTIONAL `"clarification": str` that the model writes only
+    when it is asking a question. Decode time is ~0.35 s per output token on the target CPU, so an always-present
+    `"clarification":null` cost about 2 s on nearly every turn.
 
     `calls` may be empty (minItems 0) and is NEVER forced to hold one: forcing a call is what turned a mention
     of "weather" into a weather answer. llama.cpp emits the properties in the order given, so `key_order` decides
@@ -69,12 +71,12 @@ def build_control_schema(
     props = {
         "needs_live_data": {"type": "boolean"},
         "calls": calls,
-        "clarification": {"type": ["string", "null"], "maxLength": CLARIFICATION_MAX_CHARS},
+        "clarification": {"type": "string", "maxLength": CLARIFICATION_MAX_CHARS},
     }
     return {
         "type": "object",
         "properties": {k: props[k] for k in key_order},
-        "required": list(key_order),
+        "required": [k for k in key_order if k != "clarification"],   # optional: absent = not asking (saves ~5 tokens a turn)
         "additionalProperties": False,
     }
 

@@ -1,4 +1,4 @@
-Decide what to do with the user's message. Reply with ONLY one JSON object: {"needs_live_data": true|false, "calls": [...], "clarification": text|null}.
+Decide what to do with the user's message. Reply with ONLY one JSON object: {"needs_live_data": true|false, "calls": [...]}. Add "clarification": "question" ONLY when you must ask the user something; otherwise leave the key out.
 
 Tools:
 <<tools>>
@@ -12,42 +12,42 @@ Rules:
 - If the answer needs live data but NO tool above can provide it (another day's weather, email, calendar, meetings), calls stays empty and needs_live_data is true. Never use a tool for something it does not do: the to-do list is not a calendar.
 - A question about something the user already told you (a name, a favourite) is answered from the conversation: calls stays empty. Use remember only to save, forget, or when asked what you remember about them.
 - ACTIVE shows what the user was just doing. Reuse its values only when the message continues it; a value the user names replaces it. When ACTIVE is none and RECENT is none (or absent), a message that only continues something ("and there?", "what about tomorrow?") has nothing to follow: ask, never guess a place or topic.
-- clarification is one short question, only when the message cannot be answered without something you do not have. Then calls is empty. Never invent a place, task or topic. To delete or forget something the user must have named it; if they only say "it" or "that", ask which one.
+- clarification (the key is written only then) is one short question, only when the message cannot be answered without something you do not have. Then calls is empty. Never invent a place, task or topic. To delete or forget something the user must have named it; if they only say "it" or "that", ask which one.
 - Use only the listed arguments.
 
 Examples:
 User: weather in Mumbai
-{"needs_live_data":true,"calls":[{"tool":"get_weather","args":{"place":"Mumbai"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"get_weather","args":{"place":"Mumbai"}}]}
 User: is it raining
-{"needs_live_data":true,"calls":[{"tool":"get_weather","args":{}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"get_weather","args":{}}]}
 ACTIVE: get_weather | place=Oslo | 2 min ago
 User: and in Lisbon?
-{"needs_live_data":true,"calls":[{"tool":"get_weather","args":{"place":"Lisbon"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"get_weather","args":{"place":"Lisbon"}}]}
 ACTIVE: convert_currency | amount=100 from=USD to=EUR | 1 min ago
 User: and in pounds?
-{"needs_live_data":true,"calls":[{"tool":"convert_currency","args":{"amount":100,"from":"USD","to":"GBP"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"convert_currency","args":{"amount":100,"from":"USD","to":"GBP"}}]}
 User: I didn't want the weather in Paris, I asked what 2+2 is
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: my thermostat app shows the wrong temperature, why?
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: he said it was snowing and I nodded
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: my brother keeps saying the forecast is always wrong
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: I hate being asked about the weather all the time
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: tell me about the history of the rupee
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: what should I name my new cat
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: what is my wife's name
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: explain recursion
-{"needs_live_data":false,"calls":[],"clarification":null}
+{"needs_live_data":false,"calls":[]}
 User: what meetings do I have on Friday
-{"needs_live_data":true,"calls":[],"clarification":null}
+{"needs_live_data":true,"calls":[]}
 User: do I have any messages from Sam
-{"needs_live_data":true,"calls":[],"clarification":null}
+{"needs_live_data":true,"calls":[]}
 ACTIVE: none
 RECENT: none
 User: and how about Sunday?
@@ -57,15 +57,15 @@ User: how about the other one?
 User: get rid of that one
 {"needs_live_data":false,"calls":[],"clarification":"Which one do you mean?"}
 User: remove the dentist appointment task
-{"needs_live_data":true,"calls":[{"tool":"tasks","args":{"action":"delete","title":"dentist appointment"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"tasks","args":{"action":"delete","title":"dentist appointment"}}]}
 User: I got the groceries
-{"needs_live_data":true,"calls":[{"tool":"tasks","args":{"action":"complete","title":"groceries"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"tasks","args":{"action":"complete","title":"groceries"}}]}
 User: remind me to renew my passport
-{"needs_live_data":true,"calls":[{"tool":"tasks","args":{"action":"add","title":"renew passport"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"tasks","args":{"action":"add","title":"renew passport"}}]}
 User: I'm allergic to shellfish
-{"needs_live_data":true,"calls":[{"tool":"remember","args":{"action":"save","topic":"allergy","value":"shellfish"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"remember","args":{"action":"save","topic":"allergy","value":"shellfish"}}]}
 User: who won the match last night
-{"needs_live_data":true,"calls":[{"tool":"web_search","args":{"query":"match result last night"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"web_search","args":{"query":"match result last night"}}]}
 User: convert 50 USD to EUR and add buy bread to my tasks
-{"needs_live_data":true,"calls":[{"tool":"convert_currency","args":{"amount":50,"from":"USD","to":"EUR"}},{"tool":"tasks","args":{"action":"add","title":"buy bread"}}],"clarification":null}
+{"needs_live_data":true,"calls":[{"tool":"convert_currency","args":{"amount":50,"from":"USD","to":"EUR"}},{"tool":"tasks","args":{"action":"add","title":"buy bread"}}]}
 <<tool_examples>>

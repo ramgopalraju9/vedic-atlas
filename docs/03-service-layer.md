@@ -67,7 +67,7 @@ Turn bookkeeping only (`ctx.current_agent`, `ctx.agent_chain`) and delegation to
 1. Resolve the session id **once** per turn; read the session state (`ACTIVE:` line, see `service/session/`).
 2. **One control decode** (`ControlDecoder`, `PromptComposer.control_stage`): persona-lite + every tool signature +
    rules/examples (static, one cached prefix) / `ACTIVE` + `RECENT` (two complete exchanges) + `TODAY` + `USER`
-   (volatile). Output is constrained by `build_control_schema` to `{needs_live_data, calls[<=3], clarification}`;
+   (volatile). Output is constrained by `build_control_schema` to `{needs_live_data, calls[<=3]}` plus an optional `clarification` (written only when asking: fewer output tokens, and decode time is ~0.35 s per token);
    temperature 0. Unparseable output **fails closed** (a fixed "didn't catch that" reply), never to free chat.
 3. `domain/policies/dispatch_policy.resolve` turns the decision into a route: `TOOLS`, `CLARIFY`, `CHAT`, `REFUSE`
    (`needs_live_data` with no call: a fixed refusal, never free chat) or `FAIL_CLOSED`. A destructive call never

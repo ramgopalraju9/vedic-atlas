@@ -30,13 +30,14 @@ def _t(role, content):
 
 def test_control_schema_shape_and_default_key_order():
     s = build_control_schema(MANIFESTS)
-    assert list(s["properties"]) == list(CONTROL_KEYS) and s["required"] == list(CONTROL_KEYS)
+    assert list(s["properties"]) == list(CONTROL_KEYS)
+    assert s["required"] == ["needs_live_data", "calls"]   # clarification is optional: written only when asking
     assert CONTROL_KEYS[0] == "needs_live_data"            # the flag is committed to before the calls
     assert s["additionalProperties"] is False
     calls = s["properties"]["calls"]
     assert calls["minItems"] == 0 and calls["maxItems"] == MAX_CALLS
     assert {o["properties"]["tool"]["const"] for o in calls["items"]["oneOf"]} == NAMES
-    assert s["properties"]["clarification"]["type"] == ["string", "null"]
+    assert s["properties"]["clarification"]["type"] == "string"
 
 
 def test_control_schema_can_never_force_a_call():
@@ -111,7 +112,10 @@ def test_prompt_examples_only_reference_real_tools_and_args():
         if not line.startswith('{"needs_live_data"'):
             continue
         doc = json.loads(line)
-        assert list(doc) == list(CONTROL_KEYS) or set(doc) == set(CONTROL_KEYS)
+        assert list(doc) == [k for k in CONTROL_KEYS if k in doc] and {"needs_live_data", "calls"} <= set(doc)
+        assert doc.get("clarification") is not None or "clarification" not in doc   # never an explicit null (costs tokens)
+        if "clarification" in doc:
+            assert doc["calls"] == []
         for call in doc["calls"]:
             seen += 1
             assert call["tool"] in NAMES, f"control_stage.md example uses unknown tool {call['tool']}"
@@ -122,10 +126,11 @@ def test_prompt_examples_only_reference_real_tools_and_args():
 def test_examples_follow_the_schema_key_order():
     for order in (CONTROL_KEYS, ("calls", "needs_live_data", "clarification")):
         system = _composer().control_stage("x", key_order=order).system
-        lines = [l for l in system.splitlines() if l.startswith("{") and "needs_live_data" in l and "calls" in l and "clarification" in l]
+        lines = [l for l in system.splitlines() if l.startswith("{") and "needs_live_data" in l and "calls" in l]
         assert len(lines) >= 8
         for line in lines:
-            assert list(json.loads(line)) == list(order)
+            data = json.loads(line)
+            assert list(data) == [k for k in order if k in data]
 
 
 def test_needs_live_data_definition_is_in_the_prompt_and_saved_facts_are_not_live():
@@ -153,7 +158,8 @@ def test_prompt_examples_are_not_copies_of_golden_test_cases():
 def test_the_mention_without_request_pattern_and_the_no_fitting_tool_rule_are_present():
     body = FilePromptStore().get("control_stage")
     assert "NOT a request" in body and "NO tool above can provide it" in body
-    assert any('"needs_live_data":false,"calls":[],"clarification":null' in l for l in body.splitlines())
+    assert any(l == '{"needs_live_data":false,"calls":[]}' for l in body.splitlines())
+    assert '"clarification":null' not in body       # an explicit null is ~5 wasted output tokens on every turn
 
 
 # ---- prompt: volatile tail ---------------------------------------------------
@@ -245,3 +251,12 @@ def test_composer_clip_lengths_are_configurable():
         "y" * 100, [_t("user", long_turn), _t("assistant", long_turn)])
     assert len(default.prompt) > len(short.prompt)
     assert "USER: " + "y" * 19 + "…" in short.prompt
+
+
+def test_a_decision_without_the_optional_clarification_key_parses():
+    from service.agent.control_decoder import parse_decision
+    d = parse_decision('{"needs_live_data":false,"calls":[]}')
+    assert d.valid and d.clarification is None and d.calls == ()
+    asked = parse_decision('{"needs_live_data":false,"calls":[],"clarification":"Which one?"}')
+    assert asked.valid and asked.clarification == "Which one?"
+    assert not parse_decision('{"calls":[]}').valid          # the flag is still mandatory

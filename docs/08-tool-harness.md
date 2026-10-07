@@ -15,7 +15,7 @@ How Veda calls tools reliably on a small quantized local model (Qwen3-4B Q4, CPU
 user text -> Supervisor (bookkeeping) -> AssistantOrchestrator
   1. session id resolved once; session state -> `ACTIVE: get_weather | place=Tokyo | 3 min ago`
   2. ONE control decode: persona_lite + every tool + rules (static, cached) / ACTIVE + RECENT + TODAY + USER
-        -> {"needs_live_data": bool, "calls": [<=3], "clarification": null|"..."}
+        -> {"needs_live_data": bool, "calls": [<=3]} + optional "clarification": "..." (only when asking)
   3. dispatch_policy:  TOOLS | CLARIFY | CHAT | REFUSE | FAIL_CLOSED
   4. TOOLS   each call through SkillRunner (permissions / rate limit / validators / audit hooks), logged `[tool-call]`
              reply: template tools -> their own `spoken` sentence, joined in call order (0 more decodes);

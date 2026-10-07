@@ -110,7 +110,7 @@ class PromptComposer:
         for m in self._manifests.values():
             for ex in m.examples:
                 if ex.prompt_example:
-                    decision = {"needs_live_data": True, "calls": list(ex.calls), "clarification": None}
+                    decision = {"needs_live_data": True, "calls": list(ex.calls)}
                     lines.append(f"User: {ex.user}\n" + json.dumps(decision, separators=(",", ":"), ensure_ascii=False))
         return "\n".join(lines)
 
@@ -124,9 +124,9 @@ class PromptComposer:
             data = json.loads(line)
         except ValueError:
             return line
-        if set(data) != set(CONTROL_KEYS):
+        if not set(data) <= set(CONTROL_KEYS):
             return line
-        return json.dumps({k: data[k] for k in key_order}, separators=(",", ":"), ensure_ascii=False)
+        return json.dumps({k: data[k] for k in key_order if k in data}, separators=(",", ":"), ensure_ascii=False)
 
     @staticmethod
     def _exchange_turns(history: Sequence[Turn], exchanges: int) -> list[Turn]:
