@@ -222,7 +222,7 @@ def test_shipped_prompting_yaml_loads_and_builds_valid_budgets():
 
     cfg = load_full_config().prompting
     b = PromptBudgets(**cfg.budgets)
-    assert b.control > b.call and b.observation_max > 0 and cfg.control_history_exchanges == 2
+    assert b.control > b.chat and b.observation_max > 0 and cfg.control_history_exchanges == 2
     assert (cfg.turn_chars, cfg.user_message_chars) == (200, 500)
 
 

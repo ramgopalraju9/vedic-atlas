@@ -331,6 +331,14 @@ def summarise(name: str, rows: list[dict]) -> None:
             print(f"      x {r['failure']:<11} {r['say']!r}  ->  calls={[(c['tool'], c['args']) for c in r['calls']]} live={r['needs_live_data']} clar={r['clarification']!r}")
 
 
+def apply_phase4(cases: list[dict], tool_names: set[str]) -> None:
+    """A `phase4:` block replaces `expect` once the tools it names exist (get_weather_forecast)."""
+    for case in cases:
+        override = case.get("phase4")
+        if override and {c["tool"] for c in override.get("calls", [])} <= tool_names:
+            case["expect"] = override
+
+
 def rejudge(path: Path, cases: list[dict]) -> int:
     """Re-score saved raw model outputs (no model needed): the model's answers do not change when the golden set,
     the judge or the dispatch policy do, so those can be iterated on for free."""
@@ -360,22 +368,19 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--golden", default=str(ROOT / "tests" / "eval" / "orchestrator_golden.yaml"))
     ap.add_argument("--rejudge", default="", help="re-score a saved spike JSON offline with the CURRENT judge, golden set and dispatch policy (no model)")
+    ap.add_argument("--phase4", action="store_true", help="with --rejudge: apply the `phase4:` expectations (the saved run had the forecast tool)")
     args = ap.parse_args()
 
     cases = yaml.safe_load(Path(args.golden).read_text(encoding="utf-8"))
     if args.rejudge:
+        if args.phase4:   # the saved run was made with the forecast tool present
+            apply_phase4(cases, {m.name for m in YamlToolManifestStore().load_all()})
         return rejudge(Path(args.rejudge), cases)
     if args.limit:
         cases = cases[: args.limit]
     cfg = load_full_config()
     manifests = YamlToolManifestStore().load_all()
-    # A `phase4:` block replaces `expect` once the tools it names exist (get_weather_forecast). Not applied to
-    # --rejudge above: those saved outputs were produced when the tool did not exist.
-    have = {m.name for m in manifests}
-    for case in cases:
-        override = case.get("phase4")
-        if override and {c["tool"] for c in override.get("calls", [])} <= have:
-            case["expect"] = override
+    apply_phase4(cases, {m.name for m in manifests})   # not for --rejudge unless --phase4: old saved runs predate the tool
     composer = PromptComposer(FilePromptStore(), manifests)
     print(f"loading {cfg.inference.model_path} ... ({len(cases)} cases x {args.repeats} repeat(s))", flush=True)
     runner = Runner(Model(cfg), composer, manifests)

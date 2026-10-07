@@ -79,11 +79,10 @@ decisions. Recurring porting patterns worth knowing about:
   fetching it — this was a deliberate correction from the donor's behavior
   in at least one case (`FasterWhisperProvider`'s docstring calls out that
   the donor silently downloaded on first use).
-- **Two independent agent-routing subsystems were ported in parallel** and
-  both still exist: `SupervisorAgent`'s LLM/keyword routing between named
-  agents, and `service/approval/approval_broker.py`'s separate UI-facing
-  approval flow (distinct from `guardrails/permissions.py`'s skill-level
-  approval gate). See [03-service-layer.md](03-service-layer.md) for both.
+- **Two independent approval mechanisms exist in parallel**: `service/approval/approval_broker.py`'s UI-facing
+  approval flow, distinct from `guardrails/permissions.py`'s skill-level approval gate. See
+  [03-service-layer.md](03-service-layer.md) for both. (Agent routing no longer exists: every turn is decided by
+  the one `AssistantOrchestrator` control decode.)
 
 ## Request flow, traced end to end
 
@@ -97,11 +96,11 @@ single example to hold in your head:
    from the request body and pulls `SupervisorAgent` via
    `Depends(get_supervisor)` (from `controller/dependencies/providers.py`,
    reading `request.app.state.supervisor`).
-3. **`SupervisorAgent.execute_stream(ctx)`** (`service/agent/supervisor.py`) picks
-   a target agent — keyword match first, LLM fallback second, last-known-
-   routing third — optionally consults `GovernanceProvider.check_action()`,
-   records the decision to memory, and delegates.
-4. **`ResponderAgent.execute(ctx)`** (`service/agent/responder.py`) builds a
+3. **`SupervisorAgent.execute_stream(ctx)`** (`service/agent/supervisor.py`) hands the turn to the
+   **`AssistantOrchestrator`**, which makes ONE grammar-constrained control decision (which tools, if any, with
+   what arguments — seeing the recent conversation and the session state), runs the chosen tools through
+   `SkillRunner`, and replies from the tool's own sentence; only a turn that needs no tool reaches the chat model.
+4. For a chat turn, **`ResponderAgent.execute(ctx)`** (`service/agent/responder.py`) builds a
    cache-friendly prompt (persona block first, since it's byte-identical
    every turn and keeps the inference backend's KV-cache warm) and calls
    `InferencePort.complete(...)`.

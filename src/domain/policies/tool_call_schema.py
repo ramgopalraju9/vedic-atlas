@@ -79,21 +79,3 @@ def build_control_schema(
     }
 
 
-def build_call_schema(manifests: list[ToolManifest], *, min_calls: int = 0, max_calls: int = MAX_CALLS) -> dict[str, Any]:
-    """JSON-schema for `{"calls": [...]}` over the given tools."""
-    one_of = [
-        {
-            "type": "object",
-            "properties": {"tool": {"const": m.name}, "args": tool_args_schema(m)},
-            "required": ["tool", "args"],
-            "additionalProperties": False,
-        }
-        for m in manifests
-    ]
-    item: dict[str, Any] = one_of[0] if len(one_of) == 1 else {"oneOf": one_of}
-    return {
-        "type": "object",
-        "properties": {"calls": {"type": "array", "items": item, "minItems": min_calls, "maxItems": max_calls}},
-        "required": ["calls"],
-        "additionalProperties": False,
-    }

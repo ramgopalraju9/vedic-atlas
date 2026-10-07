@@ -252,6 +252,10 @@ def test_explicit_target_is_matched_by_significant_words_of_the_users_message():
     assert target_is_explicit(REMEMBER, {"action": "forget", "topic": "favourite sweet"}, "forget my favourite sweet")
     assert target_is_explicit(TASKS, {"action": "delete", "title": "x"}, "delete x please")             # short value: whole match
     assert not target_is_explicit(TASKS, {"action": "delete", "title": "x"}, "delete the next one")        # "x" inside a word is not a name
+    for generic in ("first one", "the task", "the first", "last one", "that task"):                          # ordinals and filler name nothing
+        assert not target_is_explicit(TASKS, {"action": "delete", "title": generic}, f"delete {generic}"), generic
+    assert not target_is_explicit(TASKS, {"action": "delete", "title": "the dentist"}, "delete the one I told you")  # "the" is not "dentist"
+    assert target_is_explicit(TASKS, {"action": "delete", "title": "the bank one"}, "the bank one")
     for pronoun in ("it", "that", "them", "one", "this"):                                                    # the word is in the message, but names nothing
         assert not target_is_explicit(TASKS, {"action": "delete", "title": pronoun}, f"delete {pronoun}"), pronoun
         assert not target_is_explicit(REMEMBER, {"action": "forget", "topic": pronoun}, f"forget {pronoun}"), pronoun

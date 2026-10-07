@@ -1,6 +1,6 @@
 # Service Layer
 
-`src/service/` is the orchestration layer: multi-agent routing, skill
+`src/service/` is the orchestration layer: the one-decision-per-turn orchestrator, skill
 execution, governance/guardrail enforcement, memory, conversation
 management, and the voice pipeline. Three rules hold across every file in
 this layer:
@@ -24,16 +24,21 @@ guardrail/policy violations raise `exceptions.exception.AppException` with
 a `core.enums.ExceptionCode` — see
 [05-exception-handling.md](05-exception-handling.md).
 
-## `service/agent/` — multi-agent orchestration
+## `service/agent/` — one decision per turn
 
 ```
 BaseAgent (ABC)
   ├── LLMAgent                      — + InferencePort, MemoryRepositoryPort
-  │     ├── ResponderAgent          — general conversation (the default agent)
-  │     └── SystemAgent             — device-control planner
-  ├── ToolAgent                     — owns tools declared in manifests ("tasks", "lookup")
-  └── SupervisorAgent               — routes to the above (does not extend LLMAgent)
+  │     └── ResponderAgent          — plain conversation (reached only when no tool is needed)
+  ├── AssistantOrchestrator         — decides and runs every turn (does not extend LLMAgent)
+  └── SupervisorAgent               — the entry point; hands every turn to the orchestrator
 ```
+
+There is **no routing step**. An earlier design picked an agent from the newest message alone (keyword rules,
+then a small router model) and then asked the model for a tool; the router could not see the conversation, so a
+follow-up like "should I bring an umbrella?" lost its context, and a keyword regex could force a tool call the model
+had correctly declined. Both were deleted (`docs/10-orchestrator-review-and-plan.md` §6g). Every turn now gets
+exactly one grammar-constrained *control decode*, and tools run only through `SkillRunner`.
 
 Every agent implements `execute(ctx: AgentContext) -> AgentResult` and
 `execute_stream(ctx, cancel_event=None) -> AsyncIterator[str]`.
@@ -49,108 +54,71 @@ than propagating the error to the user.
 
 **`AgentRegistry`** (`registry.py`) is a plain `dict[str, BaseAgent]` with
 `register`/`get` (raises `AppException(AGENT_ROUTING_ERROR)` if missing)/
-`list_all()`/`list_routable(exclude=None)` (used to hide the supervisor
-from its own routing candidates).
+`list_all()`/`list_routable(exclude=None)`. Registered today: `responder`, `supervisor`.
 
-### `SupervisorAgent` — the router (`supervisor.py`)
+### `SupervisorAgent` (`supervisor.py`)
 
-Routing order in `_pick(ctx)`:
+Turn bookkeeping only (`ctx.current_agent`, `ctx.agent_chain`) and delegation to the orchestrator; sets
+`result.delegated_to`. The old `route_to_agent` governance check went with routing (per-tool governance runs in
+`SkillRunner`). The ambient-event path that used to live here is `service/sensing/ambient_dispatcher.py`.
 
-1. 0 routable agents → `default_agent`. Exactly 1 → that one.
-2. **Rules (instant, free)**: `RouterPolicy.match()` wraps the pure
-   `domain.policies.routing_policy.match_agent` — the agent whose manifest `triggers`
-   (regexes) match most, else keyword overlap with the agent descriptions. A miss is `None`
-   (`pick_agent` is the same rule with the default substituted).
-3. **LLM router** (`llm_router.py`, only when step 2 matched nothing and
-   `agents.llm_routing` is on): one `InferencePort.complete()` call with a ~300-token routing
-   prompt (`PromptComposer.route_stage`: each agent's one-line description from
-   `config/agents.yaml`, example phrases taken from the tool manifests, `config/prompts/router.md`),
-   constrained by a JSON schema whose `agent` is an enum of the real agent names
-   (`build_route_schema`), temperature 0, ~24 output tokens. Recent turns are included only for
-   short follow-ups (<= 6 words). Logged as `[route] llm -> <agent> (<ms>, <tokens>)`.
-4. **Default**: `default_agent` if the model call fails, times out or answers nonsense.
+### `AssistantOrchestrator` (`assistant_orchestrator.py`) and `ControlDecoder`
 
-`ctx.metadata["routed_via"]` records which path decided (`rules`, `llm (<ms>)`, `default`) and is
-written into the `TurnTrace` notes ("routed via llm (2336 ms)"). The old unconstrained LLM
-fallback and the "reuse the last specialist" memory fallback were removed: the former could never
-run (the policy never returned `None`) and the latter could keep sending chat to a tool agent.
+1. Resolve the session id **once** per turn; read the session state (`ACTIVE:` line, see `service/session/`).
+2. **One control decode** (`ControlDecoder`, `PromptComposer.control_stage`): persona-lite + every tool signature +
+   rules/examples (static, one cached prefix) / `ACTIVE` + `RECENT` (two complete exchanges) + `TODAY` + `USER`
+   (volatile). Output is constrained by `build_control_schema` to `{needs_live_data, calls[<=3], clarification}`;
+   temperature 0. Unparseable output **fails closed** (a fixed "didn't catch that" reply), never to free chat.
+3. `domain/policies/dispatch_policy.resolve` turns the decision into a route: `TOOLS`, `CLARIFY`, `CHAT`, `REFUSE`
+   (`needs_live_data` with no call: a fixed refusal, never free chat) or `FAIL_CLOSED`. A destructive call never
+   joins a multi-call, and its target must be named in the user's own words (`destructive_policy.target_is_explicit`:
+   a pronoun, ordinal or filler word is not a name) or the turn asks "Which one do you mean?".
+4. `TOOLS`: each call through `SkillRunner` (`tool_execution.execute_call`; permission, rate limit, validators and
+   audit hooks all apply). Reply (`domain/policies/reply_policy`): a template tool's own `spoken` sentence verbatim
+   (never sent to a model); results that need phrasing share ONE content decode (`narrate`, grounding-checked); a
+   failed call is a plain failure sentence.
+5. `CHAT`: the `ResponderAgent`. Its `reply_veto` (`ToolUseGuard.claims_action`) replaces any reply that claims an
+   action when no tool ran, also while streaming (sentence-gated).
+6. Persist the turn, write the session state (validated arguments of successful, non-destructive calls only) and a
+   `TurnTrace`. The same `claims_action` backstop applies on every path.
 
-Measured on the real model (tests/eval/golden_set.yaml, `scripts/eval_tools.py --model --routing-only`):
-rules 51/51 on the trigger-word cases; the LLM router 27/28 on the 28 messages the rules do not
-match (every no-trigger weather/news/task/system phrasing right; one chat message sent to the tasks
-agent, which harmlessly hands it back to chat). Median routing call ~2 s with the prompt cache warm.
+At most two model decodes per turn (control + one content/chat decode).
 
-`execute(ctx)` optionally consults `GovernanceProvider.check_action("route_to_agent", ...)`
-before delegating, records the routing decision to memory, and sets
-`result.delegated_to`.
-
-`dispatch_ambient(event: AmbientEvent) -> str | None` is the separate path
-for narrating non-chat events (sensor observations, reminders, system
-notices): drops `HEARTBEAT` always, drops low-urgency events unless
-proactivity is `chatty`, applies a `Debouncer` (per `event.dedupe_key`) and
-a `RateLimiter` (bypassed for `HIGH` urgency). `set_proactivity(level)`
-rebuilds the rate limiter via
-`domain.policies.proactivity_policy.rate_limit_multiplier`.
-
-### `ResponderAgent` (`responder.py`) — the default chat agent
+### `ResponderAgent` (`responder.py`) — plain chat
 
 `build_system_prompt` returns the persona prompt (`persona.py`'s
-`VEDA_SYSTEM_PROMPT`) **byte-identical every turn** — a deliberate
-performance choice so the inference backend's KV-cache prefix is reused.
+`VEDA_SYSTEM_PROMPT`, or `persona_chat.md` when `app.chat_persona: compact`) **byte-identical every turn** — a
+deliberate performance choice so the inference backend's KV-cache prefix is reused.
 
-`build_prompt(ctx)` assembles context in least-volatile-first order (for
-the same cache-friendliness reason): semantic-knowledge block → system
-context → recent conversation history (earlier-session summaries first, then
-recent turns; "Task added…"-style exchanges filtered out) → time-of-day
-context → voice-brevity instruction (if `ctx.from_voice`) → user message.
-The cross-agent "recent agent activity" block is deliberately **not** included:
-it held only internal routing records, which the model repeated back as if
-they were the user's tasks.
+`build_prompt(ctx)` assembles context in least-volatile-first order (for the same cache-friendliness reason):
+saved facts and the semantic-recall block → system context → recent conversation history of the **current
+session** (earlier-session summaries first; each turn clipped to `prompting.turn_chars`, oldest turns dropped to
+fit `PromptBudgets.chat`) → time-of-day context → voice-brevity instruction (if `ctx.from_voice`) → user message.
+Tool exchanges stay in the history (the old filter that deleted them is gone). The cross-agent "recent agent
+activity" block is deliberately **not** included: it held only internal routing records, which the model repeated
+back as if they were the user's tasks.
 
-The responder is plain chat only — it has no tools. Tool use lives in
-`ToolAgent` (below); when a tool agent decides no tool is needed, it hands the
-turn back to the responder.
+The responder has no tools. `on_completion` records both sides of the turn via `ConversationManager.add_turn()`
+and logs a `"chat"` memory action.
 
-`on_completion` records both sides of the turn via
-`ConversationManager.add_turn()` and logs a `"chat"` memory action.
+### Tools: manifests, skills, `ToolUseGuard`
 
-### `SystemAgent` (`system.py`) — device-control planner
+Every tool is a manifest in `config/tools/*.yaml` plus a `ManifestSkill` registered in `server.py`; full design in
+[08-tool-harness.md](08-tool-harness.md). Today: `get_weather`, `get_weather_forecast`, `convert_currency`,
+`web_search`, `tasks`, `remember`, and the device tools `app_control`, `volume_control`, `device_status`
+(`service/skills/builtin/system_control.py`; they replaced the old `SystemAgent`'s separate unconstrained planner).
 
-Two-step design: one capped-length (`96` tokens) LLM call produces a JSON
-action plan (`{"action": "open_app", "args": {...}}` — the fixed action
-vocabulary is `open_app`, `close_app`, `focus_app`, `battery_info`,
-`get_volume`, `set_volume`, `mute`, `top_processes`, `none`), optionally
-governance-checked, then dispatched via `asyncio.to_thread` to the matching
-`SystemControlPort` method. No streaming value for a single-shot planner,
-so `execute_stream` just wraps `execute()`.
-
-### `ToolAgent`, `ToolTurnRunner`, `ToolUseGuard` — staged tool use
-
-Registered by `server.py` (when `agents.tools_enabled`) once per owner named in
-`config/tools/*.yaml` (`tasks`, `lookup`). Full design: [08-tool-harness.md](08-tool-harness.md).
-
-- **`tool_agent.py` — `ToolAgent`**: the supervisor routes to it deterministically
-  from the manifests' trigger patterns (`AgentProfile.triggers`, consulted by
-  `domain/policies/routing_policy.py` before keyword overlap). It runs the
-  `ToolTurnRunner`; `reply is None` (no tool needed) hands the turn to the chat
-  fallback, and a fallback reply that *claims* an action is replaced with "I can't
-  confirm that…". Persists the turn and writes a `TurnTrace` per turn (a failing
-  trace store never breaks a turn).
-- **`tool_turn_runner.py` — `ToolTurnRunner`**: **decide** (one constrained
-  completion → `{"calls":[...]}`; if the message matches a tool's `required_when`
-  and no call came back, retry once with `minItems=1`), **execute** (each call via
-  `SkillRunner.execute_skill`, so every guardrail hook still applies; each logged
-  as `[tool-call]`), **reply** (the tool's own `spoken` text for template/`final`
-  results, else a short narrate-stage completion that must pass the grounding
-  check, else the deterministic text).
-- **`tool_use_guard.py` — `ToolUseGuard`**: built from the manifests; `required_tools(msg)`
-  and `claims_action(reply)`.
+- **`tool_execution.py`**: `execute_call` (one call through `SkillRunner`, logged as `[tool-call]`),
+  `narrate_with_grounding` (the content stage's `narrate` task: one short completion over capped results, rejected
+  and retried once if it states a number that is not in the results, the question or today's date),
+  `ExecutedCall` / `TurnOutcome`.
+- **`tool_use_guard.py` — `ToolUseGuard`**: built from the manifests; `claims_action(reply)` only.
 
 ## "Agent" vs. "skill" — the distinction that matters
 
 An **agent** is a named, routable, LLM-backed persona that owns a
 conversational turn end-to-end and decides *what to say*. Agents live in
-`AgentRegistry` and are chosen by `SupervisorAgent`.
+`AgentRegistry`; the `SupervisorAgent` hands every turn to the orchestrator.
 
 A **skill** is a narrow, callable *capability* (terminal exec, file I/O,
 task CRUD) that an agent invokes mid-turn to *do something*, always
@@ -389,7 +357,12 @@ others.
   `publish()` drops to a full queue with a warning rather than blocking.
 - **`rate_limiter.py` — `Debouncer` + `RateLimiter`**: ambient-narration
   specific (distinct from `guardrails/rate_limit.py`'s skill-oriented
-  one). Used by `SupervisorAgent.dispatch_ambient`.
+  one). Used by `AmbientDispatcher`.
+- **`ambient_dispatcher.py` — `AmbientDispatcher`**: decides how (and whether) to voice an ambient event and
+  owns the proactivity level. `dispatch_ambient(event)` drops `HEARTBEAT` always, drops low-urgency events
+  unless proactivity is `chatty`, applies a `Debouncer` (per `event.dedupe_key`) and a `RateLimiter` (bypassed
+  for `HIGH` urgency), and mirrors summary notifications into history. `set_proactivity(level)` rebuilds the
+  limiter via `proactivity_policy.rate_limit_multiplier`. Not an agent; extracted from the old supervisor.
 - **`sensor_registry.py` — `BaseSensor(ABC)`**: reusable `start()`/`stop()`/
   `is_running` asyncio polling lifecycle implementing `SensorPort`;
   subclasses implement `_poll_and_publish()`.
@@ -416,12 +389,15 @@ pending requests within a time window).
 ## `service/prompting/` — `PromptComposer`
 
 Assembles each stage's prompt from `PromptStorePort` text and the tool manifests under
-hard token budgets (`domain/policies/token_budget_policy.py`: call 700, narrate 500,
-chat 1500). Call stage = persona-lite + only the owning agent's tools + their examples
-+ last 2 turns; narrate stage = persona-lite + narrate rules + question + the capped tool
-result. Static text first so the KV prefix cache is reused; trimming order is oldest
-history first, then the tool result. Uses the exact tokenizer when the backend offers
-`count_tokens`.
+hard token budgets (`domain/policies/token_budget_policy.py`, overridable in `config/prompting.yaml`:
+control 3000, narrate 500, chat 1500). **Control stage** = persona-lite + every tool signature + one flagged
+example per tool + rules (static, ONE cached prefix keyed only by the JSON key order, never by a tool subset) /
+`ACTIVE` + `RECENT` + `TODAY` + `USER` (volatile; over budget the oldest exchange goes first). **Content stage**
+(`content_stage(task, document, user_message, max_tokens=)`, tasks `narrate | summarise | draft_reply | extract`) =
+persona-lite + a task-independent preamble (static, one shared prefix) / `TASK:` line + question + the document
+capped at the tool's `max_result_tokens` (volatile); no tool list and no history, ever. `narrate_stage` is the
+`narrate` task. Static text first so the KV prefix cache is reused. Uses the exact tokenizer when the backend
+offers `count_tokens`.
 
 ## `service/voice/` — the always-on pipeline
 

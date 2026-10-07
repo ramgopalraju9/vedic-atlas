@@ -71,16 +71,9 @@ class PromptComposer:
         self._now = now
         self._turn_chars = turn_chars
         self._user_msg_chars = user_message_chars
-        self._static_cache: dict[tuple[str, ...], str] = {}
         self._control_static: dict[tuple[str, ...], str] = {}  # keyed by the JSON key order only, never by a tool subset
 
     # ---- lookups ----------------------------------------------------------
-
-    def manifests_for(self, tool_names: Sequence[str]) -> list[ToolManifest]:
-        return [self._manifests[n] for n in tool_names if n in self._manifests]
-
-    def tools_of_agent(self, agent: str) -> list[str]:
-        return [m.name for m in self._manifests.values() if m.agent == agent]
 
     # ---- rendering helpers -----------------------------------------------
 
@@ -93,62 +86,9 @@ class PromptComposer:
         return f"- {m.name}({', '.join(one(p) for p in m.params)}) - {m.description}"
 
     @staticmethod
-    def _example(m: ToolManifest) -> list[str]:
-        lines = []
-        for ex in m.examples:
-            payload = json.dumps({"calls": list(ex.calls)}, separators=(",", ":"), ensure_ascii=False)
-            lines.append(f"User: {ex.user}\n{payload}")
-        return lines
-
-    def _static_call_text(self, tool_names: Sequence[str]) -> str:
-        key = tuple(tool_names)
-        if key not in self._static_cache:
-            manifests = self.manifests_for(tool_names)
-            tools = "\n".join(self._signature(m) for m in manifests)
-            examples = "\n".join(line for m in manifests for line in self._example(m))
-            body = self._prompts.get("call_stage").replace("<<tools>>", tools).replace("<<examples>>", examples)
-            self._static_cache[key] = f"{self._prompts.get('persona_lite')}\n\n{body}"
-        return self._static_cache[key]
-
-    @staticmethod
     def _clip(text: str, limit: int) -> str:
         text = " ".join((text or "").split())
         return text if len(text) <= limit else text[: limit - 1] + "…"
-
-    def _history_lines(self, history: Sequence[Turn], keep: int) -> list[str]:
-        lines = []
-        for t in list(history)[-keep:] if keep > 0 else []:
-            content = self._clip(t.content, self._turn_chars)
-            if content:
-                lines.append(f"{'User' if t.role == 'user' else 'Veda'}: {content}")
-        return lines
-
-    # ---- stages -----------------------------------------------------------
-
-    def call_stage(self, tool_names: Sequence[str], user_message: str, history: Sequence[Turn] = ()) -> ComposedPrompt:
-        system = self._static_call_text(tool_names)
-        today = f"TODAY: {self._now().strftime('%A %d %b %Y, %H:%M')}."
-        user_line = f"USER: {self._clip(user_message, self._user_msg_chars)}"
-        keep = self.budgets.call_history_turns
-        trimmed: list[str] = []
-
-        while True:
-            hist = self._history_lines(history, keep)
-            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [today, user_line])
-            total = self._count(system) + self._count(volatile)
-            if total <= self.budgets.call or keep == 0:
-                break
-            keep -= 1
-            trimmed.append("history_turn")
-
-        sections = {
-            "static": self._count(system),
-            "history": self._count("\n".join(hist)) if hist else 0,
-            "user": self._count(user_line),
-        }
-        return ComposedPrompt(system=system, prompt=volatile, tokens=total, sections=sections, trimmed=trimmed)
-
-    # ---- control stage (unified orchestrator) -----------------------------
 
     def _static_control_text(self, key_order: tuple[str, ...]) -> str:
         """persona_lite + control_stage.md with EVERY tool signature. Byte-identical every turn: it holds no date,
@@ -243,21 +183,6 @@ class PromptComposer:
             "user": self._count(user_line),
         }
         return ComposedPrompt(system=system, prompt=volatile, tokens=total, sections=sections, trimmed=trimmed)
-
-    def _tools_clause(self, agent: str) -> str:
-        """" Tools: name (what it does); ..." for the tools this agent owns, so the router knows what each can do."""
-        owned = [m for m in self._manifests.values() if m.agent == agent]
-        if not owned:
-            return ""
-
-        def short(text: str) -> str:  # first sentence, cut at a word: the router needs "what", not the usage caveats
-            first = re.split(r"\.\s|;\s", " ".join(text.split()), maxsplit=1)[0].rstrip(".")
-            if len(first) > 60:
-                first = first[:60].rsplit(" ", 1)[0]
-            first = re.sub(r"\s*\([^)]*$", "", first)  # drop a parenthesis the cut left open
-            return first.rstrip(" ,;:-")
-
-        return ". Tools: " + "; ".join(f"{m.name} - {short(m.description)}" for m in owned) + "."
 
     def narrate_stage(self, user_message: str, tool_results: Sequence[str]) -> ComposedPrompt:
         """Phrase tool results for the user: the `narrate` task of the content stage."""

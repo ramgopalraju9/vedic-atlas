@@ -19,9 +19,14 @@ from domain.entities.tool_manifest import ToolManifest
 
 _WORD = re.compile(r"[a-z0-9]+")
 _MIN_WORD = 3   # "of", "to", "my" carry no identity; "tv" or "x" fall back to whole-word matching
-# A pronoun or placeholder is never a name. The model emits one when the user said "close it" / "delete that",
-# and the word is trivially present in that very message, so it must not count as the user naming a target.
+# A pronoun, ordinal or filler word is never a name. The model emits one when the user said "close it", "delete the
+# first one" or "remove that task": the word is trivially present in that very message, so it must not count as the
+# user naming a target. A value made ONLY of such words ("first one", "the task") names nothing.
 _PLACEHOLDERS = frozenset({"it", "its", "that", "this", "them", "those", "these", "one", "ones", "him", "her", "there", "here", "none", "null", "unknown"})
+_GENERIC = _PLACEHOLDERS | frozenset({
+    "the", "and", "for", "with", "task", "tasks", "item", "items", "thing", "things", "fact", "note",
+    "first", "second", "third", "last", "next", "previous", "other", "another", "please", "all",
+})
 
 
 def is_destructive(manifest: ToolManifest, args: Mapping[str, Any]) -> bool:
@@ -40,9 +45,14 @@ def target_is_explicit(manifest: ToolManifest, args: Mapping[str, Any], user_mes
         value = str(args.get(param) or "").strip().lower()
         if not value or value in _PLACEHOLDERS:
             continue
-        words = [w for w in _WORD.findall(value) if len(w) >= _MIN_WORD]
-        if words and any(w in message for w in words):
-            return True
-        if not words and re.search(r"(?<![a-z0-9])" + re.escape(value) + r"(?![a-z0-9])", message):
+        raw = _WORD.findall(value)
+        words = [w for w in raw if len(w) >= _MIN_WORD and w not in _GENERIC]
+        if words:
+            if any(w in message for w in words):
+                return True
+            continue
+        if any(len(w) >= _MIN_WORD for w in raw):
+            continue                                   # only generic words ("the first one"): names nothing
+        if re.search(r"(?<![a-z0-9])" + re.escape(value) + r"(?![a-z0-9])", message):   # short value: "x", "tv"
             return True
     return False

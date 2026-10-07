@@ -18,7 +18,7 @@ runnable.
 | `health.py` | — | `GET /health` — duck-types `supervisor`/`event_bus`/`governance`, separately probes the DB with `SELECT 1`. Deliberately never 503s itself — it's the "what's broken" endpoint |
 | `knowledge.py` | — | `GET /knowledge`; `POST /knowledge`; `DELETE /knowledge/{index}` |
 | `lookup.py` | — | `GET /lookup/health` (live probe of geocoding, weather, currency, web search — incl. whether the API key is set) |
-| `persona.py` | — | `GET /persona`; `POST /persona` — persists to `data/cli_persona.json` (flat file, not the DB); on change, calls `supervisor.set_proactivity()` to sync |
+| `persona.py` | — | `GET /persona`; `POST /persona` — persists to `data/cli_persona.json` (flat file, not the DB); on change, calls `ambient_dispatcher.set_proactivity()` to sync |
 | `privacy.py` | — | `GET /privacy/status`; `POST /privacy/mute`; `POST /privacy/mute/toggle` |
 | `speakers.py` | — | `GET /speakers`; `POST /speakers/enroll/start|feed|finish|cancel`; `DELETE /speakers/{name}` — speaker enrolment (no CLI command yet) |
 | `stream.py` | — | `POST /stream` — SSE chat streaming via `supervisor.execute_stream()` |
@@ -38,7 +38,7 @@ def _require(request: Request, attr: str, label: str):
     return obj
 ```
 
-`get_supervisor`, `get_approval_broker`, `get_knowledge_base`,
+`get_supervisor`, `get_ambient_dispatcher`, `get_approval_broker`, `get_knowledge_base`,
 `get_trace_repo`, `get_lookup_health`, `get_task_service` and
 `get_speaker_enrollment_service` are required (503 if missing).
 `get_governance` is optional — it returns `None` without a 503, and the
@@ -172,12 +172,12 @@ adapter and the FastAPI app gets built. `_IS_WINDOWS = platform.system()
     stack; build guardrails + skills and register `TasksSkill` plus (when online) `GetWeatherSkill`,
     `ConvertCurrencySkill`, `WebSearchSkill`. With online disabled, manifests marked
     `requires_online` are dropped
-12. Build `SystemControlPort`, `AgentRegistry`, `ToolUseGuard`, `PromptComposer`,
-    `ToolTurnRunner`, `SqliteTraceRepository`; build `ResponderAgent` (plain chat),
-    `SystemAgent`; register both; if `agents.tools_enabled`, register one `ToolAgent` per owner
-    named in the manifests (`tasks`, `lookup`)
-13. Build `SupervisorAgent` with every dependency above; register it too →
-    `app.state.agent_registry`, `app.state.supervisor`
+12. Build `SystemControlPort` and register the device skills (`app_control`, `volume_control`, `device_status`),
+    `AgentRegistry`, `ToolUseGuard`, `PromptComposer`, `SqliteTraceRepository`, `SessionStateService`; build
+    `ResponderAgent` (plain chat, with the claims reply veto) and register it
+13. Build `ControlDecoder` + `AssistantOrchestrator` (`app.state.orchestrator`), then `SupervisorAgent(orchestrator)`;
+    register it too → `app.state.agent_registry`, `app.state.supervisor`; build `AmbientDispatcher` →
+    `app.state.ambient_dispatcher` (proactivity + ambient-event narration)
 14. `app.state.lookup_service` / `lookup_health` (set in step 11), `app.state.trace_repo`,
     `app.state.notifier`, `app.state.egress_allow_list`
 15. **Privacy chain**: build `mute_switch`, `audio_capture`, then

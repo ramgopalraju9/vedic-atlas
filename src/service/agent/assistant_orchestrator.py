@@ -35,7 +35,7 @@ from domain.ports.memory_repository_port import MemoryRepositoryPort
 from domain.ports.trace_repository_port import TraceRepositoryPort
 from service.agent.base_agent import BaseAgent
 from service.agent.control_decoder import ControlDecoder, DecodeResult
-from service.agent.tool_turn_runner import ExecutedCall, TurnOutcome, execute_call, narrate_with_grounding
+from service.agent.tool_execution import ExecutedCall, TurnOutcome, execute_call, narrate_with_grounding
 from service.prompting.prompt_composer import PromptComposer
 from service.session.session_state import SessionStateService
 from service.skills.skill_runner import SkillRunner

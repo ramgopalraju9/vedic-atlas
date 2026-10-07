@@ -14,8 +14,7 @@ from domain.entities.session_context import SessionContext
 from domain.policies.destructive_policy import is_destructive
 from domain.policies.session_state_policy import active_line, state_after_call, usable_slots
 from schemas.tool_manifest_schema import ToolManifestSchema
-from service.agent.tool_agent import ToolAgent
-from service.agent.tool_turn_runner import ExecutedCall, TurnOutcome
+from service.agent.tool_execution import ExecutedCall, TurnOutcome
 from service.session.session_state import SessionStateService
 from tpa.filestore.yaml_tool_manifest_store import YamlToolManifestStore
 from tpa.persistence.models import session_context  # noqa: F401 (register table)
@@ -145,55 +144,3 @@ def test_service_swallows_repository_errors():
     svc = SessionStateService(Broken(), MANIFESTS, now=lambda: NOW)
     assert svc.get("s") is None and svc.active_line("s") == "" and svc.purge_expired() == 0
     assert svc.record_success("s", "", [_call("get_weather", {"place": "Tokyo"})]) is None
-
-
-# ---- ToolAgent shadow write --------------------------------------------------
-
-class _Conversation:
-    def __init__(self, sid="sess-1"):
-        self.sid, self.resolved, self.turns_added = sid, 0, []
-
-    def current_session_id(self):
-        self.resolved += 1
-        return self.sid
-
-    def add_turn(self, role, content, session_id=None):
-        self.turns_added.append((role, session_id))
-
-
-class _Runner:
-    def __init__(self, outcome): self._o = outcome
-    async def run(self, ctx, tools): return self._o
-
-
-def _agent(outcome, conversation, svc):
-    guard = SimpleNamespace(claims_action=lambda t: False)
-    return ToolAgent(name="lookup", description="d", tool_names=["get_weather"], triggers=[], runner=_Runner(outcome),
-                     fallback=None, guard=guard, conversation=conversation, session_state=svc)
-
-
-def test_tool_agent_resolves_session_once_and_writes_shadow_state():
-    svc = SessionStateService(_repo(), MANIFESTS, now=lambda: NOW)
-    conv = _Conversation()
-    outcome = TurnOutcome(reply="In Tokyo it's 18 degrees.", calls=[_call("get_weather", {"place": "Tokyo"})])
-    ctx = AgentContext(user_message="weather in Tokyo")
-    asyncio.run(_agent(outcome, conv, svc).execute(ctx))
-    assert conv.resolved == 1 and ctx.session_id == "sess-1"
-    assert conv.turns_added == [("user", "sess-1"), ("assistant", "sess-1")]    # same id as the state row
-    row = svc.get("sess-1")
-    assert row.tool == "get_weather" and row.slots == {"place": "Tokyo"} and row.expires_at > NOW
-
-
-def test_tool_agent_honours_a_caller_supplied_session_id():
-    svc = SessionStateService(_repo(), MANIFESTS, now=lambda: NOW)
-    conv = _Conversation()
-    outcome = TurnOutcome(reply="ok", calls=[_call("get_weather", {"place": "Pune"})])
-    asyncio.run(_agent(outcome, conv, svc).execute(AgentContext(user_message="x", session_id="mine")))
-    assert conv.resolved == 0 and svc.get("mine").slots == {"place": "Pune"} and svc.get("sess-1") is None
-
-
-def test_tool_agent_without_session_state_behaves_as_before():
-    conv = _Conversation()
-    outcome = TurnOutcome(reply="ok", calls=[_call("get_weather", {"place": "Pune"})])
-    result = asyncio.run(_agent(outcome, conv, None).execute(AgentContext(user_message="x")))
-    assert result.response == "ok"

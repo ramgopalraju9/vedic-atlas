@@ -1,4 +1,4 @@
-"""Phase 4: grounding policy, trace persistence, trace recording by ToolAgent, and the API route."""
+"""Phase 4: grounding policy, trace persistence, and the API route."""
 
 import asyncio
 import json
@@ -83,38 +83,6 @@ def test_purge_removes_only_old_traces():
     repo.record(_trace(msg="new"))
     assert repo.purge_before(datetime.now() - timedelta(days=14)) == 1
     assert [t.user_message for t in repo.recent(10)] == ["new"]
-
-
-# ---- ToolAgent writes a trace per turn -----------------------------------------
-
-def test_tool_agent_records_a_trace_for_tool_and_no_tool_turns():
-    from tests.test_tool_turn import _calls, _env  # reuse the scripted-model harness
-
-    agent, client, service, convo, runner = _env([_calls(("tasks", {"action": "list"})), _calls()], chat_reply="Doing well!")
-    repo = _repo()
-    agent._traces = repo
-    service.add("bring vegies")
-
-    asyncio.run(agent.execute(AgentContext(user_message="what are my tasks?")))
-    asyncio.run(agent.execute(AgentContext(user_message="how are you?")))
-
-    newest, older = repo.recent(2)
-    assert (older.decided, older.calls[0]["tool"], older.calls[0]["ok"]) == ("tool", "tasks", True)
-    assert "bring vegies" in older.reply and older.total_ms >= 0 and "call" in older.prompt_tokens
-    assert (newest.decided, newest.calls, newest.reply) == ("no-tool", [], "Doing well!")
-
-
-def test_a_failing_trace_store_never_breaks_the_turn():
-    from tests.test_tool_turn import _calls, _env
-
-    class _Broken:
-        def record(self, trace):
-            raise RuntimeError("db locked")
-
-    agent, *_ = _env([_calls(("tasks", {"action": "list"}))])
-    agent._traces = _Broken()
-    res = asyncio.run(agent.execute(AgentContext(user_message="what are my tasks?")))
-    assert "empty" in res.response.lower()
 
 
 # ---- API route ------------------------------------------------------------------
