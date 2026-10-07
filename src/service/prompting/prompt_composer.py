@@ -27,6 +27,7 @@ from typing import Callable, Sequence
 
 from domain.entities.conversation import Turn
 from domain.entities.tool_manifest import ToolManifest, ToolParam
+from domain.policies.tool_call_schema import CONTROL_KEYS
 from domain.policies.token_budget_policy import PromptBudgets, estimate_tokens
 from domain.ports.tool_manifest_store_port import PromptStorePort
 
@@ -51,13 +52,18 @@ class PromptComposer:
         budgets: PromptBudgets | None = None,
         count_tokens: Callable[[str], int] = estimate_tokens,
         now: Callable[[], datetime] = datetime.now,
+        turn_chars: int = _TURN_CHARS,
+        user_message_chars: int = _USER_MSG_CHARS,
     ):
         self._prompts = prompts
         self._manifests = {m.name: m for m in manifests}
         self.budgets = budgets or PromptBudgets()
         self._count = count_tokens
         self._now = now
+        self._turn_chars = turn_chars
+        self._user_msg_chars = user_message_chars
         self._static_cache: dict[tuple[str, ...], str] = {}
+        self._control_static: dict[tuple[str, ...], str] = {}  # keyed by the JSON key order only, never by a tool subset
 
     # ---- lookups ----------------------------------------------------------
 
@@ -103,7 +109,7 @@ class PromptComposer:
     def _history_lines(self, history: Sequence[Turn], keep: int) -> list[str]:
         lines = []
         for t in list(history)[-keep:] if keep > 0 else []:
-            content = self._clip(t.content, _TURN_CHARS)
+            content = self._clip(t.content, self._turn_chars)
             if content:
                 lines.append(f"{'User' if t.role == 'user' else 'Veda'}: {content}")
         return lines
@@ -113,7 +119,7 @@ class PromptComposer:
     def call_stage(self, tool_names: Sequence[str], user_message: str, history: Sequence[Turn] = ()) -> ComposedPrompt:
         system = self._static_call_text(tool_names)
         today = f"TODAY: {self._now().strftime('%A %d %b %Y, %H:%M')}."
-        user_line = f"USER: {self._clip(user_message, _USER_MSG_CHARS)}"
+        user_line = f"USER: {self._clip(user_message, self._user_msg_chars)}"
         keep = self.budgets.call_history_turns
         trimmed: list[str] = []
 
@@ -129,6 +135,102 @@ class PromptComposer:
         sections = {
             "static": self._count(system),
             "history": self._count("\n".join(hist)) if hist else 0,
+            "user": self._count(user_line),
+        }
+        return ComposedPrompt(system=system, prompt=volatile, tokens=total, sections=sections, trimmed=trimmed)
+
+    # ---- control stage (unified orchestrator) -----------------------------
+
+    def _static_control_text(self, key_order: tuple[str, ...]) -> str:
+        """persona_lite + control_stage.md with EVERY tool signature. Byte-identical every turn: it holds no date,
+        history, state or user text, and exactly one tool set exists, so there is exactly one cached prefix."""
+        if key_order not in self._control_static:
+            tools = "\n".join(self._signature(m) for m in self._manifests.values())
+            body = self._prompts.get("control_stage").replace("<<tools>>", tools).replace(
+                "<<tool_examples>>", self._flagged_examples()
+            )
+            body = "\n".join(self._in_key_order(line, key_order) for line in body.splitlines())
+            self._control_static[key_order] = f"{self._prompts.get('persona_lite')}\n\n{body}"
+        return self._control_static[key_order]
+
+    def _flagged_examples(self) -> str:
+        """The ONE example per tool that opts in with `prompt_example: true`, as control decisions. Every other
+        example stays in the manifest for tests and docs only, so prompt size grows by one line pair per tool at
+        most, never by every example. (A call always sets needs_live_data true, as the rules state.)"""
+        lines: list[str] = []
+        for m in self._manifests.values():
+            for ex in m.examples:
+                if ex.prompt_example:
+                    decision = {"needs_live_data": True, "calls": list(ex.calls), "clarification": None}
+                    lines.append(f"User: {ex.user}\n" + json.dumps(decision, separators=(",", ":"), ensure_ascii=False))
+        return "\n".join(lines)
+
+    @staticmethod
+    def _in_key_order(line: str, key_order: tuple[str, ...]) -> str:
+        """Re-serialise an example decision line so its keys follow the schema's emission order; the grammar and the
+        examples must agree or the model is shown one order and forced into another."""
+        if not line.startswith('{"needs_live_data"'):
+            return line
+        try:
+            data = json.loads(line)
+        except ValueError:
+            return line
+        if set(data) != set(CONTROL_KEYS):
+            return line
+        return json.dumps({k: data[k] for k in key_order}, separators=(",", ":"), ensure_ascii=False)
+
+    @staticmethod
+    def _exchange_turns(history: Sequence[Turn], exchanges: int) -> list[Turn]:
+        """The last `exchanges` complete user->assistant pairs, oldest first. Whole pairs only: a lone user turn
+        or a leading assistant turn is dropped, so RECENT never starts mid-conversation."""
+        pairs: list[tuple[Turn, Turn]] = []
+        turns = list(history)
+        i = len(turns) - 1
+        while i > 0 and len(pairs) < max(exchanges, 0):
+            if turns[i].role != "user" and turns[i - 1].role == "user":
+                pairs.append((turns[i - 1], turns[i]))
+                i -= 2
+            else:
+                i -= 1
+        return [t for pair in reversed(pairs) for t in pair]
+
+    def control_stage(
+        self,
+        user_message: str,
+        history: Sequence[Turn] = (),
+        active: str = "",
+        *,
+        exchanges: int = 2,
+        key_order: tuple[str, ...] = CONTROL_KEYS,
+        show_empty: bool = False,
+    ) -> ComposedPrompt:
+        """The one decision prompt. SYSTEM is static; the volatile tail is `ACTIVE + RECENT + TODAY + USER`.
+        Over budget, the oldest exchange goes first, then ACTIVE is kept (it is ~25 tokens and the most informative)."""
+        system = self._static_control_text(key_order)
+        today = f"TODAY: {self._now().strftime('%A %d %b %Y, %H:%M')}."
+        user_line = f"USER: {self._clip(user_message, self._user_msg_chars)}"
+        trimmed: list[str] = []
+        keep = exchanges
+        while True:
+            lines = [
+                f"{'User' if t.role == 'user' else 'Veda'}: {self._clip(t.content, self._turn_chars)}"
+                for t in self._exchange_turns(history, keep)
+                if self._clip(t.content, self._turn_chars)
+            ]
+            # show_empty: say "none" explicitly so the model SEES that there is nothing to continue, instead of
+            # having to infer it from an absent line (omitting is the default and the design doc's layout).
+            head = [active] if active else (["ACTIVE: none"] if show_empty else [])
+            recent = [("RECENT:\n" + "\n".join(lines))] if lines else (["RECENT: none"] if show_empty else [])
+            volatile = "\n".join(head + recent + [today, user_line])
+            total = self._count(system) + self._count(volatile)
+            if total <= self.budgets.control or keep == 0:
+                break
+            keep -= 1
+            trimmed.append("history_exchange")
+        sections = {
+            "static": self._count(system),
+            "active": self._count(active) if active else 0,
+            "history": self._count("\n".join(lines)) if lines else 0,
             "user": self._count(user_line),
         }
         return ComposedPrompt(system=system, prompt=volatile, tokens=total, sections=sections, trimmed=trimmed)
@@ -174,7 +276,7 @@ class PromptComposer:
         trimmed: list[str] = []
         while True:
             hist = self._history_lines(history, keep)
-            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [f"Message: {self._clip(user_message, _USER_MSG_CHARS)}\nAnswer:"])
+            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [f"Message: {self._clip(user_message, self._user_msg_chars)}\nAnswer:"])
             total = self._count(system) + self._count(volatile)
             if total <= self.budgets.route or keep == 0:
                 break
@@ -192,7 +294,7 @@ class PromptComposer:
         if self._count(result) > cap:
             result = self._truncate_tokens(result, cap)
             trimmed.append("tool_result")
-        question = self._clip(user_message, _USER_MSG_CHARS)
+        question = self._clip(user_message, self._user_msg_chars)
         today = f"TODAY: {self._now().strftime('%d %b %Y')}"
         prompt = f"{today}\nQUESTION: {question}\nTOOL RESULT:\n{result}\n\nAnswer:"
         total = self._count(system) + self._count(prompt)
@@ -208,6 +310,10 @@ class PromptComposer:
                 target -= 8
         sections = {"static": self._count(system), "tool_result": self._count(result)}
         return ComposedPrompt(system=system, prompt=prompt, tokens=total, sections=sections, trimmed=trimmed)
+
+    def cap_tokens(self, text: str, max_tokens: int) -> str:
+        """Cut a tool result to `max_tokens` before it can reach any prompt (a tool's own `max_result_tokens`)."""
+        return self._truncate_tokens(text, max_tokens) if max_tokens > 0 else text
 
     def _truncate_tokens(self, text: str, max_tokens: int) -> str:
         """Cut `text` so it fits `max_tokens` (binary search on characters)."""

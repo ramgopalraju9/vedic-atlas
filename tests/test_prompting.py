@@ -37,7 +37,8 @@ def test_real_manifests_load_and_are_valid():
     by_name = {m.name: m for m in _manifests()}
     tasks = by_name["tasks"]
     assert tasks.agent == "tasks" and tasks.reply_mode == "template"
-    assert {p.name for p in tasks.params} >= {"action", "title", "task_id"}
+    assert {p.name for p in tasks.params} >= {"action", "title"}
+    assert "task_id" not in {p.name for p in tasks.params}   # the model never sees real ids, so it must not be able to emit one
     assert tasks.examples and tasks.triggers and tasks.claims
 
 

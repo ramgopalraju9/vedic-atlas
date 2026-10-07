@@ -1,0 +1,335 @@
+{
+  "mode": "rules-only",
+  "ok": 27,
+  "total": 41,
+  "rows": [
+    {
+      "say": "what's the weather in Tokyo",
+      "category": "explicit",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "convert 100 USD to INR",
+      "category": "explicit",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "search for the best biryani in Hyderabad",
+      "category": "explicit",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "add buy milk to my tasks",
+      "category": "explicit",
+      "routed": "tasks",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "what are my tasks",
+      "category": "explicit",
+      "routed": "tasks",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "I finished the code review",
+      "category": "explicit",
+      "routed": "tasks",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "my favourite sweet is gulab jamun",
+      "category": "explicit",
+      "routed": "memory",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "forget my favourite sweet",
+      "category": "explicit",
+      "routed": "memory",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "what do you remember about me",
+      "category": "explicit",
+      "routed": "memory",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "should I bring an umbrella?",
+      "category": "followup",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": false,
+      "verdict": "MISSED_TOOL (routed to responder)"
+    },
+    {
+      "say": "what about Delhi?",
+      "category": "followup",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": false,
+      "verdict": "MISSED_TOOL (routed to responder)"
+    },
+    {
+      "say": "is it windy?",
+      "category": "followup",
+      "routed": "lookup",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "do I need a coat?",
+      "category": "followup",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": false,
+      "verdict": "MISSED_TOOL (routed to responder)"
+    },
+    {
+      "say": "and in euros?",
+      "category": "followup",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": false,
+      "verdict": "MISSED_TOOL (routed to responder)"
+    },
+    {
+      "say": "and tomorrow?",
+      "category": "followup",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "I didn't ask about Singapore weather, what's 1+1?",
+      "category": "mention",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": false,
+      "verdict": "FALSE_POSITIVE (routed to lookup, would force a call)"
+    },
+    {
+      "say": "don't tell me the weather, just the time",
+      "category": "negation",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": false,
+      "verdict": "FALSE_POSITIVE (routed to lookup, would force a call)"
+    },
+    {
+      "say": "she asked 'how hot is it' and I laughed",
+      "category": "quotation",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": false,
+      "verdict": "FALSE_POSITIVE (routed to lookup, would force a call)"
+    },
+    {
+      "say": "what does the word forecast mean?",
+      "category": "meta",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": false,
+      "verdict": "FALSE_POSITIVE (routed to lookup, would force a call)"
+    },
+    {
+      "say": "my app shows the temperature wrong, how do I debug it?",
+      "category": "technical",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": false,
+      "verdict": "FALSE_POSITIVE (routed to lookup, would force a call)"
+    },
+    {
+      "say": "I don't need to add any tasks right now",
+      "category": "negation",
+      "routed": "tasks",
+      "force_regex": true,
+      "ok": false,
+      "verdict": "FALSE_POSITIVE (routed to tasks, would force a call)"
+    },
+    {
+      "say": "what's 1+1",
+      "category": "general",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "how many degrees in a right angle",
+      "category": "general",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "what's the capital of Japan",
+      "category": "general",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "explain recursion in one sentence",
+      "category": "general",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "tell me a joke",
+      "category": "general",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "thanks, that was helpful",
+      "category": "general",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "what is my favourite food?",
+      "category": "general",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "will it rain tomorrow in Pune",
+      "category": "no-tool",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": false,
+      "verdict": "FALSE_POSITIVE (routed to lookup, would force a call)"
+    },
+    {
+      "say": "what's on my calendar today",
+      "category": "no-tool",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "do I have any new email",
+      "category": "no-tool",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "what about tomorrow?",
+      "category": "no-state",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "and in Delhi?",
+      "category": "no-state",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "weather in Tokyo and convert 100 USD to INR",
+      "category": "multi",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "remember Tokyo is my favourite city and check its weather",
+      "category": "multi",
+      "routed": "lookup",
+      "force_regex": true,
+      "ok": false,
+      "verdict": "MISSED_TOOL (routed to lookup)"
+    },
+    {
+      "say": "delete it",
+      "category": "destructive",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "forget it",
+      "category": "destructive",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "delete the task about the dentist",
+      "category": "destructive",
+      "routed": "tasks",
+      "force_regex": true,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "is it raining in Kochi",
+      "category": "slot-guard",
+      "routed": "lookup",
+      "force_regex": false,
+      "ok": true,
+      "verdict": "ok"
+    },
+    {
+      "say": "how about Lucknow?",
+      "category": "slot-guard",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": false,
+      "verdict": "MISSED_TOOL (routed to responder)"
+    },
+    {
+      "say": "the bank one",
+      "category": "pending",
+      "routed": "responder",
+      "force_regex": false,
+      "ok": false,
+      "verdict": "MISSED_TOOL (routed to responder)"
+    }
+  ]
+}

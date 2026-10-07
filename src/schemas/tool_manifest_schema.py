@@ -12,7 +12,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from domain.entities.tool_manifest import REPLY_LLM, REPLY_TEMPLATE, ToolExample, ToolManifest, ToolParam
+from domain.entities.tool_manifest import (
+    REPLY_LLM, REPLY_TEMPLATE, RETURNS_VALUE, ToolExample, ToolManifest, ToolParam,
+)
 
 MAX_DESCRIPTION_WORDS = 25   # a description is paid for in every prompt
 MAX_EXAMPLES = 6
@@ -28,6 +30,7 @@ class ToolParamSchema(BaseModel):
 class ToolExampleSchema(BaseModel):
     user: str
     calls: list[dict[str, Any]]
+    prompt_example: bool = False
 
     @field_validator("calls")
     @classmethod
@@ -52,6 +55,11 @@ class ToolManifestSchema(BaseModel):
     permission_level: Literal["auto", "notify", "approve"] = "notify"
     hosts: list[str] = Field(default_factory=list)
     requires_online: bool = False
+    returns: Literal["value", "digest", "document"] = RETURNS_VALUE
+    max_result_tokens: int = Field(default=0, ge=0)
+    destructive: bool = False
+    destructive_when: dict[str, list[str]] = Field(default_factory=dict)
+    target_params: list[str] = Field(default_factory=list)
 
     @field_validator("name")
     @classmethod
@@ -76,6 +84,23 @@ class ToolManifestSchema(BaseModel):
 
     @model_validator(mode="after")
     def _check(self) -> "ToolManifestSchema":
+        unknown_targets = [t for t in self.target_params if t not in self.params]
+        if unknown_targets:
+            raise ValueError(f"target_params names unknown param(s) {unknown_targets}")
+        if self.target_params and not (self.destructive or self.destructive_when):
+            raise ValueError("target_params only makes sense on a destructive tool")
+        if self.returns == "document" and self.reply_mode != "llm":
+            raise ValueError("returns: document needs reply_mode: llm (a document is narrated by the content stage, never templated)")
+        if sum(e.prompt_example for e in self.examples) > 1:
+            raise ValueError("at most one example may set prompt_example: true")
+        for param, values in self.destructive_when.items():
+            if param not in self.params:
+                raise ValueError(f"destructive_when names unknown param '{param}'")
+            if not values:
+                raise ValueError(f"destructive_when['{param}'] must list at least one value")
+            allowed = self.params[param].enum
+            if allowed and set(values) - set(allowed):
+                raise ValueError(f"destructive_when['{param}'] has values outside the param's enum: {sorted(set(values) - set(allowed))}")
         if len(self.examples) > MAX_EXAMPLES:
             raise ValueError(f"at most {MAX_EXAMPLES} examples (each costs prompt tokens)")
         for ex in self.examples:
@@ -96,7 +121,9 @@ class ToolManifestSchema(BaseModel):
                 ToolParam(name=n, type=p.type, required=p.required, enum=tuple(p.enum), description=p.description)
                 for n, p in self.params.items()
             ),
-            examples=tuple(ToolExample(user=e.user, calls=tuple(e.calls)) for e in self.examples),
+            examples=tuple(
+                ToolExample(user=e.user, calls=tuple(e.calls), prompt_example=e.prompt_example) for e in self.examples
+            ),
             triggers=tuple(self.triggers),
             required_when=tuple(self.required_when),
             claims=tuple(self.claims),
@@ -105,4 +132,9 @@ class ToolManifestSchema(BaseModel):
             permission_level=self.permission_level,
             hosts=tuple(self.hosts),
             requires_online=self.requires_online,
+            returns=self.returns,
+            max_result_tokens=self.max_result_tokens,
+            destructive=self.destructive,
+            destructive_when=tuple((p, tuple(v)) for p, v in self.destructive_when.items()),
+            target_params=tuple(self.target_params),
         )

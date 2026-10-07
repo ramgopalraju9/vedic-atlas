@@ -27,6 +27,7 @@ class PromptBudgets:
     """Max prompt tokens per stage (system + prompt together)."""
 
     call: int = 700       # Stage A: pick the tool, fill arguments
+    control: int = 2600   # unified control decode: persona + every tool + rules/examples (static, cached ~2000) + volatile tail
     narrate: int = 500    # Stage B: phrase the tool result
     chat: int = 1500      # plain conversation, no tools
     route: int = 1900     # LLM routing: persona + cues + ~65 examples (fixed, cached after warm-up) + history + the message

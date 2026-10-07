@@ -1,0 +1,3300 @@
+{
+  "A1": [
+    {
+      "say": "what's the weather in Tokyo",
+      "category": "explicit",
+      "decide_ms": 6421.615500003099,
+      "prompt_tokens": 1783,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6421.615500003099,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "convert 100 USD to INR",
+      "category": "explicit",
+      "decide_ms": 7832.448999979533,
+      "prompt_tokens": 1786,
+      "out_tokens": 37,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"convert_currency\",\"args\":{\"amount\":100,\"from\":\"USD\",\"to\":\"INR\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7832.448999979533,
+      "calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "search for the best biryani in Hyderabad",
+      "category": "explicit",
+      "decide_ms": 7449.362099985592,
+      "prompt_tokens": 1786,
+      "out_tokens": 35,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"web_search\",\"args\":{\"query\":\"best biryani in Hyderabad\",\"topic\":\"general\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7449.362099985592,
+      "calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "best biryani in Hyderabad",
+            "topic": "general"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "add buy milk to my tasks",
+      "category": "explicit",
+      "decide_ms": 6082.552699983353,
+      "prompt_tokens": 1783,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"add\",\"title\":\"buy milk\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6082.552699983353,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what are my tasks",
+      "category": "explicit",
+      "decide_ms": 5986.998899985338,
+      "prompt_tokens": 1781,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"list\",\"include_done\":true}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5986.998899985338,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list",
+            "include_done": true
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "I finished the code review",
+      "category": "explicit",
+      "decide_ms": 5881.311599980108,
+      "prompt_tokens": 1782,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"complete\",\"title\":\"code review\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5881.311599980108,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "code review"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "my favourite sweet is gulab jamun",
+      "category": "explicit",
+      "decide_ms": 7780.06109999842,
+      "prompt_tokens": 1785,
+      "out_tokens": 39,
+      "raw": "{\"needs_live_data\":false,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"save\",\"topic\":\"favourite sweet\",\"value\":\"gulab jamun\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7780.06109999842,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "favourite sweet",
+            "value": "gulab jamun"
+          }
+        }
+      ],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "forget my favourite sweet",
+      "category": "explicit",
+      "decide_ms": 6118.923200003337,
+      "prompt_tokens": 1781,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"forget\",\"topic\":\"favourite sweet\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6118.923200003337,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "forget",
+            "topic": "favourite sweet"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what do you remember about me",
+      "category": "general",
+      "decide_ms": 6112.787199992454,
+      "prompt_tokens": 1783,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"list\",\"topic\": \"user\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6112.787199992454,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "list",
+            "topic": "user"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "should I bring an umbrella?",
+      "category": "followup",
+      "decide_ms": 7065.739499987103,
+      "prompt_tokens": 1815,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7065.739499987103,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what about Delhi?",
+      "category": "followup",
+      "decide_ms": 5664.7277000010945,
+      "prompt_tokens": 1813,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Delhi\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5664.7277000010945,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Delhi"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "is it windy?",
+      "category": "followup",
+      "decide_ms": 6802.598699985538,
+      "prompt_tokens": 1809,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Mumbai\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6802.598699985538,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "do I need a coat?",
+      "category": "followup",
+      "decide_ms": 7339.125300000887,
+      "prompt_tokens": 1814,
+      "out_tokens": 28,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Shimla\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7339.125300000887,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Shimla"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and in euros?",
+      "category": "followup",
+      "decide_ms": 8851.785000006203,
+      "prompt_tokens": 1828,
+      "out_tokens": 36,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"convert_currency\",\"args\":{\"amount\":100,\"from\":\"USD\",\"to\":\"EUR\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8851.785000006203,
+      "calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "EUR"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and tomorrow?",
+      "category": "followup",
+      "decide_ms": 6678.305600013118,
+      "prompt_tokens": 1809,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6678.305600013118,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "I didn't ask about Singapore weather, what's 1+1?",
+      "category": "mention",
+      "decide_ms": 4220.8634999988135,
+      "prompt_tokens": 1792,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7671.709199988982,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "don't tell me the weather, just the time",
+      "category": "negation",
+      "decide_ms": 5755.38270000834,
+      "prompt_tokens": 1787,
+      "out_tokens": 24,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5755.38270000834,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "she asked 'how hot is it' and I laughed",
+      "category": "quotation",
+      "decide_ms": 5369.685299985576,
+      "prompt_tokens": 1788,
+      "out_tokens": 24,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5369.685299985576,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "what does the word forecast mean?",
+      "category": "meta",
+      "decide_ms": 3340.2906999981496,
+      "prompt_tokens": 1784,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 11330.843899981119,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "my app shows the temperature wrong, how do I debug it?",
+      "category": "technical",
+      "decide_ms": 3939.6375000069384,
+      "prompt_tokens": 1790,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10981.553299992811,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "I don't need to add any tasks right now",
+      "category": "negation",
+      "decide_ms": 3671.9508999958634,
+      "prompt_tokens": 1787,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7161.4907999755815,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what's 1+1",
+      "category": "general",
+      "decide_ms": 3620.2918000053614,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6422.546899993904,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how many degrees in a right angle",
+      "category": "general",
+      "decide_ms": 3578.8347000197973,
+      "prompt_tokens": 1784,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9113.631900021574,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what's the capital of Japan",
+      "category": "general",
+      "decide_ms": 6508.4756999858655,
+      "prompt_tokens": 1783,
+      "out_tokens": 32,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"web_search\",\"args\":{\"query\":\"capital of Japan\",\"topic\":\"general\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6508.4756999858655,
+      "calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "capital of Japan",
+            "topic": "general"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "explain recursion in one sentence",
+      "category": "general",
+      "decide_ms": 3500.291099975584,
+      "prompt_tokens": 1782,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8499.66819997644,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "tell me a joke",
+      "category": "general",
+      "decide_ms": 3728.721899999073,
+      "prompt_tokens": 1781,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7008.7567000009585,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "thanks, that was helpful",
+      "category": "general",
+      "decide_ms": 3577.428799995687,
+      "prompt_tokens": 1782,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7853.666099981638,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what is my favourite food?",
+      "category": "general",
+      "decide_ms": 6410.528100008378,
+      "prompt_tokens": 1783,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"list\",\"topic\":\"favourite food\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6410.528100008378,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "list",
+            "topic": "favourite food"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "will it rain tomorrow in Pune",
+      "category": "no-tool",
+      "decide_ms": 5382.0336000062525,
+      "prompt_tokens": 1783,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Pune\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5382.0336000062525,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Pune"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "what's on my calendar today",
+      "category": "no-tool",
+      "decide_ms": 3714.3362000060733,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 3714.3362000060733,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "do I have any new email",
+      "category": "no-tool",
+      "decide_ms": 3525.1250000146683,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 3525.1250000146683,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what about tomorrow?",
+      "category": "no-state",
+      "decide_ms": 5079.669099999592,
+      "prompt_tokens": 1781,
+      "out_tokens": 24,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5079.669099999592,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "and in Delhi?",
+      "category": "no-state",
+      "decide_ms": 5388.739199988777,
+      "prompt_tokens": 1781,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Delhi\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5388.739199988777,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Delhi"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "weather in Tokyo and convert 100 USD to INR",
+      "category": "multi",
+      "decide_ms": 8861.949299986009,
+      "prompt_tokens": 1790,
+      "out_tokens": 46,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}},{\"tool\":\"convert_currency\",\"args\":{\"amount\":100,\"from\":\"USD\",\"to\":\"INR\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8861.949299986009,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        },
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "WRONG_ARGS",
+      "repeat": 0
+    },
+    {
+      "say": "remember Tokyo is my favourite city and check its weather",
+      "category": "multi",
+      "decide_ms": 11503.80460001179,
+      "prompt_tokens": 1787,
+      "out_tokens": 36,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"save\",\"topic\":\"favourite city\",\"value\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 11503.80460001179,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "favourite city",
+            "value": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "WRONG_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "delete it",
+      "category": "destructive",
+      "decide_ms": 8339.212400023825,
+      "prompt_tokens": 1803,
+      "out_tokens": 34,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"it\"}}],\"clarification\":\"Which task do you mean?\"}",
+      "valid": true,
+      "turn_ms": 8339.212400023825,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "it"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": "Which task do you mean?",
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "forget it",
+      "category": "destructive",
+      "decide_ms": 7747.899800015148,
+      "prompt_tokens": 1817,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":false,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"forget\",\"topic\":\"dog's name\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7747.899800015148,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "forget",
+            "topic": "dog's name"
+          }
+        }
+      ],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "clarify",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "delete the task about the dentist",
+      "category": "destructive",
+      "decide_ms": 7033.584300021175,
+      "prompt_tokens": 1783,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"dentist appointment\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7033.584300021175,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "dentist appointment"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "is it raining in Kochi",
+      "category": "slot-guard",
+      "decide_ms": 5848.6746000126,
+      "prompt_tokens": 1783,
+      "out_tokens": 28,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Kochi\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5848.6746000126,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Kochi"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how about Lucknow?",
+      "category": "slot-guard",
+      "decide_ms": 7012.6578000199515,
+      "prompt_tokens": 1808,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Lucknow\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7012.6578000199515,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Lucknow"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "the bank one",
+      "category": "pending",
+      "decide_ms": 7049.136699992232,
+      "prompt_tokens": 1798,
+      "out_tokens": 29,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"bank\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7049.136699992232,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "bank"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how much is that in rupees?",
+      "category": "followup",
+      "decide_ms": 9790.569700009655,
+      "prompt_tokens": 1828,
+      "out_tokens": 36,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"convert_currency\",\"args\":{\"amount\":92,\"from\":\"EUR\",\"to\":\"INR\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9790.569700009655,
+      "calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 92,
+            "from": "EUR",
+            "to": "INR"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "mark that one done",
+      "category": "followup",
+      "decide_ms": 7917.373699980089,
+      "prompt_tokens": 1805,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"complete\",\"title\":\"buy milk\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7917.373699980089,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "is it windy there?",
+      "category": "followup",
+      "decide_ms": 7525.695000018459,
+      "prompt_tokens": 1814,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7525.695000018459,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and in Mumbai?",
+      "category": "slot-guard",
+      "decide_ms": 6009.444999974221,
+      "prompt_tokens": 1813,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Mumbai\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6009.444999974221,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "I used to forget my tasks before I started writing them down",
+      "category": "mention",
+      "decide_ms": 4598.699099995429,
+      "prompt_tokens": 1789,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10101.476999989245,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "the word remember comes from Latin memorari",
+      "category": "meta",
+      "decide_ms": 3782.6921999803744,
+      "prompt_tokens": 1785,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9832.670499978121,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "why is the sky blue?",
+      "category": "general",
+      "decide_ms": 3767.3563999996986,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10404.504000005545,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "explain what a forecast model does",
+      "category": "general",
+      "decide_ms": 3823.6518000194337,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10511.61850002245,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and there?",
+      "category": "no-state",
+      "decide_ms": 5453.368299989961,
+      "prompt_tokens": 1780,
+      "out_tokens": 23,
+      "raw": "{\"needs_live_data\":true,\"calls\":[],\"clarification\":\"What would you like to know about there?\"}",
+      "valid": true,
+      "turn_ms": 5453.368299989961,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": "What would you like to know about there?",
+      "route": "clarify",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "did I get any email from Priya today?",
+      "category": "no-tool",
+      "decide_ms": 3613.1126999971457,
+      "prompt_tokens": 1787,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 3613.1126999971457,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    }
+  ],
+  "A5": [
+    {
+      "say": "what's the weather in Tokyo",
+      "category": "explicit",
+      "decide_ms": 6042.439499986358,
+      "prompt_tokens": 1783,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6042.439499986358,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "convert 100 USD to INR",
+      "category": "explicit",
+      "decide_ms": 7595.6340999982785,
+      "prompt_tokens": 1786,
+      "out_tokens": 37,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"convert_currency\",\"args\":{\"amount\":100,\"from\":\"USD\",\"to\":\"INR\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7595.6340999982785,
+      "calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "search for the best biryani in Hyderabad",
+      "category": "explicit",
+      "decide_ms": 7416.311399982078,
+      "prompt_tokens": 1786,
+      "out_tokens": 35,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"web_search\",\"args\":{\"query\":\"best biryani in Hyderabad\",\"topic\":\"general\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7416.311399982078,
+      "calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "best biryani in Hyderabad",
+            "topic": "general"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "add buy milk to my tasks",
+      "category": "explicit",
+      "decide_ms": 6490.4472999915015,
+      "prompt_tokens": 1783,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"add\",\"title\":\"buy milk\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6490.4472999915015,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what are my tasks",
+      "category": "explicit",
+      "decide_ms": 6943.213899998227,
+      "prompt_tokens": 1781,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"list\",\"title\": \"my tasks\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6943.213899998227,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list",
+            "title": "my tasks"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "I finished the code review",
+      "category": "explicit",
+      "decide_ms": 7017.076400021324,
+      "prompt_tokens": 1782,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"complete\",\"title\":\"code review\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7017.076400021324,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "code review"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "my favourite sweet is gulab jamun",
+      "category": "explicit",
+      "decide_ms": 8424.66359998798,
+      "prompt_tokens": 1785,
+      "out_tokens": 39,
+      "raw": "{\"needs_live_data\":false,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"save\",\"topic\":\"favourite sweet\",\"value\":\"gulab jamun\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8424.66359998798,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "favourite sweet",
+            "value": "gulab jamun"
+          }
+        }
+      ],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "forget my favourite sweet",
+      "category": "explicit",
+      "decide_ms": 6660.567599989008,
+      "prompt_tokens": 1781,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"forget\",\"topic\":\"favourite sweet\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6660.567599989008,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "forget",
+            "topic": "favourite sweet"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what do you remember about me",
+      "category": "general",
+      "decide_ms": 7148.025000002235,
+      "prompt_tokens": 1783,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"list\",\"topic\": \"user\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7148.025000002235,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "list",
+            "topic": "user"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "should I bring an umbrella?",
+      "category": "followup",
+      "decide_ms": 7921.834500011755,
+      "prompt_tokens": 1815,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7921.834500011755,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what about Delhi?",
+      "category": "followup",
+      "decide_ms": 6081.068699975731,
+      "prompt_tokens": 1813,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Delhi\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6081.068699975731,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Delhi"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "is it windy?",
+      "category": "followup",
+      "decide_ms": 7229.747899982613,
+      "prompt_tokens": 1809,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Mumbai\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7229.747899982613,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "do I need a coat?",
+      "category": "followup",
+      "decide_ms": 11971.565500018187,
+      "prompt_tokens": 1814,
+      "out_tokens": 28,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Shimla\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 11971.565500018187,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Shimla"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and in euros?",
+      "category": "followup",
+      "decide_ms": 11583.54579997831,
+      "prompt_tokens": 1828,
+      "out_tokens": 36,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"convert_currency\",\"args\":{\"amount\":100,\"from\":\"USD\",\"to\":\"EUR\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 11583.54579997831,
+      "calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "EUR"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and tomorrow?",
+      "category": "followup",
+      "decide_ms": 8831.866299995454,
+      "prompt_tokens": 1809,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8831.866299995454,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "I didn't ask about Singapore weather, what's 1+1?",
+      "category": "mention",
+      "decide_ms": 4945.7959000137635,
+      "prompt_tokens": 1792,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8640.228100004606,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "don't tell me the weather, just the time",
+      "category": "negation",
+      "decide_ms": 5631.689699977869,
+      "prompt_tokens": 1787,
+      "out_tokens": 24,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5631.689699977869,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "she asked 'how hot is it' and I laughed",
+      "category": "quotation",
+      "decide_ms": 5463.443899992853,
+      "prompt_tokens": 1788,
+      "out_tokens": 24,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5463.443899992853,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "what does the word forecast mean?",
+      "category": "meta",
+      "decide_ms": 3594.0501999866683,
+      "prompt_tokens": 1784,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10076.878599997144,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "my app shows the temperature wrong, how do I debug it?",
+      "category": "technical",
+      "decide_ms": 3940.001699986169,
+      "prompt_tokens": 1790,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 11300.958499981789,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "I don't need to add any tasks right now",
+      "category": "negation",
+      "decide_ms": 3983.8901999755763,
+      "prompt_tokens": 1787,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7682.59259997285,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what's 1+1",
+      "category": "general",
+      "decide_ms": 3788.5878999950364,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6598.572400020203,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how many degrees in a right angle",
+      "category": "general",
+      "decide_ms": 3748.1077999982517,
+      "prompt_tokens": 1784,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9775.863899994874,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what's the capital of Japan",
+      "category": "general",
+      "decide_ms": 7048.665099981008,
+      "prompt_tokens": 1783,
+      "out_tokens": 32,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"web_search\",\"args\":{\"query\":\"capital of Japan\",\"topic\":\"general\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7048.665099981008,
+      "calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "capital of Japan",
+            "topic": "general"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "explain recursion in one sentence",
+      "category": "general",
+      "decide_ms": 3745.574400003534,
+      "prompt_tokens": 1782,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8939.959600014845,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "tell me a joke",
+      "category": "general",
+      "decide_ms": 3784.4214999931864,
+      "prompt_tokens": 1781,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7091.560200002277,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "thanks, that was helpful",
+      "category": "general",
+      "decide_ms": 3989.591699995799,
+      "prompt_tokens": 1782,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8515.728400001535,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what is my favourite food?",
+      "category": "general",
+      "decide_ms": 6753.283099998953,
+      "prompt_tokens": 1783,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"list\",\"topic\":\"favourite food\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6753.283099998953,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "list",
+            "topic": "favourite food"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "will it rain tomorrow in Pune",
+      "category": "no-tool",
+      "decide_ms": 5791.776700003538,
+      "prompt_tokens": 1783,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Pune\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5791.776700003538,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Pune"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "what's on my calendar today",
+      "category": "no-tool",
+      "decide_ms": 3696.8659999838565,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 3696.8659999838565,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "do I have any new email",
+      "category": "no-tool",
+      "decide_ms": 3518.493200012017,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 3518.493200012017,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what about tomorrow?",
+      "category": "no-state",
+      "decide_ms": 5569.619400019292,
+      "prompt_tokens": 1781,
+      "out_tokens": 24,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5569.619400019292,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "and in Delhi?",
+      "category": "no-state",
+      "decide_ms": 5807.269400014775,
+      "prompt_tokens": 1781,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Delhi\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5807.269400014775,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Delhi"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "weather in Tokyo and convert 100 USD to INR",
+      "category": "multi",
+      "decide_ms": 5312.589199980721,
+      "prompt_tokens": 1790,
+      "out_tokens": 24,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5312.589199980721,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "WRONG_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "remember Tokyo is my favourite city and check its weather",
+      "category": "multi",
+      "decide_ms": 10207.710799993947,
+      "prompt_tokens": 1787,
+      "out_tokens": 49,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"save\",\"topic\":\"favourite city\",\"value\":\"Tokyo\"}},{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10207.710799993947,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "favourite city",
+            "value": "Tokyo"
+          }
+        },
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "delete it",
+      "category": "destructive",
+      "decide_ms": 7481.201200018404,
+      "prompt_tokens": 1803,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"buy milk\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7481.201200018404,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "clarify",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "forget it",
+      "category": "destructive",
+      "decide_ms": 8024.074099987047,
+      "prompt_tokens": 1817,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":false,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"forget\",\"topic\":\"dog's name\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8024.074099987047,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "forget",
+            "topic": "dog's name"
+          }
+        }
+      ],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "clarify",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "delete the task about the dentist",
+      "category": "destructive",
+      "decide_ms": 7414.669099991443,
+      "prompt_tokens": 1783,
+      "out_tokens": 31,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"dentist appointment\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7414.669099991443,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "dentist appointment"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "is it raining in Kochi",
+      "category": "slot-guard",
+      "decide_ms": 5915.628599992488,
+      "prompt_tokens": 1783,
+      "out_tokens": 28,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Kochi\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5915.628599992488,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Kochi"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how about Lucknow?",
+      "category": "slot-guard",
+      "decide_ms": 7177.098300016951,
+      "prompt_tokens": 1808,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Lucknow\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7177.098300016951,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Lucknow"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "the bank one",
+      "category": "pending",
+      "decide_ms": 7243.990099988878,
+      "prompt_tokens": 1798,
+      "out_tokens": 29,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"bank\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7243.990099988878,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "bank"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how much is that in rupees?",
+      "category": "followup",
+      "decide_ms": 9262.435200012987,
+      "prompt_tokens": 1828,
+      "out_tokens": 36,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"convert_currency\",\"args\":{\"amount\":92,\"from\":\"EUR\",\"to\":\"INR\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9262.435200012987,
+      "calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 92,
+            "from": "EUR",
+            "to": "INR"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "mark that one done",
+      "category": "followup",
+      "decide_ms": 8011.486499977764,
+      "prompt_tokens": 1805,
+      "out_tokens": 30,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"complete\",\"title\":\"buy milk\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8011.486499977764,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "is it windy there?",
+      "category": "followup",
+      "decide_ms": 7460.999900009483,
+      "prompt_tokens": 1814,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7460.999900009483,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and in Mumbai?",
+      "category": "slot-guard",
+      "decide_ms": 6212.654900009511,
+      "prompt_tokens": 1813,
+      "out_tokens": 27,
+      "raw": "{\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Mumbai\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6212.654900009511,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Mumbai"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "I used to forget my tasks before I started writing them down",
+      "category": "mention",
+      "decide_ms": 5276.587600004859,
+      "prompt_tokens": 1789,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 11495.1317999803,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "the word remember comes from Latin memorari",
+      "category": "meta",
+      "decide_ms": 4047.5554000004195,
+      "prompt_tokens": 1785,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10100.39659999893,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "why is the sky blue?",
+      "category": "general",
+      "decide_ms": 3753.4417000133544,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10165.475199988578,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "explain what a forecast model does",
+      "category": "general",
+      "decide_ms": 3772.870100016007,
+      "prompt_tokens": 1783,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10455.895800027065,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and there?",
+      "category": "no-state",
+      "decide_ms": 5317.17789999675,
+      "prompt_tokens": 1780,
+      "out_tokens": 23,
+      "raw": "{\"needs_live_data\":true,\"calls\":[],\"clarification\":\"What would you like to know about there?\"}",
+      "valid": true,
+      "turn_ms": 5317.17789999675,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": "What would you like to know about there?",
+      "route": "clarify",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "did I get any email from Priya today?",
+      "category": "no-tool",
+      "decide_ms": 3562.5435000110883,
+      "prompt_tokens": 1787,
+      "out_tokens": 15,
+      "raw": "{\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 3562.5435000110883,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    }
+  ],
+  "A6": [
+    {
+      "say": "what's the weather in Tokyo",
+      "category": "explicit",
+      "decide_ms": 6922.065799997654,
+      "prompt_tokens": 1992,
+      "out_tokens": 31,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6922.065799997654,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Tokyo"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "convert 100 USD to INR",
+      "category": "explicit",
+      "decide_ms": 8497.017299989238,
+      "prompt_tokens": 1995,
+      "out_tokens": 41,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"convert_currency\",\"args\":{\"amount\":100,\"from\":\"USD\",\"to\":\"INR\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8497.017299989238,
+      "calls": [
+        {
+          "tool": "convert_currency",
+          "args": {
+            "amount": 100,
+            "from": "USD",
+            "to": "INR"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "search for the best biryani in Hyderabad",
+      "category": "explicit",
+      "decide_ms": 7997.8832000051625,
+      "prompt_tokens": 1995,
+      "out_tokens": 39,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"web_search\",\"args\":{\"query\":\"best biryani in Hyderabad\",\"topic\":\"general\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7997.8832000051625,
+      "calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "best biryani in Hyderabad",
+            "topic": "general"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "add buy milk to my tasks",
+      "category": "explicit",
+      "decide_ms": 7128.043299977435,
+      "prompt_tokens": 1992,
+      "out_tokens": 34,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"add\",\"title\":\"buy milk\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7128.043299977435,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "add",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what are my tasks",
+      "category": "explicit",
+      "decide_ms": 7152.285499993013,
+      "prompt_tokens": 1990,
+      "out_tokens": 34,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"list\",\"include_done\":true}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7152.285499993013,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "list",
+            "include_done": true
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "I finished the code review",
+      "category": "explicit",
+      "decide_ms": 7053.388199972687,
+      "prompt_tokens": 1991,
+      "out_tokens": 34,
+      "raw": "{\"intent\":\"record\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"complete\",\"title\":\"code review\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7053.388199972687,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "code review"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "my favourite sweet is gulab jamun",
+      "category": "explicit",
+      "decide_ms": 8893.81740000681,
+      "prompt_tokens": 1994,
+      "out_tokens": 43,
+      "raw": "{\"intent\":\"record\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"save\",\"topic\":\"favourite sweet\",\"value\":\"gulab jamun\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8893.81740000681,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "favourite sweet",
+            "value": "gulab jamun"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "forget my favourite sweet",
+      "category": "explicit",
+      "decide_ms": 7100.86139998748,
+      "prompt_tokens": 1990,
+      "out_tokens": 35,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"forget\",\"topic\":\"favourite sweet\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7100.86139998748,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "forget",
+            "topic": "favourite sweet"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what do you remember about me",
+      "category": "general",
+      "decide_ms": 6124.323700001696,
+      "prompt_tokens": 1992,
+      "out_tokens": 29,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"list\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6124.323700001696,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "list"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "should I bring an umbrella?",
+      "category": "followup",
+      "decide_ms": 6493.371600023238,
+      "prompt_tokens": 2024,
+      "out_tokens": 24,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo",
+      "valid": false,
+      "turn_ms": 6493.371600023238,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "MISSED_TOOL",
+      "repeat": 0
+    },
+    {
+      "say": "what about Delhi?",
+      "category": "followup",
+      "decide_ms": 5304.947700002231,
+      "prompt_tokens": 2022,
+      "out_tokens": 26,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Delhi\"}}],\"",
+      "valid": false,
+      "turn_ms": 5304.947700002231,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "MISSED_TOOL",
+      "repeat": 0
+    },
+    {
+      "say": "is it windy?",
+      "category": "followup",
+      "decide_ms": 7355.005000019446,
+      "prompt_tokens": 2018,
+      "out_tokens": 30,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Mumbai\"}}],\"clarification\":null",
+      "valid": false,
+      "turn_ms": 7355.005000019446,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "MISSED_TOOL",
+      "repeat": 0
+    },
+    {
+      "say": "do I need a coat?",
+      "category": "followup",
+      "decide_ms": 7003.849100001389,
+      "prompt_tokens": 2023,
+      "out_tokens": 25,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Shimla",
+      "valid": false,
+      "turn_ms": 7003.849100001389,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "MISSED_TOOL",
+      "repeat": 0
+    },
+    {
+      "say": "and in euros?",
+      "category": "followup",
+      "decide_ms": 4425.9708000172395,
+      "prompt_tokens": 2037,
+      "out_tokens": 11,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"",
+      "valid": false,
+      "turn_ms": 4425.9708000172395,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "MISSED_TOOL",
+      "repeat": 0
+    },
+    {
+      "say": "and tomorrow?",
+      "category": "followup",
+      "decide_ms": 7363.90019999817,
+      "prompt_tokens": 2018,
+      "out_tokens": 30,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}],\"clarification\":null",
+      "valid": false,
+      "turn_ms": 7363.90019999817,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "INVALID",
+      "repeat": 0
+    },
+    {
+      "say": "I didn't ask about Singapore weather, what's 1+1?",
+      "category": "mention",
+      "decide_ms": 5159.789199999068,
+      "prompt_tokens": 2001,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8762.286499986658,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "don't tell me the weather, just the time",
+      "category": "negation",
+      "decide_ms": 6183.472600008827,
+      "prompt_tokens": 1996,
+      "out_tokens": 28,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6183.472600008827,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "she asked 'how hot is it' and I laughed",
+      "category": "quotation",
+      "decide_ms": 4337.63209998142,
+      "prompt_tokens": 1997,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9213.471199997002,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what does the word forecast mean?",
+      "category": "meta",
+      "decide_ms": 4491.452899994329,
+      "prompt_tokens": 1993,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 12892.585099994903,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "my app shows the temperature wrong, how do I debug it?",
+      "category": "technical",
+      "decide_ms": 4658.555500005605,
+      "prompt_tokens": 1999,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 11840.364400006365,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "I don't need to add any tasks right now",
+      "category": "negation",
+      "decide_ms": 4947.397100011585,
+      "prompt_tokens": 1996,
+      "out_tokens": 20,
+      "raw": "{\"intent\":\"no_context\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8698.511299997335,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what's 1+1",
+      "category": "general",
+      "decide_ms": 4780.485499999486,
+      "prompt_tokens": 1992,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8491.780200012727,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how many degrees in a right angle",
+      "category": "general",
+      "decide_ms": 4489.510499988683,
+      "prompt_tokens": 1993,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10412.902999989456,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what's the capital of Japan",
+      "category": "general",
+      "decide_ms": 7784.580000006827,
+      "prompt_tokens": 1992,
+      "out_tokens": 36,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"web_search\",\"args\":{\"query\":\"capital of Japan\",\"topic\":\"general\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7784.580000006827,
+      "calls": [
+        {
+          "tool": "web_search",
+          "args": {
+            "query": "capital of Japan",
+            "topic": "general"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "explain recursion in one sentence",
+      "category": "general",
+      "decide_ms": 4247.479999990901,
+      "prompt_tokens": 1991,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9293.477099970914,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "tell me a joke",
+      "category": "general",
+      "decide_ms": 4466.949399997247,
+      "prompt_tokens": 1990,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7838.79270000034,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "thanks, that was helpful",
+      "category": "general",
+      "decide_ms": 4502.332200005185,
+      "prompt_tokens": 1991,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9159.299799997825,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what is my favourite food?",
+      "category": "general",
+      "decide_ms": 7801.370899978792,
+      "prompt_tokens": 1992,
+      "out_tokens": 35,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"list\",\"topic\":\"favourite food\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7801.370899978792,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "list",
+            "topic": "favourite food"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "will it rain tomorrow in Pune",
+      "category": "no-tool",
+      "decide_ms": 6475.9697999979835,
+      "prompt_tokens": 1992,
+      "out_tokens": 31,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Pune\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6475.9697999979835,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Pune"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "what's on my calendar today",
+      "category": "no-tool",
+      "decide_ms": 4712.590899987845,
+      "prompt_tokens": 1992,
+      "out_tokens": 20,
+      "raw": "{\"intent\":\"unavailable\",\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 4712.590899987845,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "do I have any new email",
+      "category": "no-tool",
+      "decide_ms": 4583.187799988082,
+      "prompt_tokens": 1992,
+      "out_tokens": 20,
+      "raw": "{\"intent\":\"unavailable\",\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 4583.187799988082,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "what about tomorrow?",
+      "category": "no-state",
+      "decide_ms": 6397.324999998091,
+      "prompt_tokens": 1990,
+      "out_tokens": 28,
+      "raw": "{\"intent\":\"no_context\",\"needs_live_data\":false,\"calls\":[],\"clarification\":\"What would you like to know about tomorrow?\"}",
+      "valid": true,
+      "turn_ms": 6397.324999998091,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": "What would you like to know about tomorrow?",
+      "route": "clarify",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and in Delhi?",
+      "category": "no-state",
+      "decide_ms": 6392.531099991174,
+      "prompt_tokens": 1990,
+      "out_tokens": 31,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Delhi\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6392.531099991174,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Delhi"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "FALSE_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "weather in Tokyo and convert 100 USD to INR",
+      "category": "multi",
+      "decide_ms": 5991.791200009175,
+      "prompt_tokens": 1999,
+      "out_tokens": 28,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 5991.791200009175,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "WRONG_CALL",
+      "repeat": 0
+    },
+    {
+      "say": "remember Tokyo is my favourite city and check its weather",
+      "category": "multi",
+      "decide_ms": 9801.134100009222,
+      "prompt_tokens": 1996,
+      "out_tokens": 49,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"save\",\"topic\":\"favorite city\",\"value\":\"Tokyo\"}},{\"tool\":\"get_weather\",\"args\":{}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 9801.134100009222,
+      "calls": [
+        {
+          "tool": "remember",
+          "args": {
+            "action": "save",
+            "topic": "favorite city",
+            "value": "Tokyo"
+          }
+        },
+        {
+          "tool": "get_weather",
+          "args": {}
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": false,
+      "failure": "WRONG_ARGS",
+      "repeat": 0
+    },
+    {
+      "say": "delete it",
+      "category": "destructive",
+      "decide_ms": 8098.065099999076,
+      "prompt_tokens": 2012,
+      "out_tokens": 34,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"buy milk\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8098.065099999076,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "clarify",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "forget it",
+      "category": "destructive",
+      "decide_ms": 6039.040400006343,
+      "prompt_tokens": 2026,
+      "out_tokens": 22,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":false,\"calls\":[{\"tool\":\"remember\",\"args\":{\"action\":\"forget",
+      "valid": false,
+      "turn_ms": 6039.040400006343,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "INVALID",
+      "repeat": 0
+    },
+    {
+      "say": "delete the task about the dentist",
+      "category": "destructive",
+      "decide_ms": 7884.912899986375,
+      "prompt_tokens": 1992,
+      "out_tokens": 35,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"dentist appointment\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7884.912899986375,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "dentist appointment"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "is it raining in Kochi",
+      "category": "slot-guard",
+      "decide_ms": 6775.8702999853995,
+      "prompt_tokens": 1992,
+      "out_tokens": 32,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Kochi\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 6775.8702999853995,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Kochi"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how about Lucknow?",
+      "category": "slot-guard",
+      "decide_ms": 7551.21269999654,
+      "prompt_tokens": 2017,
+      "out_tokens": 31,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Lucknow\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7551.21269999654,
+      "calls": [
+        {
+          "tool": "get_weather",
+          "args": {
+            "place": "Lucknow"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "the bank one",
+      "category": "pending",
+      "decide_ms": 7869.9803999916185,
+      "prompt_tokens": 2007,
+      "out_tokens": 33,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"delete\",\"title\":\"bank\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 7869.9803999916185,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "delete",
+            "title": "bank"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "how much is that in rupees?",
+      "category": "followup",
+      "decide_ms": 4437.8752000047825,
+      "prompt_tokens": 2037,
+      "out_tokens": 11,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"",
+      "valid": false,
+      "turn_ms": 4437.8752000047825,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "MISSED_TOOL",
+      "repeat": 0
+    },
+    {
+      "say": "mark that one done",
+      "category": "followup",
+      "decide_ms": 8005.043300014222,
+      "prompt_tokens": 2014,
+      "out_tokens": 34,
+      "raw": "{\"intent\":\"record\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"tasks\",\"args\":{\"action\":\"complete\",\"title\":\"buy milk\"}}],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 8005.043300014222,
+      "calls": [
+        {
+          "tool": "tasks",
+          "args": {
+            "action": "complete",
+            "title": "buy milk"
+          }
+        }
+      ],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "tools",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "is it windy there?",
+      "category": "followup",
+      "decide_ms": 6634.66559999506,
+      "prompt_tokens": 2023,
+      "out_tokens": 25,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Tokyo\"}}",
+      "valid": false,
+      "turn_ms": 6634.66559999506,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "MISSED_TOOL",
+      "repeat": 0
+    },
+    {
+      "say": "and in Mumbai?",
+      "category": "slot-guard",
+      "decide_ms": 5364.957499987213,
+      "prompt_tokens": 2022,
+      "out_tokens": 26,
+      "raw": "{\"intent\":\"request\",\"needs_live_data\":true,\"calls\":[{\"tool\":\"get_weather\",\"args\":{\"place\":\"Mumbai\"}}],\"",
+      "valid": false,
+      "turn_ms": 5364.957499987213,
+      "calls": [],
+      "needs_live_data": null,
+      "clarification": null,
+      "route": "fail_closed",
+      "ok": false,
+      "failure": "MISSED_TOOL",
+      "repeat": 0
+    },
+    {
+      "say": "I used to forget my tasks before I started writing them down",
+      "category": "mention",
+      "decide_ms": 5077.271300018765,
+      "prompt_tokens": 1998,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10581.532100011827,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "the word remember comes from Latin memorari",
+      "category": "meta",
+      "decide_ms": 4498.438000009628,
+      "prompt_tokens": 1994,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10526.990300015314,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "why is the sky blue?",
+      "category": "general",
+      "decide_ms": 4502.934399992228,
+      "prompt_tokens": 1992,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 10947.461000003386,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "explain what a forecast model does",
+      "category": "general",
+      "decide_ms": 4575.431000004755,
+      "prompt_tokens": 1992,
+      "out_tokens": 19,
+      "raw": "{\"intent\":\"chat\",\"needs_live_data\":false,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 11140.84200002253,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": null,
+      "route": "chat",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "and there?",
+      "category": "no-state",
+      "decide_ms": 6277.841000002809,
+      "prompt_tokens": 1989,
+      "out_tokens": 28,
+      "raw": "{\"intent\":\"no_context\",\"needs_live_data\":false,\"calls\":[],\"clarification\":\"What would you like to know about there?\"}",
+      "valid": true,
+      "turn_ms": 6277.841000002809,
+      "calls": [],
+      "needs_live_data": false,
+      "clarification": "What would you like to know about there?",
+      "route": "clarify",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    },
+    {
+      "say": "did I get any email from Priya today?",
+      "category": "no-tool",
+      "decide_ms": 4479.941099998541,
+      "prompt_tokens": 1996,
+      "out_tokens": 20,
+      "raw": "{\"intent\":\"unavailable\",\"needs_live_data\":true,\"calls\":[],\"clarification\":null}",
+      "valid": true,
+      "turn_ms": 4479.941099998541,
+      "calls": [],
+      "needs_live_data": true,
+      "clarification": null,
+      "route": "refuse",
+      "ok": true,
+      "failure": "",
+      "repeat": 0
+    }
+  ]
+}

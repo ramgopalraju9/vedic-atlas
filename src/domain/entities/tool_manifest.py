@@ -16,6 +16,10 @@ from typing import Any
 REPLY_TEMPLATE = "template"  # reply is built from the tool's own `spoken` text — no 2nd model call
 REPLY_LLM = "llm"            # a short narrate-stage model call phrases the result
 
+RETURNS_VALUE = "value"        # a small fact; may appear in a control prompt
+RETURNS_DIGEST = "digest"      # a short list of references/snippets; may appear in a control prompt
+RETURNS_DOCUMENT = "document"  # large content; may reach only the data plane, never a control prompt
+
 
 @dataclass(frozen=True)
 class ToolParam:
@@ -34,6 +38,7 @@ class ToolExample:
 
     user: str
     calls: tuple[dict[str, Any], ...]  # each {"tool": name, "args": {...}}
+    prompt_example: bool = False       # the one example this tool may contribute to a prompt (all others are docs/tests)
 
 
 @dataclass(frozen=True)
@@ -51,3 +56,12 @@ class ToolManifest:
     permission_level: str = "notify"
     hosts: tuple[str, ...] = field(default_factory=tuple)  # egress hosts the tool may touch
     requires_online: bool = False
+    returns: str = RETURNS_VALUE   # what kind of result the tool yields (see RETURNS_*)
+    max_result_tokens: int = 0     # hard cap on the result before it reaches any prompt; 0 = use the stage budget
+    destructive: bool = False      # the whole tool is destructive: never inherits session slots, never writes session state
+    # Per-argument destructiveness for tools whose enum mixes safe and destructive actions,
+    # e.g. (("action", ("delete",)),). A tuple of pairs keeps the dataclass hashable.
+    destructive_when: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    # The argument(s) that say WHAT a destructive call acts on (tasks: title). The user must have named it in their
+    # own message; otherwise the call is not run and the turn asks. Empty = the tool has no such rule.
+    target_params: tuple[str, ...] = ()

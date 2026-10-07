@@ -72,6 +72,7 @@ class SupervisorAgent(BaseAgent):
         llm_router: RouterPort | None = None,
         routing_mode: str | None = None,
         router_on_failure: str = "keyword",
+        orchestrator: BaseAgent | None = None,
     ):
         super().__init__(name="supervisor", description="Routes user requests to the correct specialist agent.", model=model)
         self.agent_registry = agent_registry
@@ -82,6 +83,8 @@ class SupervisorAgent(BaseAgent):
         self.router = router or RouterPolicy()
         self.conversation = conversation  # ConversationManager, optional — used only to mirror ambient summaries into history
         self.routing_num_predict = routing_num_predict
+        # When set, EVERY turn goes to the orchestrator and none of the routing below runs (docs/10).
+        self.orchestrator = orchestrator
         self.llm_router = llm_router  # RouterPort | None — the model that routes (see routing_mode)
         # keyword | hybrid | model (config/routing.yaml). None = the legacy behaviour: rules first, and the model
         # only for a message no rule recognised (what `agents.llm_routing: true` always did).
@@ -216,6 +219,10 @@ class SupervisorAgent(BaseAgent):
     async def execute(self, ctx: AgentContext) -> AgentResult:
         ctx.current_agent = self.name
         ctx.agent_chain.append(self.name)
+        if self.orchestrator is not None:
+            result = await self.orchestrator.execute(ctx)
+            result.delegated_to = result.delegated_to or self.orchestrator.name
+            return result
         agent = await self._pick(ctx)
 
         if self.governance is not None:
@@ -232,6 +239,10 @@ class SupervisorAgent(BaseAgent):
     async def execute_stream(self, ctx: AgentContext, cancel_event: asyncio.Event | None = None) -> AsyncIterator[str]:
         ctx.current_agent = self.name
         ctx.agent_chain.append(self.name)
+        if self.orchestrator is not None:
+            async for chunk in self.orchestrator.execute_stream(ctx, cancel_event=cancel_event):
+                yield chunk
+            return
         agent = await self._pick(ctx)
 
         if self.governance is not None:

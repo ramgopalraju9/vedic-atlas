@@ -49,7 +49,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class AppSectionConfig(BaseModel):
@@ -331,6 +331,10 @@ class AgentsConfig(BaseModel):
     memory: AgentEntry = AgentEntry(description="Saves lasting facts the user states about themselves: favourites, allergies, names, routines")
     tools_enabled: bool = False  # when true, tool-owning specialist agents (from config/tools) are registered
     llm_routing: bool = False  # when true, messages the routing rules don't recognise are routed by a small LLM call
+    session_ttl_sec: int = 900  # session working state older than this is ignored (docs/10)
+    # Unified control decode: ONE context-aware decision per turn replaces keyword routing + the router model +
+    # the per-agent tool decision. false = the legacy supervisor path (the rollback target). See docs/10.
+    orchestrator_enabled: bool = False
 
 
 class SkillEntry(BaseModel):
@@ -391,6 +395,31 @@ class RoutingConfig(BaseModel):
     model: RouterModelConfig = RouterModelConfig()
 
 
+class PromptingConfig(BaseModel):
+    """prompting: section (config/prompting.yaml). Tunable prompt budgets; a missing key keeps the dataclass default."""
+
+    budgets: dict[str, int] = {}
+    control_history_exchanges: int = Field(default=2, ge=0, le=6)
+    turn_chars: int = Field(default=200, ge=40)
+    user_message_chars: int = Field(default=500, ge=40)
+
+    @field_validator("budgets")
+    @classmethod
+    def _known_positive_budgets(cls, budgets: dict[str, int]) -> dict[str, int]:
+        from dataclasses import fields
+
+        from domain.policies.token_budget_policy import PromptBudgets
+
+        known = {f.name for f in fields(PromptBudgets)}
+        unknown = sorted(set(budgets) - known)
+        if unknown:
+            raise ValueError(f"unknown prompt budget(s) {unknown}; valid: {sorted(known)}")
+        bad = sorted(k for k, v in budgets.items() if v < 0)
+        if bad:
+            raise ValueError(f"prompt budget(s) must be >= 0: {bad}")
+        return budgets
+
+
 class AppConfig(BaseModel):
     """Complete application configuration combining all sections."""
 
@@ -404,4 +433,5 @@ class AppConfig(BaseModel):
     guardrails: GuardrailsConfig = GuardrailsConfig()
     agents: AgentsConfig = AgentsConfig()
     routing: RoutingConfig = RoutingConfig()
+    prompting: PromptingConfig = PromptingConfig()
     skills: SkillsConfig = SkillsConfig()

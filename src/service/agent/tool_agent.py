@@ -17,13 +17,15 @@ from core.logging_config import logger
 from domain.entities.agent_context import AgentContext
 from domain.entities.agent_result import AgentResult
 from domain.entities.turn_trace import TurnTrace
+from domain.policies.reply_policy import UNCONFIRMED_REPLY
 from domain.ports.memory_repository_port import MemoryRepositoryPort
 from domain.ports.trace_repository_port import TraceRepositoryPort
 from service.agent.base_agent import BaseAgent
 from service.agent.tool_turn_runner import TurnOutcome, ToolTurnRunner
 from service.agent.tool_use_guard import ToolUseGuard
+from service.session.session_state import SessionStateService
 
-_UNCONFIRMED_REPLY = "I can't confirm that I did that. Could you say it again?"
+_UNCONFIRMED_REPLY = UNCONFIRMED_REPLY
 _ERROR_REPLY = "Something went wrong on my end. Could you try again?"
 
 
@@ -42,6 +44,7 @@ class ToolAgent(BaseAgent):
         memory: MemoryRepositoryPort | None = None,
         model: str | None = None,
         traces: TraceRepositoryPort | None = None,
+        session_state: SessionStateService | None = None,
     ):
         super().__init__(name=name, description=description, skills=tool_names, model=model, triggers=triggers)
         self._runner = runner
@@ -50,12 +53,32 @@ class ToolAgent(BaseAgent):
         self._conversation = conversation
         self._memory = memory
         self._traces = traces
+        self._session_state = session_state
+
+    def _resolve_session(self, ctx: AgentContext) -> None:
+        """Resolve the turn's session id exactly once and keep it on the context, so state reads/writes and the
+        saved turns all use the same id even if the 30-minute boundary is crossed mid-turn."""
+        if ctx.session_id is None and self._conversation is not None:
+            try:
+                ctx.session_id = self._conversation.current_session_id()
+            except Exception as e:
+                logger.warning(f"[{self.name}] session id unavailable: {e}")
+
+    def _shadow_log_active(self, ctx: AgentContext) -> None:
+        """Phase 1 shadow mode: show what the ACTIVE: line WOULD be. It is not used anywhere."""
+        if self._session_state is None or ctx.session_id is None:
+            return
+        line = self._session_state.active_line(ctx.session_id, ctx.speaker_id)
+        if line:
+            logger.info(f"[session-state] shadow {line} (session={ctx.session_id})")
 
     async def execute(self, ctx: AgentContext) -> AgentResult:
         ctx.current_agent = self.name
         if not ctx.agent_chain or ctx.agent_chain[-1] != self.name:
             ctx.agent_chain.append(self.name)
 
+        self._resolve_session(ctx)
+        self._shadow_log_active(ctx)
         started = time.perf_counter()
         try:
             outcome = await self._runner.run(ctx, self.skills)
@@ -74,6 +97,8 @@ class ToolAgent(BaseAgent):
             return result
 
         self._persist(ctx, outcome.reply)
+        if self._session_state is not None and ctx.session_id is not None:
+            self._session_state.record_success(ctx.session_id, ctx.speaker_id, outcome.calls)
         self._record_trace(ctx, outcome, outcome.reply, started, "tool")
         return AgentResult(agent_name=self.name, response=outcome.reply, skill_calls=list(ctx.skill_results))
 
@@ -103,8 +128,8 @@ class ToolAgent(BaseAgent):
 
     def _persist(self, ctx: AgentContext, reply: str) -> None:
         if self._conversation is not None:
-            self._conversation.add_turn("user", ctx.user_message)
-            self._conversation.add_turn("assistant", reply)
+            self._conversation.add_turn("user", ctx.user_message, session_id=ctx.session_id)
+            self._conversation.add_turn("assistant", reply, session_id=ctx.session_id)
         if self._memory is not None:
             try:
                 self._memory.record(agent_name=self.name, action="tool_turn", context={}, user_message=ctx.user_message)

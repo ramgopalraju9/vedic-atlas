@@ -69,7 +69,7 @@ class _Convo:
         self.turns = []
         self.added = []
 
-    def add_turn(self, role, content):
+    def add_turn(self, role, content, session_id=None):
         self.added.append((role, content))
 
 

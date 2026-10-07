@@ -25,6 +25,7 @@ examples:
     calls: [{tool: convert_currency, args: {amount: 100, from: USD, to: INR}}]
   - user: convert 5000 yen to euros
     calls: [{tool: convert_currency, args: {amount: 5000, from: JPY, to: EUR}}]
+    prompt_example: true
   - user: what's the dollar rate
     calls: [{tool: convert_currency, args: {amount: 1, from: USD, to: INR}}]
 

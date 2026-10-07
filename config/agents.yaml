@@ -8,6 +8,14 @@ tools_enabled: true
 # instead of defaulting to plain chat. Set false to route by rules only.
 llm_routing: false   # off for v1: on a Raspberry Pi the routing call takes 30 s+ (about 2 s on a laptop)
 
+# Session working state (last successful tool + its slots) is ignored once older than this many seconds.
+session_ttl_sec: 900
+
+# Unified control decode: one context-aware decision per turn replaces keyword routing, the router model and the
+# per-agent tool decision (docs/10). false = the legacy supervisor + ToolTurnRunner path (rollback target).
+orchestrator_enabled: false
+# (How much history the control decode sees, and every prompt budget, live in config/prompting.yaml.)
+
 supervisor:
   enabled: true
   model: null

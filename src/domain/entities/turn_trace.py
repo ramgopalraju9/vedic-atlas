@@ -26,4 +26,10 @@ class TurnTrace:
     prompt_tokens: dict[str, int] = field(default_factory=dict)
     timings_ms: dict[str, int] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
+    # Orchestrator observability (docs/10). Inert until the orchestrator fills them.
+    state_used: bool = False                 # an ACTIVE: session-state line was in the control prompt
+    slots_inherited: list[str] = field(default_factory=list)   # arg names filled from session state
+    needs_live_data: bool | None = None      # the control decode's flag; None = not a control decode
+    clarified: bool = False                  # the reply was a clarification question
+    prefix_cache_hit: bool | None = None     # the backend reused the cached prompt prefix; None = unknown
     id: int | None = None

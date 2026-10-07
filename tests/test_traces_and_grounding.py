@@ -130,3 +130,18 @@ def test_trace_route_returns_recent_traces(tmp_path):
     body = TestClient(app).get("/api/trace?limit=5").json()
     assert body["traces"][0]["agent"] == "tasks" and body["traces"][0]["calls"][0]["tool"] == "tasks"
     json.dumps(body)  # fully serialisable
+
+
+def test_trace_orchestrator_fields_default_and_round_trip():
+    repo = _repo()
+    repo.record(_trace(msg="legacy"))
+    legacy = repo.recent(1)[0]
+    assert (legacy.state_used, legacy.slots_inherited, legacy.needs_live_data, legacy.clarified, legacy.prefix_cache_hit) == (
+        False, [], None, False, None)
+
+    t = _trace(msg="umbrella")
+    t.state_used, t.slots_inherited, t.needs_live_data, t.clarified, t.prefix_cache_hit = True, ["place"], True, False, True
+    repo.record(t)
+    got = repo.recent(1)[0]
+    assert got.state_used is True and got.slots_inherited == ["place"]
+    assert got.needs_live_data is True and got.prefix_cache_hit is True

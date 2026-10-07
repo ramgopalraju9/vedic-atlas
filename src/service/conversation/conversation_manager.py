@@ -30,15 +30,20 @@ class ConversationManager:
         self.max_history = max_history
         self.summaries_limit = summaries_limit
 
-    def add_turn(self, role: str, content: str) -> None:
-        """Insert a new turn. Session id resolves automatically via the repo."""
+    def current_session_id(self) -> str:
+        """The session a turn happening now belongs to (30-minute activity gap, resolved by the repo)."""
+        return self.repo.current_session_id()
+
+    def add_turn(self, role: str, content: str, session_id: str | None = None) -> None:
+        """Insert a new turn. `session_id` is the one the caller already resolved for this turn; when omitted
+        it resolves via the repo (so a turn straddling the 30-minute boundary can't land in two sessions)."""
         try:
             from datetime import datetime
 
             self.repo.add_turn(
                 Turn(
                     id=None,
-                    session_id=self.repo.current_session_id(),
+                    session_id=session_id or self.repo.current_session_id(),
                     role=role,
                     content=content,
                     created_at=datetime.now(),

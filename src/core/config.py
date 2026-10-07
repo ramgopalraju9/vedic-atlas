@@ -21,7 +21,7 @@ from schemas.config_schemas import AppConfig
 
 _SECTION_FILES = (
     "app", "inference", "embedding", "audio", "sensing", "privacy",
-    "governance", "guardrails", "agents", "routing", "skills",
+    "governance", "guardrails", "agents", "routing", "prompting", "skills",
 )
 
 _full_config_cache: AppConfig | None = None

@@ -27,6 +27,7 @@ async def stream_chat(req: StreamRequest, request: Request, supervisor: Supervis
         user_message=req.message,
         system_context=(req.system_context or "")[:2000],
         from_voice=req.from_voice,
+        session_id=req.session_id,
     )
     cancel_event = asyncio.Event()
 

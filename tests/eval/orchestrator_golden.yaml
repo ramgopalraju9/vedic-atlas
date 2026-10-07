@@ -1,0 +1,147 @@
+# Golden set for the unified orchestrator (docs/10-orchestrator-review-and-plan.md, Phase 0).
+# A MEASUREMENT set, not a coverage set. The older tests/eval/golden_set.yaml (routing + tool) is untouched.
+#
+#   say:        the user message
+#   category:   grouping for the report
+#   history:    optional earlier exchanges [{user, veda}] shown in RECENT:
+#   state:      optional session state before this turn {tool, slots}
+#   expect:
+#     calls:           [] or [{tool, args}]   args = subset the model's arguments must contain (strings: case-insensitive substring)
+#     needs_live_data: true | false           (only checked when calls is empty)
+#     clarification:   true | false           true = a clarification question, no call
+#   phase4:     optional override of `expect` once get_weather_forecast exists
+#
+# Tools that exist today: get_weather, convert_currency, web_search, tasks, remember.
+
+# ---- explicit tool requests ----------------------------------------------------------------------
+- {say: "what's the weather in Tokyo", category: explicit, expect: {calls: [{tool: get_weather, args: {place: Tokyo}}]}}
+- {say: "convert 100 USD to INR", category: explicit, expect: {calls: [{tool: convert_currency, args: {amount: 100, from: USD, to: INR}}]}}
+- {say: "search for the best biryani in Hyderabad", category: explicit, expect: {calls: [{tool: web_search, args: {query: biryani}}]}}
+- {say: "add buy milk to my tasks", category: explicit, expect: {calls: [{tool: tasks, args: {action: add, title: milk}}]}}
+- {say: "what are my tasks", category: explicit, expect: {calls: [{tool: tasks, args: {action: list}}]}}
+- {say: "I finished the code review", category: explicit, expect: {calls: [{tool: tasks, args: {action: complete, title: code review}}]}}
+- {say: "my favourite sweet is gulab jamun", category: explicit, expect: {calls: [{tool: remember, args: {action: save, value: gulab}}]}}
+- {say: "forget my favourite sweet", category: explicit, expect: {calls: [{tool: remember, args: {action: forget}}]}}
+# saved facts are always in the chat prompt, so chat answers this with no tool (a remember `list` call is also harmless)
+- {say: "what do you remember about me", category: general, expect: {calls: [], needs_live_data: false}}
+
+# ---- follow-ups that need the previous turn (Bug A) ----------------------------------------------
+- say: "should I bring an umbrella?"
+  category: followup
+  history: [{user: "what's the weather in Tokyo?", veda: "In Tokyo it's 18 degrees and cloudy."}]
+  state: {tool: get_weather, slots: {place: Tokyo}}
+  expect: {calls: [{tool: get_weather, args: {place: Tokyo}}]}
+  phase4: {calls: [{tool: get_weather_forecast, args: {place: Tokyo}}]}
+- say: "what about Delhi?"
+  category: followup
+  history: [{user: "what's the weather in Tokyo?", veda: "In Tokyo it's 18 degrees and cloudy."}]
+  state: {tool: get_weather, slots: {place: Tokyo}}
+  expect: {calls: [{tool: get_weather, args: {place: Delhi}}]}
+- say: "is it windy?"
+  category: followup
+  history: [{user: "weather in Mumbai", veda: "In Mumbai it's 31 degrees and humid."}]
+  state: {tool: get_weather, slots: {place: Mumbai}}
+  expect: {calls: [{tool: get_weather, args: {place: Mumbai}}]}
+- say: "do I need a coat?"
+  category: followup
+  history: [{user: "weather in Shimla", veda: "In Shimla it's 6 degrees and clear."}]
+  state: {tool: get_weather, slots: {place: Shimla}}
+  expect: {calls: [{tool: get_weather, args: {place: Shimla}}]}
+- say: "and in euros?"
+  category: followup
+  history: [{user: "convert 100 USD to INR", veda: "100 USD is about 8300 INR."}]
+  state: {tool: convert_currency, slots: {amount: 100, from: USD, to: INR}}
+  expect: {calls: [{tool: convert_currency, args: {amount: 100, from: USD, to: EUR}}]}
+- say: "and tomorrow?"
+  category: followup
+  history: [{user: "weather in Tokyo", veda: "In Tokyo it's 18 degrees and cloudy."}]
+  state: {tool: get_weather, slots: {place: Tokyo}}
+  expect: {calls: []}   # no forecast tool yet: fail closed
+  phase4: {calls: [{tool: get_weather_forecast, args: {place: Tokyo, date_offset: 1}}]}
+
+# ---- mention without request (Bug B) -------------------------------------------------------------
+- {say: "I didn't ask about Singapore weather, what's 1+1?", category: mention, expect: {calls: [], needs_live_data: false}}
+- {say: "don't tell me the weather, just the time", category: negation, expect: {calls: []}}
+- {say: "she asked 'how hot is it' and I laughed", category: quotation, expect: {calls: [], needs_live_data: false}}
+- {say: "what does the word forecast mean?", category: meta, expect: {calls: [], needs_live_data: false}}
+- {say: "my app shows the temperature wrong, how do I debug it?", category: technical, expect: {calls: [], needs_live_data: false}}
+- {say: "I don't need to add any tasks right now", category: negation, expect: {calls: []}}
+
+# ---- general knowledge / chat: no tool, no refusal -----------------------------------------------
+- {say: "what's 1+1", category: general, expect: {calls: [], needs_live_data: false}}
+- {say: "how many degrees in a right angle", category: general, expect: {calls: [], needs_live_data: false}}
+- {say: "what's the capital of Japan", category: general, expect: {calls: [], needs_live_data: false}}
+- {say: "explain recursion in one sentence", category: general, expect: {calls: [], needs_live_data: false}}
+- {say: "tell me a joke", category: general, expect: {calls: [], needs_live_data: false}}
+- {say: "thanks, that was helpful", category: general, expect: {calls: [], needs_live_data: false}}
+# a saved fact is answered from the chat prompt, not refused and not looked up
+- {say: "what is my favourite food?", category: general, expect: {calls: [], needs_live_data: false}}
+
+# ---- live data with no tool available: refuse, never hallucinate --------------------------------
+- {say: "will it rain tomorrow in Pune", category: no-tool, expect: {calls: [], needs_live_data: true}, phase4: {calls: [{tool: get_weather_forecast, args: {place: Pune, date_offset: 1}}]}}
+- {say: "what's on my calendar today", category: no-tool, expect: {calls: [], needs_live_data: true}}
+- {say: "do I have any new email", category: no-tool, expect: {calls: [], needs_live_data: true}}
+
+# ---- no active state: clarify, never invent a topic ----------------------------------------------
+- {say: "what about tomorrow?", category: no-state, expect: {calls: [], clarification: true}}
+- {say: "and in Delhi?", category: no-state, expect: {calls: [], clarification: true}}
+
+# ---- multi-intent (independent calls, one decode) ------------------------------------------------
+- {say: "weather in Tokyo and convert 100 USD to INR", category: multi, expect: {calls: [{tool: get_weather, args: {place: Tokyo}}, {tool: convert_currency, args: {amount: 100}}]}}
+- {say: "remember Tokyo is my favourite city and check its weather", category: multi, expect: {calls: [{tool: remember, args: {action: save, value: Tokyo}}, {tool: get_weather, args: {place: Tokyo}}]}}
+
+# ---- destructive ambiguity: ask, do not act ------------------------------------------------------
+- say: "delete it"
+  category: destructive
+  history: [{user: "what are my tasks?", veda: "You have 3 tasks: buy milk, call the bank, renew passport."}]
+  expect: {calls: [], clarification: true}
+- say: "forget it"
+  category: destructive
+  history: [{user: "my dog's name is Rex", veda: "Saved: dog's name is Rex."}, {user: "my cat's name is Tom", veda: "Saved: cat's name is Tom."}]
+  expect: {calls: [], clarification: true}
+- say: "delete the task about the dentist"
+  category: destructive
+  expect: {calls: [{tool: tasks, args: {action: delete, title: dentist}}]}
+
+# ---- slot guard: a named city must never silently become the default place -----------------------
+- {say: "is it raining in Kochi", category: slot-guard, expect: {calls: [{tool: get_weather, args: {place: Kochi}}]}}
+- say: "how about Lucknow?"
+  category: slot-guard
+  history: [{user: "weather in Pune", veda: "In Pune it's 27 degrees."}]
+  state: {tool: get_weather, slots: {place: Pune}}
+  expect: {calls: [{tool: get_weather, args: {place: Lucknow}}]}
+
+# ---- clarification answered on the next turn (pending state) -------------------------------------
+- say: "the bank one"
+  category: pending
+  history: [{user: "delete a task", veda: "Which task do you mean?"}]
+  state: {tool: tasks, slots: {}, pending: {tool: tasks, partial_args: {action: delete}, awaiting: title, candidates: [buy milk, call the bank, renew passport]}}
+  expect: {calls: [{tool: tasks, args: {action: delete, title: bank}}]}
+
+# ---- added from docs/implementation_guide.md (phase-gated cases of the other agent's golden set) ----
+- say: "how much is that in rupees?"
+  category: followup
+  history: [{user: "convert 100 dollars to euros", veda: "100 US dollars is about 92 euros."}]
+  state: {tool: convert_currency, slots: {amount: 100, from: USD, to: EUR}}
+  expect: {calls: [{tool: convert_currency, args: {to: INR}}]}   # 100 USD or the 92 EUR just quoted are both valid readings of "that"
+- say: "mark that one done"
+  category: followup
+  history: [{user: "what are my tasks?", veda: "You have one task: buy milk."}]
+  state: {tool: tasks, slots: {action: list}}
+  expect: {calls: [{tool: tasks, args: {action: complete, title: milk}}]}
+- say: "is it windy there?"
+  category: followup
+  history: [{user: "what's the weather in Tokyo?", veda: "In Tokyo it's 22 degrees and cloudy."}]
+  state: {tool: get_weather, slots: {place: Tokyo}}
+  expect: {calls: [{tool: get_weather, args: {place: Tokyo}}]}
+- say: "and in Mumbai?"
+  category: slot-guard
+  history: [{user: "what's the weather in Tokyo?", veda: "In Tokyo it's 22 degrees and cloudy."}]
+  state: {tool: get_weather, slots: {place: Tokyo}}
+  expect: {calls: [{tool: get_weather, args: {place: Mumbai}}]}
+- {say: "I used to forget my tasks before I started writing them down", category: mention, expect: {calls: [], needs_live_data: false}}
+- {say: "the word remember comes from Latin memorari", category: meta, expect: {calls: [], needs_live_data: false}}
+- {say: "why is the sky blue?", category: general, expect: {calls: [], needs_live_data: false}}
+- {say: "explain what a forecast model does", category: general, expect: {calls: [], needs_live_data: false}}
+- {say: "and there?", category: no-state, expect: {calls: [], clarification: true}}
+- {say: "did I get any email from Priya today?", category: no-tool, expect: {calls: [], needs_live_data: true}}

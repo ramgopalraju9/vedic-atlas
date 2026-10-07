@@ -1,0 +1,22 @@
+# Prompt budgets per stage, in estimated tokens (system + prompt together). The composer trims oldest-first to fit.
+# These are the values of domain/policies/token_budget_policy.py::PromptBudgets, copied verbatim (plus `control`).
+# n_ctx is 4096 in the base config (2048 in the small-model profiles) and the reply needs room too:
+# raise with care, then measure (scripts/measure_prompt_budget.py). A missing key falls back to the dataclass default.
+budgets:
+  control: 2600          # the ONE decision per turn: persona + every tool + rules/examples (static, cached ~2000) + ACTIVE/RECENT/USER
+  call: 700              # legacy call_stage - deleted at cutover
+  route: 1900            # legacy route_stage - deleted with the router
+  narrate: 500           # data plane: one capped tool result, no tools, no history
+  chat: 1500             # plain conversation, no tools
+  observation_max: 320   # hard cap on a tool result before it enters any prompt
+  call_history_turns: 2
+  chat_history_turns: 8
+
+# Recent conversation shown to the control decode, in COMPLETE exchanges (user + reply), never lone turns.
+control_history_exchanges: 2
+
+# Characters a history turn / the user message is clipped to in a prompt.
+turn_chars: 200
+user_message_chars: 500
+
+# Per-tool caps do NOT live here: a tool's `max_result_tokens` belongs in its manifest (config/tools/*.yaml).

@@ -48,3 +48,8 @@ class AgentContext:
     # first-class, testable field (like from_voice was) should be promoted
     # out of here rather than accumulating untyped keys.
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    # Session scope for working state (docs/10). `session_id` is resolved ONCE per turn by the first
+    # component that needs it (None until then); `speaker_id` is "" until speaker profiles ship.
+    session_id: str | None = None
+    speaker_id: str = ""

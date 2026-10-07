@@ -47,10 +47,13 @@ from domain.value_objects.urgency import Urgency
 from exceptions.handlers import register_exception_handlers
 from schemas.config_schemas import AppConfig
 from service.agent.registry import AgentRegistry
+from service.agent.assistant_orchestrator import AssistantOrchestrator
+from service.agent.control_decoder import ControlDecoder
 from service.agent.llm_router import LlmRouter
 from service.agent.tool_agent import ToolAgent
 from service.agent.tool_turn_runner import ToolTurnRunner
 from service.agent.tool_use_guard import ToolUseGuard
+from service.session.session_state import SessionStateService
 from service.prompting.prompt_composer import PromptComposer
 from service.agent.responder import ResponderAgent
 from service.agent.supervisor import SupervisorAgent
@@ -85,6 +88,7 @@ from tpa.inference.factory import build_inference_client
 from service.inference.graceful_degradation import GracefulDegradation
 from service.inference.single_flight import SingleFlight
 from tpa.filestore.file_prompt_store import FilePromptStore
+from tpa.persistence.repositories.session_context_repository import SqliteSessionContextRepository
 from tpa.persistence.repositories.trace_repository import SqliteTraceRepository
 from tpa.filestore.yaml_tool_manifest_store import YamlToolManifestStore
 from tpa.online.http_client import AllowListedHttpClient
@@ -841,10 +845,16 @@ def bootstrap(app: FastAPI) -> None:
     agent_registry = AgentRegistry()
     trace_repo = SqliteTraceRepository()
     app.state.trace_repo = trace_repo
+    session_state = SessionStateService(
+        SqliteSessionContextRepository(), tool_manifests, ttl_sec=cfg.agents.session_ttl_sec,
+    )
+    app.state.session_state = session_state
     guard = ToolUseGuard(tool_manifests.values())
+    use_orchestrator = cfg.agents.orchestrator_enabled and bool(tool_manifests)
     count_tokens = getattr(inference_backend, "count_tokens", None) or estimate_tokens
     composer = PromptComposer(
-        FilePromptStore(), list(tool_manifests.values()), budgets=PromptBudgets(), count_tokens=count_tokens,
+        FilePromptStore(), list(tool_manifests.values()), budgets=PromptBudgets(**cfg.prompting.budgets), count_tokens=count_tokens,
+        turn_chars=cfg.prompting.turn_chars, user_message_chars=cfg.prompting.user_message_chars,
     )
     tool_runner = ToolTurnRunner(
         client=inference_client, composer=composer, skill_runner=skill_runner,
@@ -854,7 +864,11 @@ def bootstrap(app: FastAPI) -> None:
     responder = ResponderAgent(
         client=inference_client, conversation=conversation, knowledge=knowledge,
         model=cfg.agents.responder.model, memory=memory_repo,
-        recall=semantic_recall, claim_filter=guard.claims_action,
+        recall=semantic_recall,
+        # Orchestrator on: chat is only reached when no tool ran, so any action claim is unbacked and is vetted as it
+        # is generated, and real tool exchanges stay in the history (the old filter deleted them). Off: legacy filter.
+        claim_filter=None if use_orchestrator else guard.claims_action,
+        reply_veto=guard.claims_action if use_orchestrator else None,
         persona=FilePromptStore().get("persona_chat") if cfg.app.chat_persona == "compact" else None,
     )
     system_agent = SystemAgent(
@@ -879,24 +893,41 @@ def bootstrap(app: FastAPI) -> None:
                 triggers=[t for n in owned for t in tool_manifests[n].triggers],
                 runner=tool_runner, fallback=responder, guard=guard,
                 conversation=conversation, memory=memory_repo,
-                model=cfg.agents.responder.model, traces=trace_repo,
+                model=cfg.agents.responder.model, traces=trace_repo, session_state=session_state,
             ))
 
     # Routing: config/routing.yaml decides keyword | hybrid | model. The old `agents.llm_routing: true` flag still
     # works when routing.mode is left at "keyword": it means "keyword rules, then the main LLM for unmatched messages".
     routing_mode = cfg.routing.mode
-    llm_router = _build_router(cfg, inference_client, composer, conversation, inference_lock, inference_thread_lock)
-    if cfg.agents.llm_routing and routing_mode == "keyword":
+    # With the orchestrator there is no routing step, so the router model (and its RAM) is not loaded at all.
+    llm_router = None if use_orchestrator else _build_router(
+        cfg, inference_client, composer, conversation, inference_lock, inference_thread_lock)
+    if use_orchestrator:
+        routing_mode = "keyword"
+    if cfg.agents.llm_routing and routing_mode == "keyword" and not use_orchestrator:
         logger.warning("[route] agents.llm_routing is deprecated; set routing.mode in config/routing.yaml instead")
         llm_router = LlmRouter(
             client=inference_client, composer=composer, model=cfg.agents.supervisor.model,
             num_predict=min(cfg.inference.routing_num_predict, 24), history=lambda: conversation.turns,
         )
         routing_mode = None  # legacy behaviour
-    elif routing_mode != "keyword" and llm_router is None:
+    elif routing_mode != "keyword" and llm_router is None:  # (never true with the orchestrator: it forces "keyword")
         logger.error(f"[route] routing.mode={routing_mode} but no router model is available; using keyword rules")
         routing_mode = "keyword"
     app.state.llm_router = llm_router
+    orchestrator = None
+    if use_orchestrator:
+        orchestrator = AssistantOrchestrator(
+            decoder=ControlDecoder(
+                client=inference_client, composer=composer, manifests=tool_manifests,
+                model=cfg.agents.responder.model, exchanges=cfg.prompting.control_history_exchanges,
+            ),
+            composer=composer, skill_runner=skill_runner, manifests=tool_manifests, responder=responder,
+            client=inference_client, conversation=conversation, claims_action=guard.claims_action,
+            session_state=session_state, traces=trace_repo, memory=memory_repo, model=cfg.agents.responder.model,
+        )
+        logger.info("[config] orchestrator ON: one control decode per turn (no routing, no router model)")
+    app.state.orchestrator = orchestrator
     supervisor = SupervisorAgent(
         agent_registry=agent_registry, client=inference_client, default_agent="responder",
         model=cfg.agents.supervisor.model, debounce_window_sec=cfg.sensing.debounce_window_sec,
@@ -904,7 +935,7 @@ def bootstrap(app: FastAPI) -> None:
         proactivity=cfg.sensing.proactivity, memory=memory_repo, governance=governance,
         conversation=conversation,
         routing_num_predict=cfg.inference.routing_num_predict, llm_router=llm_router,
-        routing_mode=routing_mode, router_on_failure=cfg.routing.on_failure,
+        routing_mode=routing_mode, router_on_failure=cfg.routing.on_failure, orchestrator=orchestrator,
     )
     agent_registry.register(supervisor)
     app.state.agent_registry = agent_registry
@@ -963,7 +994,7 @@ async def _backfill_memory_index(app: FastAPI) -> None:
         logger.warning(f"[memory-index] backfill failed: {e}")
 
 
-async def _housekeeping_loop(task_service, trace_repo, interval_sec: float = 3600.0) -> None:
+async def _housekeeping_loop(task_service, trace_repo, session_state=None, interval_sec: float = 3600.0) -> None:
     """Hourly: drop completed tasks and old tool-turn traces past their retention windows."""
     from datetime import datetime, timedelta
 
@@ -977,6 +1008,10 @@ async def _housekeeping_loop(task_service, trace_repo, interval_sec: float = 360
             old = trace_repo.purge_before(datetime.now() - timedelta(days=TURN_TRACE_RETENTION_DAYS))
             if old:
                 logger.info(f"[trace] purged {old} old tool-turn trace(s)")
+            if session_state is not None:
+                expired = session_state.purge_expired()
+                if expired:
+                    logger.info(f"[session-state] purged {expired} expired row(s)")
         except Exception as e:
             logger.warning(f"[housekeeping] failed: {e}")
         await asyncio.sleep(interval_sec)
@@ -1017,6 +1052,8 @@ async def lifespan(app: FastAPI):
 
     if cfg.inference.warmup_on_boot:
         await app.state.supervisor.warm_router()
+        if app.state.orchestrator is not None:
+            await app.state.orchestrator.warmup()  # pre-evaluate the control prefix so the first real turn is not cold
 
     # Must start inside the running loop — the gate captures it so a
     # mute transition raised on a hardware thread can still reach the bus.
@@ -1030,7 +1067,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"ConversationSummariser failed to start: {e}")
 
-    app.state.task_purge_job = asyncio.create_task(_housekeeping_loop(app.state.task_service, app.state.trace_repo))
+    app.state.task_purge_job = asyncio.create_task(_housekeeping_loop(app.state.task_service, app.state.trace_repo, app.state.session_state))
 
     if getattr(app.state, "memory_indexer", None) is not None and app.state.memory_indexer.enabled:
         asyncio.create_task(_backfill_memory_index(app))
