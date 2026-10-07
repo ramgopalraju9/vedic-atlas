@@ -28,7 +28,7 @@ def test_profile_from_the_environment_overrides_the_base(monkeypatch):
     assert config.active_profile() == "qwen3-0.6b"
     assert "0.6B" in cfg.inference.model_path
     assert cfg.app.chat_summaries == 0 and cfg.app.chat_persona == "compact"
-    assert cfg.inference.n_ctx == 2048
+    assert cfg.inference.n_ctx == 3072
     assert cfg.embedding.top_k == 1
 
 
@@ -60,4 +60,4 @@ def test_an_unknown_profile_fails_loudly(monkeypatch):
 def test_every_shipped_profile_loads(monkeypatch, name):
     monkeypatch.setenv("VEDA_PROFILE", name)
     cfg = config.load_full_config()
-    assert cfg.inference.n_ctx == 2048 and cfg.app.max_history == 4 and cfg.app.chat_persona == "compact"
+    assert cfg.inference.n_ctx == 3072 and cfg.app.max_history == 4 and cfg.app.chat_persona == "compact"

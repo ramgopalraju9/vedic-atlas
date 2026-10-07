@@ -3,7 +3,9 @@
 # the base one, so without VEDA_PROFILE the 4B runs with the untrimmed base config exactly as before.
 inference:
   model_path: data/Qwen3-4B-Q4_K_M.gguf
-  n_ctx: 2048
+  n_ctx: 3072
+  # The control decode's static prompt (persona + every tool + rules/examples) is ~2,200 estimated tokens, so 2048 can
+  # no longer hold it. 3072 holds it plus history, the question and the 200-token decision (test_profiles_fit_the_control_prompt).
   num_predict: 80
 app:
   max_history: 4       # recent turns replayed into each chat prompt (base: 30)
@@ -12,3 +14,6 @@ app:
 embedding:
   top_k: 1             # semantic recall: at most one memory (base: 3)
   min_score: 0.55
+prompting:
+  budgets:
+    control: 2800      # n_ctx 3072 minus the 200-token decision and a margin; history is trimmed first to fit (shallow merge: other budgets keep their defaults)
