@@ -329,12 +329,7 @@ class AgentsConfig(BaseModel):
     tasks: AgentEntry = AgentEntry(description="The user's to-do list: add, list, complete, delete tasks")
     lookup: AgentEntry = AgentEntry(description="Live data from the web: weather, currency rates, news, current facts")
     memory: AgentEntry = AgentEntry(description="Saves lasting facts the user states about themselves: favourites, allergies, names, routines")
-    tools_enabled: bool = False  # when true, tool-owning specialist agents (from config/tools) are registered
-    llm_routing: bool = False  # when true, messages the routing rules don't recognise are routed by a small LLM call
     session_ttl_sec: int = 900  # session working state older than this is ignored (docs/10)
-    # Unified control decode: ONE context-aware decision per turn replaces keyword routing + the router model +
-    # the per-agent tool decision. false = the legacy supervisor path (the rollback target). See docs/10.
-    orchestrator_enabled: bool = False
 
 
 class SkillEntry(BaseModel):
@@ -366,33 +361,6 @@ class SkillsConfig(BaseModel):
     )
     tasks: SkillEntry = SkillEntry(permission_level="notify")
     custom_skills_dir: str = "data/custom_skills"
-
-
-class RouterModelConfig(BaseModel):
-    """routing.model: the small dedicated model that picks the specialist agent (llama.cpp, GGUF)."""
-
-    # A path = a separate small model (e.g. Qwen3-0.6B) that only routes. null = the main LLM does the routing too.
-    model_path: str | None = "data/Qwen3-0.6B-Q4_K_M.gguf"
-    n_ctx: int = 2560             # the fixed router prompt (persona + ~65 examples) is ~1.6k tokens; room for history + message
-    n_threads: int | None = None
-    timeout_sec: float = 8.0      # how long the model may RUN for one routing call (queue time is not counted)
-    queue_wait_sec: float = 30.0  # how long a routing call may wait behind the main model before it is skipped
-    num_predict: int = 16         # the answer is {"agent": "<name>"}
-    prompt_cache_mb: int = 64     # the long fixed router prompt is evaluated once and reused
-
-
-class RoutingConfig(BaseModel):
-    """routing: section - how a message is mapped to a specialist agent.
-
-    keyword: manifest trigger regexes + word overlap only (instant; the model is never loaded).
-    model:   the router model decides every message; keyword rules are only the fallback if it fails.
-    hybrid:  keyword rules decide when SURE (one agent's trigger matched, no correction cue); the router
-             model decides everything else (no match, a weak match, two agents claiming it, a negation).
-    """
-
-    mode: Literal["keyword", "hybrid", "model"] = "keyword"
-    on_failure: Literal["keyword", "chat"] = "keyword"  # when the router cannot answer: use the rules, or go to chat
-    model: RouterModelConfig = RouterModelConfig()
 
 
 class PromptingConfig(BaseModel):
@@ -432,6 +400,5 @@ class AppConfig(BaseModel):
     governance: GovernanceConfig = GovernanceConfig()
     guardrails: GuardrailsConfig = GuardrailsConfig()
     agents: AgentsConfig = AgentsConfig()
-    routing: RoutingConfig = RoutingConfig()
     prompting: PromptingConfig = PromptingConfig()
     skills: SkillsConfig = SkillsConfig()

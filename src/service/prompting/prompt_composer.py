@@ -259,42 +259,6 @@ class PromptComposer:
 
         return ". Tools: " + "; ".join(f"{m.name} - {short(m.description)}" for m in owned) + "."
 
-    def route_stage(
-        self, agents: Sequence[tuple[str, str]], user_message: str, history: Sequence[Turn] = ()
-    ) -> ComposedPrompt:
-        """Routing prompt: each agent with its one-line description, plus example phrases taken from
-        the tool manifests (so adding a tool teaches the router about it with no code change)."""
-        agent_lines = "\n".join(f"- {name}: {desc}{self._tools_clause(name)}" for name, desc in agents)
-        example_lines = []
-        for name, _ in agents:
-            seen = 0
-            for m in self._manifests.values():
-                if m.agent != name:
-                    continue
-                for ex in m.examples[:1]:  # one per tool: the fixed examples in router.md cover the hard cases
-                    if seen >= 3:
-                        break
-                    example_lines.append(f'"{ex.user}" -> {name}')
-                    seen += 1
-        system = (
-            self._prompts.get("router")
-            .replace("<<agents>>", agent_lines)
-            .replace("<<examples>>", "\n".join(example_lines))
-        )
-        keep = 2
-        trimmed: list[str] = []
-        while True:
-            hist = self._history_lines(history, keep)
-            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [f"Message: {self._clip(user_message, self._user_msg_chars)}\nAnswer:"])
-            total = self._count(system) + self._count(volatile)
-            if total <= self.budgets.route or keep == 0:
-                break
-            keep -= 1
-            trimmed.append("history_turn")
-        return ComposedPrompt(system=system, prompt=volatile, tokens=total,
-                              sections={"static": self._count(system), "history": self._count("\n".join(hist)) if hist else 0},
-                              trimmed=trimmed)
-
     def narrate_stage(self, user_message: str, tool_results: Sequence[str]) -> ComposedPrompt:
         """Phrase tool results for the user: the `narrate` task of the content stage."""
         result = "\n".join(r.strip() for r in tool_results if r and r.strip())

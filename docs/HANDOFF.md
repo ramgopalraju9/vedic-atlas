@@ -1,7 +1,12 @@
 # HANDOFF — unified control decode (read this first on another device)
 
-**Branch:** `feature/unified-orchestrator` (branched from `release/v1.1` @ `1771944`). Work is **paused mid-gate** on purpose.
-**Written:** 2026-10-07. Nothing here is merged; the new path is **off by default** (`orchestrator_enabled: false`), so behaviour on the default config is unchanged.
+> **UPDATE 2026-10-08 — read this block first; the sections below it are the 2026-10-07 state and are partly STALE.**
+> Phases 3, 4 and 5 are done; the guide's Phase 6 first step (`AmbientDispatcher`) is done. **There is no `orchestrator_enabled` flag any more**: the orchestrator is the only path (rollback = `git revert` of the Phase 3 commit). Routing, the router model, `required_when` forcing, `SystemAgent` and `_without_action_claims` are deleted; `scripts/eval_tools.py`, `eval_orchestrator.py`, `eval_routing.py` no longer exist (`spike_decision_protocol.py` is the eval). Details: `docs/10-orchestrator-review-and-plan.md` §6d-§6g.
+> **Open gate:** tuned golden set 84% (43/51); the held-out set (`tests/eval/orchestrator_heldout.yaml`, never tune on it) scored 65% BEFORE the `/no_think` fix and the forecast tool; the re-run was pending when Phase 3 was done at the user's request. If it stays far below the tuned score: larger control model or fixed tool groups (Plan B), not more prompt tuning.
+> **Remaining (Phase 6 cutover):** delete `ToolAgent`, `ToolTurnRunner` decide path + `call_stage` + `build_call_schema` + `budgets.call` and their tests (`test_tool_turn.py`...); update `docs/00`-`08` and the README; measure on the Pi (decision latency was 13 s median on a laptop; small profile `n_ctx: 2048` cannot hold the ~2,300-token control prompt).
+
+**Branch:** `feature/unified-orchestrator` (branched from `release/v1.1` @ `1771944`).
+**Written:** 2026-10-07 (this paragraph and below are historical).
 
 ## 0. What this work is
 Veda (a **voice** assistant; typed chat is only a test/future feature) decides each turn in up to four places today: keyword router → 0.6B router model → per-agent tool decision → `SystemAgent` planner. The router cannot see conversation, so follow-ups fail (Bug A), and a `required_when` regex forces tool calls the model correctly refused (Bug B).

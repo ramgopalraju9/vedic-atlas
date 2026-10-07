@@ -11,12 +11,8 @@ Batch 11 entry for the full reasoning on each):
   - The always-on ambient voice loop (`service/voice/voice_session.py` was
     never built in any batch — `AmbientLoop`/wake-word/STT/TTS adapters
     exist in `tpa/` but have no orchestrator wired to them yet).
-  - `ResponderAgent` has no skill-calling loop — the donor's tool-calling
-    relied on the Claude/Copilot CLI's native tool-use protocol, which a
-    raw Ollama/llama.cpp `complete()` call doesn't provide equivalently.
-    `SkillRunner` is still constructed and available on `app.state` for a
-    future tool-calling redesign; `SystemAgent`'s bespoke single-action
-    JSON protocol is the only skill-invocation path wired today.
+  - `ResponderAgent` has no skill-calling loop: every turn first goes through the AssistantOrchestrator's ONE
+    control decode, and tools run only through `SkillRunner`.
 """
 
 from __future__ import annotations
@@ -49,15 +45,11 @@ from schemas.config_schemas import AppConfig
 from service.agent.registry import AgentRegistry
 from service.agent.assistant_orchestrator import AssistantOrchestrator
 from service.agent.control_decoder import ControlDecoder
-from service.agent.llm_router import LlmRouter
-from service.agent.tool_agent import ToolAgent
-from service.agent.tool_turn_runner import ToolTurnRunner
 from service.agent.tool_use_guard import ToolUseGuard
 from service.session.session_state import SessionStateService
 from service.prompting.prompt_composer import PromptComposer
 from service.agent.responder import ResponderAgent
 from service.agent.supervisor import SupervisorAgent
-from service.agent.system import SystemAgent
 from service.approval.approval_broker import ApprovalBroker
 from service.conversation.conversation_manager import ConversationManager
 from service.conversation.summariser import ConversationSummariser
@@ -574,43 +566,6 @@ def _build_inference(cfg: AppConfig, governance, lock: asyncio.Lock | None = Non
     return wrapped, primary
 
 
-def _build_router(cfg: AppConfig, main_client, composer, conversation, lock: asyncio.Lock, thread_lock=None):
-    """The model that routes messages, or None (keyword mode, or the router model could not be set up).
-
-    A dedicated small model (routing.model.model_path) gets its own llama.cpp instance that shares the main
-    model's lock; `model_path: null` makes the main LLM route too. Any problem here degrades to keyword rules.
-    """
-    rcfg = cfg.routing
-    if rcfg.mode == "keyword":
-        return None
-    m = rcfg.model
-    client, model_name = main_client, cfg.agents.supervisor.model
-    if m.model_path:
-        from core.constants import PROJECT_ROOT
-        path = Path(m.model_path)
-        path = path if path.is_absolute() else PROJECT_ROOT / path
-        if not path.exists():
-            logger.error(f"[route] router model not found at {path}; routing by keyword rules only")
-            return None
-        try:
-            client = SingleFlight(
-                build_inference_client(
-                    backend="llama_cpp", llama_cpp_model_path=str(path), n_ctx=m.n_ctx, n_threads=m.n_threads,
-                    timeout=m.timeout_sec, num_predict=m.num_predict, think=False, prompt_cache_mb=m.prompt_cache_mb,
-                    model_lock=thread_lock,
-                ),
-                lock=lock,
-            )
-        except Exception as e:
-            logger.error(f"[route] could not load the router model ({type(e).__name__}: {e}); routing by keyword rules only")
-            return None
-        model_name = None
-    return LlmRouter(
-        client=client, composer=composer, model=model_name, num_predict=m.num_predict,
-        timeout_sec=m.timeout_sec, queue_wait_sec=m.queue_wait_sec, history=lambda: conversation.turns,
-    )
-
-
 def _build_embedding(cfg: AppConfig):
     ecfg = cfg.embedding
     if not ecfg.enabled:
@@ -847,6 +802,13 @@ def bootstrap(app: FastAPI) -> None:
     app.state.skill_runner = skill_runner
 
     system_control = _build_system_control()
+    from service.skills.builtin.system_control import AppControlSkill, DeviceStatusSkill, VolumeControlSkill
+    for tool_name, skill_cls in (
+        ('app_control', AppControlSkill), ('volume_control', VolumeControlSkill), ('device_status', DeviceStatusSkill),
+    ):
+        manifest = tool_manifests.get(tool_name)
+        if manifest is not None:
+            skill_registry.register(skill_cls(system_control, manifest, governance=governance))
     agent_registry = AgentRegistry()
     trace_repo = SqliteTraceRepository()
     app.state.trace_repo = trace_repo
@@ -855,91 +817,32 @@ def bootstrap(app: FastAPI) -> None:
     )
     app.state.session_state = session_state
     guard = ToolUseGuard(tool_manifests.values())
-    use_orchestrator = cfg.agents.orchestrator_enabled and bool(tool_manifests)
     count_tokens = getattr(inference_backend, "count_tokens", None) or estimate_tokens
     composer = PromptComposer(
         FilePromptStore(), list(tool_manifests.values()), budgets=PromptBudgets(**cfg.prompting.budgets), count_tokens=count_tokens,
         turn_chars=cfg.prompting.turn_chars, user_message_chars=cfg.prompting.user_message_chars,
     )
-    tool_runner = ToolTurnRunner(
-        client=inference_client, composer=composer, skill_runner=skill_runner,
-        manifests=tool_manifests, guard=guard, conversation=conversation,
-        model=cfg.agents.responder.model,
-    )
     responder = ResponderAgent(
         client=inference_client, conversation=conversation, knowledge=knowledge,
         model=cfg.agents.responder.model, memory=memory_repo,
         recall=semantic_recall,
-        # Orchestrator on: chat is only reached when no tool ran, so any action claim is unbacked and is vetted as it
-        # is generated, and real tool exchanges stay in the history (the old filter deleted them). Off: legacy filter.
-        claim_filter=None if use_orchestrator else guard.claims_action,
-        reply_veto=guard.claims_action if use_orchestrator else None,
+        # Chat is only reached when no tool ran, so any action claim is unbacked: it is vetted as it is generated.
+        reply_veto=guard.claims_action,
         persona=FilePromptStore().get("persona_chat") if cfg.app.chat_persona == "compact" else None,
         chat_budget_tokens=PromptBudgets(**cfg.prompting.budgets).chat, history_turn_chars=cfg.prompting.turn_chars,
     )
-    system_agent = SystemAgent(
-        client=inference_client, system_control=system_control,
-        model=cfg.agents.system.model, governance=governance, memory=memory_repo,
-    )
     agent_registry.register(responder)
-    agent_registry.register(system_agent)
-    if cfg.agents.tools_enabled:
-        # One specialist per owning agent named in the tool manifests. Routing
-        # triggers, tools and guard rules all come from the manifests.
-        for owner in sorted({m.agent for m in tool_manifests.values()}):
-            owned = composer.tools_of_agent(owner)
-            agent_registry.register(ToolAgent(
-                name=owner,
-                description=(
-                    getattr(cfg.agents, owner, None).description
-                    if getattr(cfg.agents, owner, None) is not None and getattr(cfg.agents, owner).description
-                    else "; ".join(tool_manifests[n].description for n in owned)
-                ),
-                tool_names=owned,
-                triggers=[t for n in owned for t in tool_manifests[n].triggers],
-                runner=tool_runner, fallback=responder, guard=guard,
-                conversation=conversation, memory=memory_repo,
-                model=cfg.agents.responder.model, traces=trace_repo, session_state=session_state,
-            ))
-
-    # Routing: config/routing.yaml decides keyword | hybrid | model. The old `agents.llm_routing: true` flag still
-    # works when routing.mode is left at "keyword": it means "keyword rules, then the main LLM for unmatched messages".
-    routing_mode = cfg.routing.mode
-    # With the orchestrator there is no routing step, so the router model (and its RAM) is not loaded at all.
-    llm_router = None if use_orchestrator else _build_router(
-        cfg, inference_client, composer, conversation, inference_lock, inference_thread_lock)
-    if use_orchestrator:
-        routing_mode = "keyword"
-    if cfg.agents.llm_routing and routing_mode == "keyword" and not use_orchestrator:
-        logger.warning("[route] agents.llm_routing is deprecated; set routing.mode in config/routing.yaml instead")
-        llm_router = LlmRouter(
-            client=inference_client, composer=composer, model=cfg.agents.supervisor.model,
-            num_predict=min(cfg.inference.routing_num_predict, 24), history=lambda: conversation.turns,
-        )
-        routing_mode = None  # legacy behaviour
-    elif routing_mode != "keyword" and llm_router is None:  # (never true with the orchestrator: it forces "keyword")
-        logger.error(f"[route] routing.mode={routing_mode} but no router model is available; using keyword rules")
-        routing_mode = "keyword"
-    app.state.llm_router = llm_router
-    orchestrator = None
-    if use_orchestrator:
-        orchestrator = AssistantOrchestrator(
-            decoder=ControlDecoder(
-                client=inference_client, composer=composer, manifests=tool_manifests,
-                model=cfg.agents.responder.model, exchanges=cfg.prompting.control_history_exchanges,
-            ),
-            composer=composer, skill_runner=skill_runner, manifests=tool_manifests, responder=responder,
-            client=inference_client, conversation=conversation, claims_action=guard.claims_action,
-            session_state=session_state, traces=trace_repo, memory=memory_repo, model=cfg.agents.responder.model,
-        )
-        logger.info("[config] orchestrator ON: one control decode per turn (no routing, no router model)")
-    app.state.orchestrator = orchestrator
-    supervisor = SupervisorAgent(
-        agent_registry=agent_registry, client=inference_client, default_agent="responder",
-        model=cfg.agents.supervisor.model, memory=memory_repo, governance=governance,
-        routing_num_predict=cfg.inference.routing_num_predict, llm_router=llm_router,
-        routing_mode=routing_mode, router_on_failure=cfg.routing.on_failure, orchestrator=orchestrator,
+    orchestrator = AssistantOrchestrator(
+        decoder=ControlDecoder(
+            client=inference_client, composer=composer, manifests=tool_manifests,
+            model=cfg.agents.responder.model, exchanges=cfg.prompting.control_history_exchanges,
+        ),
+        composer=composer, skill_runner=skill_runner, manifests=tool_manifests, responder=responder,
+        client=inference_client, conversation=conversation, claims_action=guard.claims_action,
+        session_state=session_state, traces=trace_repo, memory=memory_repo, model=cfg.agents.responder.model,
     )
+    app.state.orchestrator = orchestrator
+    supervisor = SupervisorAgent(model=cfg.agents.supervisor.model, orchestrator=orchestrator)
     agent_registry.register(supervisor)
     app.state.agent_registry = agent_registry
     app.state.supervisor = supervisor
@@ -1033,8 +936,7 @@ async def lifespan(app: FastAPI):
     logger.info(
         f"[config] profile={active_profile() or 'base (none set)'} model={cfg.inference.model_path} "
         f"n_ctx={cfg.inference.n_ctx} max_history={cfg.app.max_history} chat_summaries={cfg.app.chat_summaries} "
-        f"chat_persona={cfg.app.chat_persona} routing={cfg.routing.mode}"
-        + (f" router_model={cfg.routing.model.model_path or 'main LLM'}" if cfg.routing.mode != "keyword" else "")
+        f"chat_persona={cfg.app.chat_persona}"
     )
     ensure_dirs()
     init_tables()
@@ -1059,9 +961,7 @@ async def lifespan(app: FastAPI):
             logger.warning(f"[inference] warmup skipped: {e}")
 
     if cfg.inference.warmup_on_boot:
-        await app.state.supervisor.warm_router()
-        if app.state.orchestrator is not None:
-            await app.state.orchestrator.warmup()  # pre-evaluate the control prefix so the first real turn is not cold
+        await app.state.orchestrator.warmup()  # pre-evaluate the control prefix so the first real turn is not cold
 
     # Must start inside the running loop — the gate captures it so a
     # mute transition raised on a hardware thread can still reach the bus.

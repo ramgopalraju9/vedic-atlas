@@ -1,0 +1,27 @@
+name: app_control
+agent: system
+description: Open, close or switch to an application on the user's device.
+reply_mode: template        # the sentence is the device's own confirmation, never model text
+permission_level: notify
+returns: value
+destructive_when: {action: [close]}     # closing can lose unsaved work
+target_params: [name]                   # the app must be named in the user's own words, or the turn asks
+
+params:
+  action:
+    type: string
+    required: true
+    enum: [open, close, focus]
+  name:
+    type: string
+    required: true
+    description: application name
+
+examples:
+  - user: open VS Code
+    calls: [{tool: app_control, args: {action: open, name: vs code}}]
+    prompt_example: true
+  - user: please close Spotify
+    calls: [{tool: app_control, args: {action: close, name: spotify}}]
+  - user: bring chrome to the front
+    calls: [{tool: app_control, args: {action: focus, name: chrome}}]

@@ -297,14 +297,14 @@ def test_stream_of_a_tool_turn_emits_the_reply_once_and_chat_streams_through_the
     assert tool_text == "In Tokyo it's 18 degrees." and chat_text == "Hi!"
 
 
-def test_supervisor_delegates_every_turn_to_the_orchestrator_and_skips_routing():
+def test_supervisor_delegates_every_turn_to_the_orchestrator():
     e = env([dec(live=False)], {}, responder_text="Chat!")
-    sup = SupervisorAgent(agent_registry=None, client=None, orchestrator=e.orch)   # no registry: routing would crash
+    sup = SupervisorAgent(orchestrator=e.orch)
     result = asyncio.run(sup.execute(AgentContext(user_message="hello")))
     assert result.response == "Chat!" and result.delegated_to == "responder"
 
     e2 = env([dec([call("get_weather", place="Tokyo")], live=True)], {"get_weather": WEATHER})
-    sup2 = SupervisorAgent(agent_registry=None, client=None, orchestrator=e2.orch)
+    sup2 = SupervisorAgent(orchestrator=e2.orch)
 
     async def run():
         return "".join([c async for c in sup2.execute_stream(AgentContext(user_message="weather"))])

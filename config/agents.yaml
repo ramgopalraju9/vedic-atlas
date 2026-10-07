@@ -1,19 +1,9 @@
-# When true, a specialist agent is registered for every owner named in config/tools/*.yaml
-# (tasks, lookup, ...). Each runs its tools through the staged tool turn: constrained JSON
-# call -> guarded execution -> reply. Routing, prompts and guard rules come from the manifests.
-tools_enabled: true
-
-# Routing: manifest triggers and keyword overlap decide first (instant). With llm_routing on, a message
-# they don't recognise is routed by one tiny constrained model call (adds ~1-3 s to those turns)
-# instead of defaulting to plain chat. Set false to route by rules only.
-llm_routing: false   # off for v1: on a Raspberry Pi the routing call takes 30 s+ (about 2 s on a laptop)
+# Every user turn goes through ONE control decode (service/agent/assistant_orchestrator.py); the tools it can
+# call are the manifests in config/tools/*.yaml. There is no routing step and no per-owner specialist agent.
 
 # Session working state (last successful tool + its slots) is ignored once older than this many seconds.
 session_ttl_sec: 900
 
-# Unified control decode: one context-aware decision per turn replaces keyword routing, the router model and the
-# per-agent tool decision (docs/10). false = the legacy supervisor + ToolTurnRunner path (rollback target).
-orchestrator_enabled: false
 # (How much history the control decode sees, and every prompt budget, live in config/prompting.yaml.)
 
 supervisor:

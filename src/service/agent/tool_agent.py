@@ -113,7 +113,7 @@ class ToolAgent(BaseAgent):
         try:
             self._traces.record(TurnTrace(
                 request_id=ctx.request_id, agent=self.name, user_message=ctx.user_message[:300],
-                reply=reply[:400], decided=decided, forced=outcome.forced, narrated=outcome.narrated,
+                reply=reply[:400], decided=decided, narrated=outcome.narrated,
                 total_ms=int((time.perf_counter() - started) * 1000),
                 calls=[
                     {"tool": c.tool, "args": c.args, "ok": c.ok, "ms": c.ms,

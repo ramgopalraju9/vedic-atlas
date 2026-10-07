@@ -9,12 +9,10 @@ import pytest
 
 from core.enums import ExceptionCode
 from domain.entities.agent_context import AgentContext
-from domain.entities.agent_profile import AgentProfile
 from domain.entities.fact_answer import FactAnswer
 from domain.entities.fact_query import FactQuery
 from domain.policies.coordinate_policy import parse_lat_lon
 from domain.policies.currency_policy import normalize_currency, parse_amount
-from domain.policies.routing_policy import pick_agent
 from domain.policies.weather_code_policy import describe_weather_code
 from exceptions.exception import AppException, ToolUnavailableError
 from service.lookup.currency_lookup import CurrencyLookup
@@ -327,41 +325,15 @@ def test_skill_rejects_unknown_params_and_bad_values():
     assert ok.success and ok.metadata["source"] == "frankfurter"
 
 
-# ---- manifests & routing -------------------------------------------------------
-
-def _profiles():
-    by_agent = {}
-    for m in MANIFESTS.values():
-        by_agent.setdefault(m.agent, []).extend(m.triggers)
-    return (AgentProfile(name="responder", description="General conversation", model_alias=""),) + tuple(
-        AgentProfile(name=a, description=a, model_alias="", triggers=tuple(t)) for a, t in by_agent.items()
-    )
-
-
-@pytest.mark.parametrize("text,agent", [
-    ("what's the weather in Mumbai?", "lookup"),
-    ("is it going to rain today", "lookup"),
-    ("how much is 100 dollars in rupees", "lookup"),
-    ("convert 5000 yen to euros", "lookup"),
-    ("latest news on ISRO", "lookup"),
-    ("who won the cricket match yesterday", "lookup"),
-    ("search for the best biryani in town", "lookup"),
-    ("what are my tasks?", "tasks"),
-    ("I need to bring vegies", "tasks"),
-    ("remind me to call mom", "tasks"),
-    ("tell me a joke", "responder"),
-    ("how are you today?", "responder"),
-])
-def test_phrases_route_to_the_right_agent(text, agent):
-    assert pick_agent(text, _profiles(), "responder") == agent
-
+# ---- manifests --------------------------------------------------------------------
 
 def test_every_manifest_is_small_and_consistent():
-    assert set(MANIFESTS) == {"tasks", "get_weather", "get_weather_forecast", "convert_currency", "web_search", "remember"}
+    assert set(MANIFESTS) == {
+        "tasks", "get_weather", "get_weather_forecast", "convert_currency", "web_search", "remember",
+        "app_control", "volume_control", "device_status",
+    }
     for m in MANIFESTS.values():
-        assert 1 <= len(m.examples) <= 6 and m.triggers
-        if m.name != "get_weather_forecast":  # deliberately never forced from a keyword
-            assert m.required_when
+        assert 1 <= len(m.examples) <= 6
         if m.requires_online:
             assert m.hosts and m.cache_ttl_sec > 0
     assert MANIFESTS["web_search"].reply_mode == "llm"

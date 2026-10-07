@@ -46,7 +46,6 @@ class ResponderAgent(LLMAgent):
         max_history_turns: int = 20,
         memory: MemoryRepositoryPort | None = None,
         recall: "SemanticRecall | None" = None,
-        claim_filter: Callable[[str], bool] | None = None,
         persona: str | None = None,
         reply_veto: Callable[[str], bool] | None = None,
         chat_budget_tokens: int | None = None,
@@ -67,7 +66,6 @@ class ResponderAgent(LLMAgent):
         self.knowledge = knowledge
         self.max_history_turns = max_history_turns
         self._recall = recall
-        self._claim_filter = claim_filter
         # True = this reply asserts a tool action that did not happen. Only set where the chat path is reached with
         # no tool having run (the orchestrator), so every claim here is unbacked. See docs/10 §4.7.
         self._reply_veto = reply_veto
@@ -208,27 +206,12 @@ class ResponderAgent(LLMAgent):
                 # (If it did finish it saved the full text through on_completion, which vets it.)
                 await self.on_completion(ctx, "".join(spoken).strip() or UNCONFIRMED_REPLY)
 
-    def _without_action_claims(self, turns):
-        """Drop "Task added…"-style exchanges (the assistant reply and the user
-        request before it). Shown as history they teach the model to answer in
-        that shape without calling a tool, which is how claims got made up."""
-        if self._claim_filter is None:
-            return turns
-        kept = []
-        for turn in turns:
-            if turn.role != "user" and self._claim_filter(turn.content or ""):
-                if kept and kept[-1].role == "user":
-                    kept.pop()
-                continue
-            kept.append(turn)
-        return kept
-
     def _render_history(self, fits: Callable[[str], bool] | None = None) -> str:
         blocks: list[str] = []
         summaries = self.conversation.get_summaries_block()
         if summaries:
             blocks.append(summaries)
-        recent = self._without_action_claims(self.conversation.turns[-self.max_history_turns:])
+        recent = self.conversation.turns[-self.max_history_turns:]
         lines = []
         for turn in recent:
             content = (turn.content or "").strip()

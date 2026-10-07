@@ -22,9 +22,3 @@ examples:
   - user: how will the weather be the day after tomorrow in Goa
     calls: [{tool: get_weather_forecast, args: {place: Goa, date_offset: 2}}]
 
-# Legacy keyword routing only (removed with it). Narrow on purpose: a bare "tomorrow" also appears in task requests.
-# No required_when: forcing a call from a keyword is the false-positive bug the orchestrator removes.
-triggers:
-  - '\b(umbrella|raincoat)\b'
-  - '\b(weather|rain|forecast|hot|cold)\b.*\b(tomorrow|weekend|next week)\b'
-  - '\b(tomorrow|weekend|next week)\b.*\b(weather|rain|forecast)\b'

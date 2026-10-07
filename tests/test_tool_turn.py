@@ -1,4 +1,4 @@
-"""Phase 2: routing triggers, the staged ToolTurnRunner and ToolAgent.
+"""Phase 2: the staged ToolTurnRunner and ToolAgent (legacy path, deleted at cutover).
 
 Real manifests, prompts, TasksSkill, SkillRunner and an in-memory DB; only the
 model is scripted. Run: pytest tests/test_tool_turn.py
@@ -11,11 +11,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from domain.entities.agent_context import AgentContext
-from domain.entities.agent_profile import AgentProfile
 from domain.entities.agent_result import AgentResult
 from domain.entities.skill_result import SkillResult
 from domain.entities.tool_manifest import ToolManifest, ToolParam
-from domain.policies.routing_policy import pick_agent
 from service.agent.base_agent import BaseAgent
 from service.agent.tool_agent import ToolAgent
 from service.agent.tool_turn_runner import ToolTurnRunner
@@ -103,18 +101,6 @@ def _run(agent, text):
     return asyncio.run(agent.execute(AgentContext(user_message=text)))
 
 
-# ---- routing -------------------------------------------------------------
-
-def test_triggers_route_task_phrases_and_leave_chat_alone():
-    profiles = (
-        AgentProfile(name="responder", description="General conversation", model_alias=""),
-        AgentProfile(name="tasks", description="to-do list", model_alias="", triggers=MANIFESTS["tasks"].triggers),
-    )
-    for text in ["I need to code", "yeah I bought the milk packets", "what are my tasks?", "remind me to call mom"]:
-        assert pick_agent(text, profiles, "responder") == "tasks", text
-    assert pick_agent("how are you today?", profiles, "responder") == "responder"
-
-
 # ---- the staged turn -----------------------------------------------------
 
 def test_complete_by_phrase_uses_one_constrained_call_and_a_templated_reply():
@@ -136,21 +122,21 @@ def test_schema_only_allows_the_agents_tools():
     assert item["properties"]["tool"] == {"const": "tasks"}
 
 
-def test_required_tool_with_empty_decision_is_forced():
-    agent, client, service, *_ = _env([_calls(), _calls(("tasks", {"action": "list"}))])
+def test_an_empty_decision_is_never_forced():
+    """The model reading the whole sentence decided no tool; no keyword may override it (Bug B)."""
+    agent, client, service, *_ = _env([_calls()], chat_reply="Sure, here is the chat answer.")
     service.add("bring vegies")
     res = _run(agent, "what are my tasks?")
-    assert "bring vegies" in res.response
-    assert len(client.calls) == 2
+    assert res.response == "Sure, here is the chat answer."
+    assert len(client.calls) == 1                                              # one decide call, no retry
     assert client.calls[0]["schema"]["properties"]["calls"]["minItems"] == 0
-    assert client.calls[1]["schema"]["properties"]["calls"]["minItems"] == 1   # forced
-    assert "must call a tool" in client.calls[1]["prompt"]
+    assert "must call a tool" not in client.calls[0]["prompt"]
 
 
-def test_unparseable_output_is_treated_as_no_call_then_forced():
-    agent, client, service, *_ = _env(["not json at all", _calls(("tasks", {"action": "list"}))])
-    service.add("code")
-    assert "code" in _run(agent, "show my to-do list").response
+def test_unparseable_output_is_treated_as_no_call_not_retried():
+    agent, client, *_ = _env(["not json at all"], chat_reply="Chat answer.")
+    assert _run(agent, "show my to-do list").response == "Chat answer."
+    assert len(client.calls) == 1
 
 
 def test_not_required_and_empty_hands_over_to_chat():

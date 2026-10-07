@@ -1,0 +1,24 @@
+name: volume_control
+agent: system
+description: Read or change the device volume, or mute and unmute.
+reply_mode: template
+permission_level: auto
+returns: value
+
+params:
+  action:
+    type: string
+    required: true
+    enum: [get, set, mute, unmute]
+  level:
+    type: integer
+    description: volume 0 to 100, only for set
+
+examples:
+  - user: turn the volume to 30
+    calls: [{tool: volume_control, args: {action: set, level: 30}}]
+    prompt_example: true
+  - user: mute
+    calls: [{tool: volume_control, args: {action: mute}}]
+  - user: how loud is it
+    calls: [{tool: volume_control, args: {action: get}}]

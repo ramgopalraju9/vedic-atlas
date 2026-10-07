@@ -1,0 +1,19 @@
+name: device_status
+agent: system
+description: Report the device battery level, or the busiest running applications.
+reply_mode: template
+permission_level: auto
+returns: value
+
+params:
+  what:
+    type: string
+    required: true
+    enum: [battery, processes]
+
+examples:
+  - user: how much battery is left
+    calls: [{tool: device_status, args: {what: battery}}]
+    prompt_example: true
+  - user: what's running right now
+    calls: [{tool: device_status, args: {what: processes}}]

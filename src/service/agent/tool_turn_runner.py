@@ -3,8 +3,6 @@
     A. DECIDE   a tiny prompt (persona-lite + this agent's tools + last 2 turns) and a
                 JSON-schema-constrained completion -> {"calls": [...]}. The model can't
                 emit malformed JSON, an unknown tool or a bad argument.
-       FORCE    if the user's message matches a tool's `required_when` (e.g. "my tasks",
-                "weather") and the model returned no call, retry once with minItems=1.
     B. EXECUTE  each call goes through SkillRunner (permission / rate-limit / validators /
                 audit hooks all still apply). Every call is logged.
     C. REPLY    template tools: the reply is the tool's own `spoken` text (nothing for the
@@ -33,7 +31,6 @@ from service.agent.tool_use_guard import ToolUseGuard
 from service.prompting.prompt_composer import PromptComposer
 from service.skills.skill_runner import SkillRunner
 
-_FORCE_NOTE = "\nNOTE: this message is about {tools}. You must call a tool - do not reply with an empty list."
 _FAIL_REPLY = "I couldn't do that: {error}"
 
 
@@ -53,7 +50,6 @@ class ExecutedCall:
 class TurnOutcome:
     reply: str | None  # None => no tool needed, hand to plain chat
     calls: list[ExecutedCall] = field(default_factory=list)
-    forced: bool = False
     narrated: bool = False
     prompt_tokens: dict[str, int] = field(default_factory=dict)
     timings_ms: dict[str, int] = field(default_factory=dict)
@@ -170,19 +166,6 @@ class ToolTurnRunner:
         calls = await self._decide(stage_a.system, stage_a.prompt, manifests, min_calls=0)
         outcome.timings_ms["decide"] = int((time.perf_counter() - t0) * 1000)
 
-        required = [t for t in self._guard.required_tools(ctx.user_message) if t in tool_names]
-        if not calls and required:
-            outcome.forced = True
-            logger.warning(f"[tool-guard] no call for required tool(s) {required}; forcing. user={ctx.user_message!r}")
-            t1 = time.perf_counter()
-            calls = await self._decide(
-                stage_a.system,
-                stage_a.prompt + _FORCE_NOTE.format(tools=", ".join(required)),
-                self._composer.manifests_for(required),
-                min_calls=1,
-            )
-            outcome.timings_ms["force"] = int((time.perf_counter() - t1) * 1000)
-
         if not calls:
             logger.info(f"[tool-turn] agent={ctx.current_agent} decided=no-tool user={ctx.user_message!r}")
             return outcome
@@ -197,7 +180,7 @@ class ToolTurnRunner:
         outcome.timings_ms["reply"] = int((time.perf_counter() - t3) * 1000)
         logger.info(
             f"[tool-turn] agent={ctx.current_agent} calls={[c.tool for c in outcome.calls]} "
-            f"ok={[c.ok for c in outcome.calls]} forced={outcome.forced} narrated={outcome.narrated} "
+            f"ok={[c.ok for c in outcome.calls]} narrated={outcome.narrated} "
             f"timings_ms={outcome.timings_ms} tokens={outcome.prompt_tokens}"
         )
         return outcome
