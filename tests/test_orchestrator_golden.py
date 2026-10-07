@@ -62,3 +62,30 @@ def test_destructive_ambiguity_never_expects_a_call_unless_target_is_named():
             assert g["expect"]["calls"] == []
         else:
             assert g["expect"]["calls"][0]["args"].get("title"), "a destructive call must name its target"
+
+
+# ---- held-out set (never tune against it) -------------------------------------------------------------
+
+HELDOUT = yaml.safe_load((Path(__file__).parent / "eval" / "orchestrator_heldout.yaml").read_text(encoding="utf-8"))
+
+
+def test_heldout_is_well_formed_and_names_real_tools():
+    assert len(HELDOUT) >= 40
+    for g in HELDOUT:
+        assert g["say"].strip() and g["category"], g
+        assert set(g["expect"]) <= {"calls", "needs_live_data", "clarification"}, g
+        assert set(_called_tools(g["expect"])) <= TOOLS, g
+        if "phase4" in g:
+            assert set(_called_tools(g["phase4"])) <= TOOLS | FUTURE_TOOLS, g
+        if g["expect"].get("clarification"):
+            assert g["expect"]["calls"] == [], g
+        if g["category"] == "followup":
+            assert g.get("history") and g.get("state"), g
+        if g.get("state"):
+            assert g["state"]["tool"] in TOOLS, g
+
+
+def test_heldout_shares_no_utterance_with_the_tuned_golden_set():
+    tuned = {g["say"].strip().lower().rstrip("?.!") for g in GOLDEN}
+    clash = [g["say"] for g in HELDOUT if g["say"].strip().lower().rstrip("?.!") in tuned]
+    assert not clash, f"held-out cases duplicate tuned ones: {clash}"

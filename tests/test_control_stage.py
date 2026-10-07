@@ -140,7 +140,11 @@ def test_prompt_examples_are_not_copies_of_golden_test_cases():
     """An example that is also a test case measures memorisation, not judgement (it leaked 'Delhi' into a no-state case)."""
     import yaml
     from pathlib import Path
-    golden = {g["say"].lower() for g in yaml.safe_load((Path(__file__).parent / "eval" / "orchestrator_golden.yaml").read_text(encoding="utf-8"))}
+    golden = {
+        g["say"].lower()
+        for name in ("orchestrator_golden.yaml", "orchestrator_heldout.yaml")
+        for g in yaml.safe_load((Path(__file__).parent / "eval" / name).read_text(encoding="utf-8"))
+    }
     system = _composer().control_stage("x").system
     shown = {line[len("User: "):].lower() for line in system.splitlines() if line.startswith("User: ")}
     assert shown and not (shown & golden), f"prompt example(s) duplicate golden cases: {shown & golden}"

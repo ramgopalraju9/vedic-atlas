@@ -51,7 +51,8 @@ class ControlDecoder:
         manifests: Mapping[str, ToolManifest],
         model: str | None = None,
         num_predict: int = 200,
-        temperature: float = 0.1,
+        temperature: float = 0.0,
+        show_empty: bool = True,
         exchanges: int = 2,
         key_order: tuple[str, ...] = CONTROL_KEYS,
     ):
@@ -62,11 +63,13 @@ class ControlDecoder:
         self._temperature = temperature
         self._exchanges = exchanges
         self._key_order = key_order
+        self._show_empty = show_empty
         self._schema = build_control_schema(list(manifests.values()), key_order=key_order)
 
     async def decide(self, user_message: str, history: Sequence[Turn] = (), active: str = "") -> DecodeResult:
         prompt = self._composer.control_stage(
             user_message, history, active, exchanges=self._exchanges, key_order=self._key_order,
+            show_empty=self._show_empty,
         )
         started = time.perf_counter()
         try:

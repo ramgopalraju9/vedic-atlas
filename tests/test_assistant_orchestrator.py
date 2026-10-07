@@ -341,3 +341,18 @@ def test_decoder_sends_the_constrained_schema_and_never_raises():
     boom = Client(RuntimeError("model down"))
     r = asyncio.run(ControlDecoder(client=boom, composer=composer, manifests=MANIFESTS).decide("hi"))
     assert not r.decision.valid and "model down" in r.decision.note
+
+
+def test_decoder_defaults_are_the_measured_winners():
+    """Spike A5: temperature 0 and explicit `ACTIVE: none` / `RECENT: none` scored best (docs/10 §6c)."""
+    class Client:
+        kw = None
+        async def complete(self, **kw):
+            self.kw = kw
+            return '{"needs_live_data": false, "calls": [], "clarification": null}'
+
+    c = Client()
+    composer = PromptComposer(FilePromptStore(), list(MANIFESTS.values()))
+    asyncio.run(ControlDecoder(client=c, composer=composer, manifests=MANIFESTS).decide("hello there"))
+    assert c.kw["temperature"] == 0.0
+    assert "ACTIVE: none" in c.kw["prompt"] and "RECENT: none" in c.kw["prompt"]
