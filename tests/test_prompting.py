@@ -126,3 +126,41 @@ def test_default_prompts_are_small():
     c = _composer()
     assert c.call_stage(["tasks"], "hi").tokens < 700
     assert c.narrate_stage("hi", ["ok"]).tokens < 300
+
+
+# ---- content stage (data plane) -----------------------------------------------------------------------
+
+def test_content_tasks_share_one_cached_prefix_and_differ_only_in_the_tail():
+    c = _composer()
+    prompts = {t: c.content_stage(t, "the document body", "what does it say") for t in ("narrate", "summarise", "draft_reply", "extract")}
+    assert len({p.system for p in prompts.values()}) == 1
+    assert len({p.prompt for p in prompts.values()}) == 4
+    for task, p in prompts.items():
+        assert p.prompt.startswith("TASK: ") and "the document body" in p.prompt and "Answer:" in p.prompt
+
+
+def test_content_stage_has_no_tools_no_history_and_no_volatile_text_in_system():
+    system = _composer().content_stage("summarise", "doc", "q").system
+    for forbidden in ("get_weather", "convert_currency", "tasks", "ACTIVE", "RECENT", "TODAY", "QUESTION"):
+        assert forbidden not in system
+
+
+def test_narrate_stage_is_the_narrate_task():
+    c = _composer()
+    assert c.narrate_stage("q", ["a", "b"]) == c.content_stage("narrate", "a\nb", "q")
+    assert "TOOL RESULT:" in c.narrate_stage("q", ["a"]).prompt
+
+
+def test_the_tools_own_cap_is_applied_before_composition():
+    doc = "word " * 2000
+    capped = _composer().content_stage("summarise", doc, "q", max_tokens=40)
+    uncapped = _composer().content_stage("summarise", doc, "q")
+    assert "tool_result" in capped.trimmed and capped.sections["tool_result"] <= 42
+    assert capped.sections["tool_result"] < uncapped.sections["tool_result"]
+    assert capped.tokens <= PromptBudgets().narrate
+
+
+def test_unknown_content_task_is_a_programming_error():
+    import pytest
+    with pytest.raises(ValueError):
+        _composer().content_stage("translate", "doc", "q")

@@ -24,7 +24,7 @@ from domain.entities.agent_context import AgentContext
 from domain.entities.agent_result import AgentResult
 from domain.entities.control_decision import ControlDecision
 from domain.entities.session_context import SessionContext
-from domain.entities.tool_manifest import ToolManifest
+from domain.entities.tool_manifest import RETURNS_DOCUMENT, ToolManifest
 from domain.entities.turn_trace import TurnTrace
 from domain.policies.dispatch_policy import Resolution, Route, resolve
 from domain.policies.grounding_policy import is_grounded
@@ -41,6 +41,7 @@ from service.session.session_state import SessionStateService
 from service.skills.skill_runner import SkillRunner
 
 _ERROR_REPLY = "Something went wrong on my end. Could you try again?"
+_DOCUMENT_FALLBACK_TOKENS = 60  # about two spoken sentences: all a failed narration of a document may fall back to
 _DECIDED = {
     Route.TOOLS: "tool", Route.CHAT: "chat", Route.CLARIFY: "clarify", Route.REFUSE: "refuse", Route.FAIL_CLOSED: "fail",
 }
@@ -165,7 +166,12 @@ class AssistantOrchestrator(BaseAgent):
                     pieces.append(narration)
                     narration_placed = True
             else:  # narration failed or was ungrounded: say plainly what the tool returned
-                pieces.append(spoken_text(c.spoken, c.observation))
+                text = spoken_text(c.spoken, c.observation)
+                if self._manifests[c.tool].returns == RETURNS_DOCUMENT:
+                    # A document's first line can be the whole document. This text is spoken AND saved into history,
+                    # which feeds later prompts, so it is cut: a document must not leak into any control prompt.
+                    text = self._composer.cap_tokens(text, _DOCUMENT_FALLBACK_TOKENS)
+                pieces.append(text)
         return " ".join(pieces)
 
     def _backstop(self, reply: str, outcome: TurnOutcome) -> str:

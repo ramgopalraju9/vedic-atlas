@@ -356,3 +356,30 @@ def test_decoder_defaults_are_the_measured_winners():
     asyncio.run(ControlDecoder(client=c, composer=composer, manifests=MANIFESTS).decide("hello there"))
     assert c.kw["temperature"] == 0.0
     assert "ACTIVE: none" in c.kw["prompt"] and "RECENT: none" in c.kw["prompt"]
+
+
+# ---- data plane: a document never reaches a control prompt (docs/10 Phase 5) -----------------------------
+
+def test_the_control_prompt_has_no_input_for_a_tool_result():
+    import inspect
+    params = set(inspect.signature(PromptComposer.control_stage).parameters) - {"self"}
+    assert params == {"user_message", "history", "active", "exchanges", "key_order", "show_empty"}
+
+
+def test_a_document_cannot_leak_through_history_or_state_when_narration_fails():
+    doc = "SECRETDOC " * 3000                                  # one huge line, as an email body would be
+    e = env([dec([call("web_search", query="x")], live=True)], {"web_search": ok(observation=doc)}, narration="")
+    _, result = turn(e, "search x")
+    saved = e.convo.added[-1][1]
+    assert saved == result.response
+    assert len(saved) < 400 and saved != doc                    # capped fallback, not the document
+    assert "SECRETDOC" not in e.state.active_line("sess-1")     # session state only ever holds validated ARGUMENTS
+
+
+def test_a_document_result_is_capped_before_the_content_decode():
+    seen = {}
+    e = env([dec([call("web_search", query="x")], live=True)], {"web_search": ok(observation="word " * 3000)})
+    orig = e.orch._composer.content_stage
+    e.orch._composer.content_stage = lambda task, doc, q, **kw: seen.setdefault("task", task) and orig(task, doc, q, **kw)
+    turn(e, "x")
+    assert seen["task"] == "narrate"

@@ -34,6 +34,15 @@ from domain.ports.tool_manifest_store_port import PromptStorePort
 _TURN_CHARS = 200        # a history turn is cut to this many characters
 _USER_MSG_CHARS = 500
 
+# Content-stage tasks: task -> (prompt file holding its instruction, label the document carries in the prompt).
+# "narrate" keeps the label "TOOL RESULT" it has always had.
+CONTENT_TASKS = {
+    "narrate": ("narrate", "TOOL RESULT"),
+    "summarise": ("content_summarise", "DOCUMENT"),
+    "draft_reply": ("content_draft_reply", "DOCUMENT"),
+    "extract": ("content_extract", "DOCUMENT"),
+}
+
 
 @dataclass
 class ComposedPrompt:
@@ -287,23 +296,45 @@ class PromptComposer:
                               trimmed=trimmed)
 
     def narrate_stage(self, user_message: str, tool_results: Sequence[str]) -> ComposedPrompt:
-        system = f"{self._prompts.get('persona_lite')}\n\n{self._prompts.get('narrate')}"
+        """Phrase tool results for the user: the `narrate` task of the content stage."""
         result = "\n".join(r.strip() for r in tool_results if r and r.strip())
+        return self.content_stage("narrate", result, user_message)
+
+    def content_stage(self, task: str, document: str, user_message: str, *, max_tokens: int = 0) -> ComposedPrompt:
+        """The data plane: reason over ONE capped document. No tool list, no history, ever.
+
+        SYSTEM is the same for every task (persona + preamble), so all tasks share one cached prefix; the task
+        instruction rides in the volatile tail. `max_tokens` is the producing tool's `max_result_tokens`, applied
+        before anything else; the stage's own `observation_max` / `narrate` budgets still apply after it."""
+        if task not in CONTENT_TASKS:
+            raise ValueError(f"unknown content task {task!r}; expected one of {sorted(CONTENT_TASKS)}")
+        system = f"{self._prompts.get('persona_lite')}\n\n{self._prompts.get('content_stage')}"
+        instruction = self._prompts.get(CONTENT_TASKS[task][0]).strip()
+        label = CONTENT_TASKS[task][1]
+        result = self.cap_tokens(document, max_tokens)
         trimmed: list[str] = []
+        if result != document:
+            trimmed.append("tool_result")
         cap = self.budgets.observation_max
         if self._count(result) > cap:
             result = self._truncate_tokens(result, cap)
-            trimmed.append("tool_result")
+            if "tool_result" not in trimmed:
+                trimmed.append("tool_result")
         question = self._clip(user_message, self._user_msg_chars)
         today = f"TODAY: {self._now().strftime('%d %b %Y')}"
-        prompt = f"{today}\nQUESTION: {question}\nTOOL RESULT:\n{result}\n\nAnswer:"
+
+        def build(doc: str) -> str:
+            return f"TASK: {instruction}\n{today}\nQUESTION: {question}\n{label}:\n{doc}\n\nAnswer:"
+
+        prompt = build(result)
         total = self._count(system) + self._count(prompt)
         if total > self.budgets.narrate:
-            trimmed.append("tool_result")
+            if "tool_result" not in trimmed:
+                trimmed.append("tool_result")
             target = max(50, self._count(result) - (total - self.budgets.narrate))
             while True:  # the ellipsis suffix can cost a token, so re-check until it fits
                 result = self._truncate_tokens(result, target)
-                prompt = f"{today}\nQUESTION: {question}\nTOOL RESULT:\n{result}\n\nAnswer:"
+                prompt = build(result)
                 total = self._count(system) + self._count(prompt)
                 if total <= self.budgets.narrate or target <= 50:
                     break
