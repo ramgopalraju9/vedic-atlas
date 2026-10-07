@@ -12,22 +12,19 @@ runnable.
 | File | Router | Endpoints |
 |---|---|---|
 | `admin.py` | — | `POST /admin/shutdown` — sends `SIGINT` to the server's own process after a short delay (lets the response flush first; uvicorn handles `SIGINT` for clean teardown) |
-| `ambient.py` | — | `POST /ambient/publish` (test hook — builds and publishes an `AmbientEvent`); `GET /ambient/stream` (SSE — subscribes to the event bus, runs each event through `supervisor.dispatch_ambient()`, yields narration JSON, 15s keepalive) |
-| `approval.py` | — | `POST /approval/request` (blocks until resolved); `POST /approval/{id}/approve`; `POST /approval/{id}/deny`; `GET /approval/pending`; `POST /approval/yolo/on`; `POST /approval/yolo/off`; `GET /approval/yolo` |
-| `chat.py` | — | `POST /chat` — the main non-streaming chat endpoint |
+| `approval.py` | — | `POST /approval/{id}/approve`; `POST /approval/{id}/deny`; `GET /approval/pending`; `POST /approval/yolo/on`; `POST /approval/yolo/off`; `GET /approval/yolo` |
 | `config.py` | — | `GET /config/proactivity`; `POST /config/proactivity` (400 on an invalid value) |
-| `governance.py` | `prefix="/governance"` | `GET /governance/status`; `GET /governance/audit/stats`; `GET /governance/audit/entries` (filters: `event_type`, `agent`, `limit`); `GET /governance/audit/verify`; `GET /governance/health` (circuit-breaker status); `GET /governance/policies`. Duck-types via `hasattr()` since the provider can be `None` |
+| `governance.py` | `prefix="/governance"` | `GET /governance/status`; `GET /governance/audit/stats`. Duck-types via `hasattr()` since the provider can be `None` |
 | `health.py` | — | `GET /health` — duck-types `supervisor`/`event_bus`/`governance`, separately probes the DB with `SELECT 1`. Deliberately never 503s itself — it's the "what's broken" endpoint |
 | `knowledge.py` | — | `GET /knowledge`; `POST /knowledge`; `DELETE /knowledge/{index}` |
-| `lookup.py` | — | `GET /lookup/providers`; `GET /lookup/health` (live probe of geocoding, weather, currency, web search — incl. whether the API key is set); `POST /lookup/fetch` (maps `EgressDeniedError`→403, `ValueError`→404) |
-| `memory.py` | — | `GET /memory/recent`; `GET /memory/search` (returns `{"enabled": false}` if semantic recall isn't wired) |
+| `lookup.py` | — | `GET /lookup/health` (live probe of geocoding, weather, currency, web search — incl. whether the API key is set) |
 | `persona.py` | — | `GET /persona`; `POST /persona` — persists to `data/cli_persona.json` (flat file, not the DB); on change, calls `supervisor.set_proactivity()` to sync |
 | `privacy.py` | — | `GET /privacy/status`; `POST /privacy/mute`; `POST /privacy/mute/toggle` |
+| `speakers.py` | — | `GET /speakers`; `POST /speakers/enroll/start|feed|finish|cancel`; `DELETE /speakers/{name}` — speaker enrolment (no CLI command yet) |
 | `stream.py` | — | `POST /stream` — SSE chat streaming via `supervisor.execute_stream()` |
-| `system.py` | — | `GET /system` — active window title via `win32gui`/`win32process`/`psutil` in a thread, `ImportError`-degrades on non-Windows |
-| `tasks.py` | — | `GET /tasks`; `POST /tasks`; `POST /tasks/{id}/complete`; `DELETE /tasks/{id}` |
+| `tasks.py` | — | `GET /tasks`; `POST /tasks`; `POST /tasks/{id}/complete` |
 | `trace.py` | — | `GET /trace?limit=N` — recent tool turns: what was asked, every tool call with its real result, guard decisions, stage timings, prompt tokens |
-| `voice.py` | — | `GET /voice/config`; `GET /voice/status`; `POST /voice/start`; `POST /voice/stop`; `POST /voice/say`. Mute control deliberately lives under `/privacy`, not here |
+| `voice.py` | — | `GET /voice/status` (read-only). Mute control lives under `/privacy`; the voice session starts and stops with the server |
 
 ## Dependency injection (`dependencies/providers.py`)
 
@@ -41,12 +38,11 @@ def _require(request: Request, attr: str, label: str):
     return obj
 ```
 
-`get_supervisor`, `get_event_bus`, `get_approval_broker`,
-`get_knowledge_base`, `get_memory`, `get_lookup_service`, `get_task_service`
-are all required (503 if missing). `get_governance` and
-`get_semantic_recall` are optional — they return `None` without a 503, and
-the calling route must handle that case (both are allowed to be disabled
-by config). Note that `privacy.py` and `voice.py` don't use this module —
+`get_supervisor`, `get_approval_broker`, `get_knowledge_base`,
+`get_trace_repo`, `get_lookup_health`, `get_task_service` and
+`get_speaker_enrollment_service` are required (503 if missing).
+`get_governance` is optional — it returns `None` without a 503, and the
+calling route must handle that case (governance can be disabled by config). Note that `privacy.py` and `voice.py` don't use this module —
 they define their own local `_require`-style dependency inline, reading
 `app.state.capture_gate`/`app.state.voice_session` directly.
 
@@ -215,9 +211,9 @@ app = FastAPI(title=PROJECT_NAME, version=VERSION, lifespan=lifespan)
 register_exception_handlers(app)
 app.middleware("http")(request_context)
 
-for _mod in (admin, ambient, approval, chat, config_route, governance_route,
-             health, knowledge, lookup, memory_route, persona, privacy,
-             stream, system, tasks_route, voice):
+for _mod in (admin, approval, config_route, governance_route,
+             health, knowledge, lookup, persona, privacy, speakers,
+             stream, tasks_route, trace_route, voice):
     app.include_router(_mod.router, prefix="/api")
 ```
 

@@ -1,7 +1,7 @@
 """SSE plumbing shared by every streaming route.
 
 ★ new — extracted from what were previously two independent, near-identical
-StreamingResponse setups in veda/routes/stream.py and veda/routes/ambient.py
+StreamingResponse setups in veda/routes/stream.py and the (since removed) ambient route
 (same headers dict, same media type, both read in full this batch).
 """
 

@@ -11,7 +11,7 @@ vedic-atlas/
 ├── config/
 ├── scripts/
 ├── src/
-│   ├── controller/
+│   ├── controller/          # CLI + REST routes
 │   ├── core/
 │   ├── domain/
 │   ├── exceptions/
@@ -21,7 +21,6 @@ vedic-atlas/
 │   │   └── online/
 │   │       └── allow_list.py
 │   └── utilities/
-├── server.py
 ├── .env.example
 ├── LICENSE
 ├── README.md
@@ -36,12 +35,6 @@ vedic-atlas/
 - Python 3.10+
 
 ### Setup & Run
-Using Windows:
-```cmd
-run.bat
-```
-
-Using Linux/macOS:
-```bash
-./run.sh
-```
+`run.bat` (Windows) and `./run.sh` (Linux/macOS) start the `veda` CLI. With no arguments
+it opens the REPL and starts the local server (the voice loop runs inside it) if one is not
+already running. `veda server` runs the server on its own.

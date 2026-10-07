@@ -17,14 +17,11 @@ from fastapi import HTTPException, Request
 
 if TYPE_CHECKING:
     from domain.ports.governance_port import GovernanceProvider
-    from domain.ports.memory_repository_port import MemoryRepositoryPort
     from service.agent.supervisor import SupervisorAgent
     from service.approval.approval_broker import ApprovalBroker
     from domain.ports.trace_repository_port import TraceRepositoryPort
     from service.lookup.health_service import LookupHealthService
-    from service.lookup.lookup_service import LookupService
     from service.memory.knowledge_base import KnowledgeBase
-    from service.sensing.event_bus import EventBus
     from service.speakers.speaker_enrollment_service import SpeakerEnrollmentService
 
 
@@ -39,24 +36,12 @@ def get_supervisor(request: Request) -> "SupervisorAgent":
     return _require(request, "supervisor", "supervisor")
 
 
-def get_event_bus(request: Request) -> "EventBus":
-    return _require(request, "event_bus", "event bus")
-
-
 def get_approval_broker(request: Request) -> "ApprovalBroker":
     return _require(request, "approval_broker", "approval broker")
 
 
 def get_knowledge_base(request: Request) -> "KnowledgeBase":
     return _require(request, "knowledge", "knowledge base")
-
-
-def get_memory(request: Request) -> "MemoryRepositoryPort":
-    return _require(request, "memory", "memory repository")
-
-
-def get_lookup_service(request: Request) -> "LookupService":
-    return _require(request, "lookup_service", "lookup service")
 
 
 def get_trace_repo(request: Request) -> "TraceRepositoryPort":
@@ -70,11 +55,6 @@ def get_lookup_health(request: Request) -> "LookupHealthService":
 def get_governance(request: Request) -> "GovernanceProvider | None":
     """Governance is optional — routes must handle `None` (disabled) themselves."""
     return getattr(request.app.state, "governance", None)
-
-
-def get_semantic_recall(request: Request):
-    """Optional — None when embeddings are unavailable; routes handle that."""
-    return getattr(request.app.state, "semantic_recall", None)
 
 
 def get_task_service(request: Request):

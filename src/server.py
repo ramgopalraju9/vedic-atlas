@@ -32,8 +32,8 @@ from fastapi import FastAPI
 
 from controller.middleware.request_context import request_context
 from controller.routes import (
-    admin, ambient, approval, chat, config as config_route, governance as governance_route,
-    health, knowledge, lookup, memory as memory_route, persona, privacy, speakers, stream, system,
+    admin, approval, config as config_route, governance as governance_route,
+    health, knowledge, lookup, persona, privacy, speakers, stream,
     tasks as tasks_route, trace as trace_route, voice,
 )
 from core.config import active_profile, ensure_dirs, load_full_config
@@ -1078,8 +1078,8 @@ app.middleware("http")(request_context)
 logger.info(f"{PROJECT_NAME} v{VERSION} application initialized")
 
 for _mod in (
-    admin, ambient, approval, chat, config_route, governance_route,
-    health, knowledge, lookup, memory_route, persona, privacy, speakers, stream, system, tasks_route, trace_route, voice,
+    admin, approval, config_route, governance_route,
+    health, knowledge, lookup, persona, privacy, speakers, stream, tasks_route, trace_route, voice,
 ):
     app.include_router(_mod.router, prefix="/api")
 

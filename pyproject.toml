@@ -27,7 +27,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "veda"
-version = "0.1.0"
+version = "1.1.0"
 description = "Veda - personal offline"
 requires-python = ">=3.12"
 dependencies = [

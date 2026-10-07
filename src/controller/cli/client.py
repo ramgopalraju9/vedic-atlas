@@ -225,15 +225,6 @@ class VedaClient:
                         value = value[1:]
                     data_lines.append(value)
 
-    def chat_one_shot(self, message: str, *, from_voice: bool = False, system_context: str = "") -> str:
-        """Non-streaming /api/chat — used for single-line responses (status, etc)."""
-        r = self._http.post(
-            f"{self.server_url}/api/chat",
-            json={"message": message, "from_voice": from_voice, "system_context": system_context},
-        )
-        r.raise_for_status()
-        return r.json().get("response", "")
-
     # ---------- persona ----------
 
     def get_persona(self) -> dict[str, Any]:

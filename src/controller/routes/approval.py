@@ -7,9 +7,6 @@ call `ApprovalBroker.request_approval` directly, in-process.
 
 Endpoints:
 
-  POST /api/approval/request          — a gated skill blocks on this until
-                                         the user approves/denies (or the
-                                         broker's own timeout auto-denies).
   POST /api/approval/{id}/approve     — Approve button
   POST /api/approval/{id}/deny        — Deny button
   GET  /api/approval/pending          — list open asks
@@ -22,29 +19,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 
 from controller.dependencies.providers import get_approval_broker
 from service.approval.approval_broker import ApprovalBroker
 
 router = APIRouter()
-
-
-class ApprovalRequestBody(BaseModel):
-    action_name: str
-    arguments: dict = {}
-    reason: str = ""
-
-
-@router.post("/approval/request")
-async def request_approval(body: ApprovalRequestBody, broker: ApprovalBroker = Depends(get_approval_broker)):
-    """Blocks until resolved (approved, denied, or timed out)."""
-    allow, reason = await broker.request_approval(
-        action_name=body.action_name,
-        arguments=body.arguments,
-        reason=body.reason,
-    )
-    return {"allow": allow, "reason": reason}
 
 
 @router.post("/approval/{request_id}/approve")

@@ -30,10 +30,3 @@ async def complete_task(task_id: int, service: TaskService = Depends(get_task_se
     if not service.complete(task_id):
         raise HTTPException(status_code=404, detail="task not found")
     return {"status": "completed", "id": task_id}
-
-
-@router.delete("/tasks/{task_id}")
-async def delete_task(task_id: int, service: TaskService = Depends(get_task_service)) -> dict:
-    if not service.delete(task_id):
-        raise HTTPException(status_code=404, detail="task not found")
-    return {"status": "deleted", "id": task_id}
