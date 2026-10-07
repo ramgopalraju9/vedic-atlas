@@ -39,8 +39,10 @@ class ConversationRepositoryPort(Protocol):
         """Insert a turn. Returns its row id."""
         ...
 
-    def recent_turns(self, limit: int = 30, only_unsummarized: bool = True) -> list[Turn]:
-        """Most recent turns GLOBALLY (no session filter), chronological order."""
+    def recent_turns(
+        self, limit: int = 30, only_unsummarized: bool = True, session_id: str | None = None,
+    ) -> list[Turn]:
+        """Most recent turns, chronological order. Global when `session_id` is None, otherwise that session only."""
         ...
 
     def add_summary(self, summary: ConversationSummary) -> int:

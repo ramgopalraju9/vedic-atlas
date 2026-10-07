@@ -357,9 +357,11 @@ def test_phrases_route_to_the_right_agent(text, agent):
 
 
 def test_every_manifest_is_small_and_consistent():
-    assert set(MANIFESTS) == {"tasks", "get_weather", "convert_currency", "web_search", "remember"}
+    assert set(MANIFESTS) == {"tasks", "get_weather", "get_weather_forecast", "convert_currency", "web_search", "remember"}
     for m in MANIFESTS.values():
-        assert 1 <= len(m.examples) <= 6 and m.triggers and m.required_when
+        assert 1 <= len(m.examples) <= 6 and m.triggers
+        if m.name != "get_weather_forecast":  # deliberately never forced from a keyword
+            assert m.required_when
         if m.requires_online:
             assert m.hosts and m.cache_ttl_sec > 0
     assert MANIFESTS["web_search"].reply_mode == "llm"

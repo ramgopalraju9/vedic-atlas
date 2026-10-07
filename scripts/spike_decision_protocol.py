@@ -14,7 +14,7 @@ Variants (all on tests/eval/orchestrator_golden.yaml, the model in config/infere
       tool + valid args) or plain text (chat). One decode for chat turns.
 
 A turn that needs a chat reply after the decision (A* with no calls) also runs a chat decode, so `turn_ms` is
-comparable across variants. The per-case result is checked against `expect` (the `phase4:` override is ignored).
+comparable across variants. The per-case result is checked against `expect` (a `phase4:` block replaces it once the tool it names exists).
 Results go to tests/eval/results/spike-protocol-<ts>.json.
 """
 
@@ -175,7 +175,7 @@ class Model:
         messages = [{"role": "system", "content": system}]
         for h in history:
             messages += [{"role": "user", "content": h["user"]}, {"role": "assistant", "content": h["veda"]}]
-        messages.append({"role": "user", "content": f"{user} /no_think"})
+        messages.append({"role": "user", "content": f"{user}\n/no_think"})
         kw = {"messages": messages, "max_tokens": max_tokens, "temperature": TEMPERATURE if temperature is None else temperature}
         if schema is not None:
             kw["response_format"] = {"type": "json_object", "schema": schema}
@@ -369,6 +369,13 @@ def main() -> int:
         cases = cases[: args.limit]
     cfg = load_full_config()
     manifests = YamlToolManifestStore().load_all()
+    # A `phase4:` block replaces `expect` once the tools it names exist (get_weather_forecast). Not applied to
+    # --rejudge above: those saved outputs were produced when the tool did not exist.
+    have = {m.name for m in manifests}
+    for case in cases:
+        override = case.get("phase4")
+        if override and {c["tool"] for c in override.get("calls", [])} <= have:
+            case["expect"] = override
     composer = PromptComposer(FilePromptStore(), manifests)
     print(f"loading {cfg.inference.model_path} ... ({len(cases)} cases x {args.repeats} repeat(s))", flush=True)
     runner = Runner(Model(cfg), composer, manifests)

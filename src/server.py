@@ -95,6 +95,7 @@ from tpa.online.http_client import AllowListedHttpClient
 from tpa.online.providers.fx import FxProvider
 from tpa.online.providers.geocode import GeocodingProvider
 from tpa.online.providers.tavily import TavilyProvider
+from tpa.online.providers.forecast import ForecastProvider
 from tpa.online.providers.weather import WeatherProvider
 from tpa.persistence.migrations import init_tables
 from tpa.persistence.repositories.agent_memory_repository import AgentMemoryRepository
@@ -628,7 +629,7 @@ def _build_embedding(cfg: AppConfig):
 
 
 # Tool -> provider category, for per-category cache TTLs taken from the tool manifests.
-_TOOL_CATEGORY = {"get_weather": "weather", "convert_currency": "fx", "web_search": "search"}
+_TOOL_CATEGORY = {"get_weather": "weather", "get_weather_forecast": "forecast", "convert_currency": "fx", "web_search": "search"}
 _GEOCODE_TTL_SEC = 24 * 3600
 
 
@@ -638,7 +639,7 @@ def _build_lookup(cfg: AppConfig, tool_manifests: dict) -> tuple[LookupService, 
     registry = FactProviderRegistry(allow_list=allow_list)
     key_env = cfg.privacy.online.search_api_key_env
     search = TavilyProvider(http_client, api_key_provider=lambda: os.environ.get(key_env))
-    for provider in (WeatherProvider(http_client), GeocodingProvider(http_client), FxProvider(http_client), search):
+    for provider in (WeatherProvider(http_client), ForecastProvider(http_client), GeocodingProvider(http_client), FxProvider(http_client), search):
         try:
             registry.register(provider)
         except ValueError as e:
@@ -822,12 +823,15 @@ def bootstrap(app: FastAPI) -> None:
         from service.lookup.search_lookup import SearchLookup
         from service.lookup.weather_lookup import WeatherLookup
         from service.skills.builtin.currency import ConvertCurrencySkill
-        from service.skills.builtin.weather import GetWeatherSkill
+        from service.skills.builtin.weather import GetWeatherForecastSkill, GetWeatherSkill
         from service.skills.builtin.web_search import WebSearchSkill
 
         places = PlaceResolver(lookup_service, default_place=online.default_place)
+        weather_lookup = WeatherLookup(lookup_service, places)
         for skill in (
-            GetWeatherSkill(WeatherLookup(lookup_service, places), tool_manifests["get_weather"]),
+            GetWeatherSkill(weather_lookup, tool_manifests["get_weather"]),
+            *([GetWeatherForecastSkill(weather_lookup, tool_manifests["get_weather_forecast"])]
+              if "get_weather_forecast" in tool_manifests else []),
             ConvertCurrencySkill(CurrencyLookup(lookup_service), tool_manifests["convert_currency"]),
             WebSearchSkill(SearchLookup(lookup_service), tool_manifests["web_search"]),
         ):
@@ -870,6 +874,7 @@ def bootstrap(app: FastAPI) -> None:
         claim_filter=None if use_orchestrator else guard.claims_action,
         reply_veto=guard.claims_action if use_orchestrator else None,
         persona=FilePromptStore().get("persona_chat") if cfg.app.chat_persona == "compact" else None,
+        chat_budget_tokens=PromptBudgets(**cfg.prompting.budgets).chat, history_turn_chars=cfg.prompting.turn_chars,
     )
     system_agent = SystemAgent(
         client=inference_client, system_control=system_control,

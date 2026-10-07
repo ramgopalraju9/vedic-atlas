@@ -1,0 +1,30 @@
+name: get_weather_forecast
+agent: lookup
+description: Forecast for a place 0-6 days ahead (0 today, 1 tomorrow); also for umbrella or coat questions. Empty place means home.
+reply_mode: template        # the sentence is built from the provider's numbers; it names the place and the day
+permission_level: auto
+requires_online: true
+cache_ttl_sec: 1800
+hosts: [api.open-meteo.com, geocoding-api.open-meteo.com]
+
+params:
+  place:
+    type: string
+    description: city or place name; empty means home
+  date_offset:
+    type: integer
+    required: true
+    description: days from today, 0 to 6 (0 today, 1 tomorrow, 2 day after tomorrow)
+
+examples:
+  - user: will it rain tomorrow in Pune
+    calls: [{tool: get_weather_forecast, args: {place: Pune, date_offset: 1}}]
+  - user: how will the weather be the day after tomorrow in Goa
+    calls: [{tool: get_weather_forecast, args: {place: Goa, date_offset: 2}}]
+
+# Legacy keyword routing only (removed with it). Narrow on purpose: a bare "tomorrow" also appears in task requests.
+# No required_when: forcing a call from a keyword is the false-positive bug the orchestrator removes.
+triggers:
+  - '\b(umbrella|raincoat)\b'
+  - '\b(weather|rain|forecast|hot|cold)\b.*\b(tomorrow|weekend|next week)\b'
+  - '\b(tomorrow|weekend|next week)\b.*\b(weather|rain|forecast)\b'

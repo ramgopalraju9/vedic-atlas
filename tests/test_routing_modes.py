@@ -81,7 +81,7 @@ def test_keyword_mode_never_calls_the_model():
     router = _Router("lookup")
     sup = _supervisor("keyword", router)
     assert _route(sup, "what are my tasks") == ("tasks", "rules")
-    assert _route(sup, "do I need an umbrella today") == ("responder", "default")  # no rule: chat, no model
+    assert _route(sup, "do I need a jacket today") == ("responder", "default")  # no rule: chat, no model
     assert router.calls == []
 
 
@@ -96,7 +96,7 @@ def test_model_mode_asks_the_model_even_when_a_rule_matches():
 
 def test_model_mode_routes_what_the_rules_miss():
     router = _Router("lookup")
-    assert _route(_supervisor("model", router), "do I need an umbrella today")[0] == "lookup"
+    assert _route(_supervisor("model", router), "do I need a jacket today")[0] == "lookup"
 
 
 def test_model_mode_falls_back_to_the_keyword_rules_when_the_model_cannot_answer():
@@ -127,7 +127,7 @@ def test_hybrid_trusts_a_sure_rule_without_calling_the_model():
 
 
 @pytest.mark.parametrize("text", [
-    "do I need an umbrella today",                     # no rule matched
+    "do I need a jacket today",                     # no rule matched
     "i didn't ask about the weather, what is 1+1",    # a correction cue: the trigger word is only mentioned
     "show the weather and my tasks",                  # two agents claim it
 ])

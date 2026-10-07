@@ -102,13 +102,13 @@ def test_recognised_messages_are_routed_by_rules_without_a_model_call(text, agen
 
 def test_an_unrecognised_message_is_routed_by_the_constrained_llm_call():
     client = _Client(answer=json.dumps({"agent": "lookup"}))
-    agent, via = _route(_supervisor(client), "do I need an umbrella in Pune tomorrow")
+    agent, via = _route(_supervisor(client), "do I need a jacket in Pune tonight")
     assert agent == "lookup" and via.startswith("llm")
     call = client.calls[0]
     # chat is listed last: a small model leans toward the first option it sees
     assert call["schema"]["properties"]["agent"]["enum"] == ["system", "tasks", "lookup", "responder"]
     assert call["temperature"] == 0.0 and call["n"] <= 64
-    assert "Message: do I need an umbrella in Pune tomorrow" in call["prompt"]
+    assert "Message: do I need a jacket in Pune tonight" in call["prompt"]
 
 
 def test_the_routing_prompt_names_every_agent_and_tool_and_carries_worked_examples():
@@ -136,7 +136,7 @@ def test_model_failure_falls_back_to_the_default_agent():
 
 def test_llm_routing_off_means_rules_only_like_before():
     client = _Client(answer=json.dumps({"agent": "lookup"}))
-    assert _route(_supervisor(client, llm=False), "do I need an umbrella in Pune tomorrow") == ("responder", "default")
+    assert _route(_supervisor(client, llm=False), "do I need a jacket in Pune tonight") == ("responder", "default")
     assert client.calls == []
 
 

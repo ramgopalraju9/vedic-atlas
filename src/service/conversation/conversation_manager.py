@@ -55,9 +55,13 @@ class ConversationManager:
 
     @property
     def turns(self) -> list[Turn]:
-        """Recent, un-summarised turns — global across sessions, matching the donor."""
+        """Recent, un-summarised turns of the CURRENT session only. An earlier session reaches the model through its
+        summary; a new session (30-minute gap) correctly starts with an empty history."""
+        return self.turns_in(self.repo.current_session_id())
+
+    def turns_in(self, session_id: str) -> list[Turn]:
         limit = max(self.max_history * 2, 1)
-        return self.repo.recent_turns(limit=limit, only_unsummarized=True)
+        return self.repo.recent_turns(limit=limit, only_unsummarized=True, session_id=session_id)
 
     def get_summaries_block(self, limit: int | None = None) -> str:
         """Older-session summaries (compacted by ConversationSummariser), oldest first."""

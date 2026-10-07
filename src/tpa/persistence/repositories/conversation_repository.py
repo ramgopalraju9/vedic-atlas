@@ -76,10 +76,14 @@ class ConversationRepository:
             s.flush()
             return row.id
 
-    def recent_turns(self, limit: int = 10, only_unsummarized: bool = True) -> list[Turn]:
-        """Most recent turns GLOBALLY (no session filter) — matches the donor."""
+    def recent_turns(
+        self, limit: int = 10, only_unsummarized: bool = True, session_id: str | None = None,
+    ) -> list[Turn]:
+        """Most recent turns, global when `session_id` is None (the donor's behaviour), else that session only."""
         with self._session() as s:
             stmt = select(ConversationTurnRow)
+            if session_id is not None:
+                stmt = stmt.where(ConversationTurnRow.session_id == session_id)
             if only_unsummarized:
                 stmt = stmt.where(ConversationTurnRow.summarized == False)  # noqa: E712
             stmt = stmt.order_by(

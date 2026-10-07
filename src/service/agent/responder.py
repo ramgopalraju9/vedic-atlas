@@ -27,6 +27,7 @@ from core.logging_config import logger
 from domain.policies.claim_guard_policy import SentenceClaimGuard
 from domain.policies.reply_filler_policy import FillerStreamFilter, strip_filler
 from domain.policies.reply_policy import UNCONFIRMED_REPLY
+from domain.policies.token_budget_policy import estimate_tokens
 from service.agent.base_llm_agent import LLMAgent
 from service.agent.persona import VEDA_SYSTEM_PROMPT
 from service.conversation.conversation_manager import ConversationManager
@@ -48,6 +49,8 @@ class ResponderAgent(LLMAgent):
         claim_filter: Callable[[str], bool] | None = None,
         persona: str | None = None,
         reply_veto: Callable[[str], bool] | None = None,
+        chat_budget_tokens: int | None = None,
+        history_turn_chars: int = 200,
     ):
         super().__init__(
             name="responder",
@@ -68,6 +71,10 @@ class ResponderAgent(LLMAgent):
         # True = this reply asserts a tool action that did not happen. Only set where the chat path is reached with
         # no tool having run (the orchestrator), so every claim here is unbacked. See docs/10 §4.7.
         self._reply_veto = reply_veto
+        # Chat prompt budget (PromptBudgets.chat) and the per-turn clip. History is the only part that grows, so it is
+        # what gets trimmed (oldest first) to fit; None = unbounded, the previous behaviour.
+        self._chat_budget = chat_budget_tokens
+        self._turn_chars = history_turn_chars
 
     def build_system_prompt(self, ctx: AgentContext) -> str:
         # Persona only: byte-identical every turn so the backend's KV prefix
@@ -103,17 +110,25 @@ class ResponderAgent(LLMAgent):
         # Deliberately no cross-agent activity block here: it only holds internal
         # routing records (supervisor/responder), which the model mistook for user
         # tasks and echoed back. Activity is still recorded via _record_to_memory.
-        history_block = self._render_history()
-        if history_block:
-            parts.append(history_block)
-        parts.append(self._time_context())
+        tail: list[str] = [self._time_context()]
         if ctx.from_voice:
-            parts.append(
+            tail.append(
                 "DELIVERY: this request arrived via voice — keep the reply to one or two "
                 "short sentences, zero lists, nothing the user wouldn't hear in one breath."
             )
-        parts.append(f"USER: {ctx.user_message}")
-        parts.append("Respond directly to the user. Be concise and conversational.")
+        tail.append(f"USER: {ctx.user_message}")
+        tail.append("Respond directly to the user. Be concise and conversational.")
+        fits = None
+        if self._chat_budget is not None:
+            system_tokens = estimate_tokens(self.system_prompt)
+
+            def fits(history: str) -> bool:  # measures the assembled prompt, so separators and rounding are counted
+                return system_tokens + estimate_tokens("\n\n".join(parts + ([history] if history else []) + tail)) <= self._chat_budget
+
+        history_block = self._render_history(fits)
+        if history_block:
+            parts.append(history_block)
+        parts.extend(tail)
         return "\n\n".join(parts)
 
     async def _prepare_semantic_context(self, ctx: AgentContext) -> None:
@@ -208,7 +223,7 @@ class ResponderAgent(LLMAgent):
             kept.append(turn)
         return kept
 
-    def _render_history(self) -> str:
+    def _render_history(self, fits: Callable[[str], bool] | None = None) -> str:
         blocks: list[str] = []
         summaries = self.conversation.get_summaries_block()
         if summaries:
@@ -221,8 +236,17 @@ class ResponderAgent(LLMAgent):
                 content = strip_filler(content)  # older saved replies may still end with the stock offer
             if not content:
                 continue
+            if len(content) > self._turn_chars:
+                content = content[: self._turn_chars - 1] + "…"
             prefix = "User" if turn.role == "user" else "Veda"
             lines.append(f"{prefix}: {content}")
+        if fits is not None:
+            dropped = 0
+            while lines and not fits("\n\n".join(blocks + ["RECENT CONVERSATION:\n" + "\n".join(lines)])):
+                lines.pop(0)
+                dropped += 1
+            if dropped:
+                logger.info(f"[chat] history trimmed to the {self._chat_budget}-token chat budget: dropped {dropped} oldest turn(s)")
         if lines:
             blocks.append("RECENT CONVERSATION:\n" + "\n".join(lines))
         return "\n\n".join(blocks)

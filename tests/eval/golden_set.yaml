@@ -84,7 +84,7 @@
 
 # ---- phrasings with NO trigger words: only the LLM router can send these to the right agent (llm: true) ----
 # `agent` is the expected final route. CI checks that the rules really do not match them; the model eval measures the LLM.
-- {say: "do I need an umbrella in Pune tomorrow", agent: lookup, tool: get_weather, args: {place: Pune}, llm: true}
+- {say: "do I need a jacket in Pune tonight", agent: lookup, tool: get_weather, args: {place: Pune}, llm: true}
 - {say: "is it chilly in Shimla right now", agent: lookup, tool: get_weather, args: {place: Shimla}, llm: true}
 - {say: "which team is top of the IPL table", agent: lookup, tool: web_search, args: {query: IPL}, llm: true}
 - {say: "is bitcoin going up today", agent: lookup, tool: web_search, args: {query: bitcoin}, llm: true}

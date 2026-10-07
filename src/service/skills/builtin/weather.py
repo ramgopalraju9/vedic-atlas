@@ -20,3 +20,16 @@ class GetWeatherSkill(ManifestSkill):
     async def run(self, ctx: AgentContext, **params) -> SkillResult:
         obs = await self._lookup.get(params.get("place"))
         return self._from_observation(obs)
+
+
+class GetWeatherForecastSkill(ManifestSkill):
+    what = "get the forecast"
+
+    def __init__(self, lookup: WeatherLookup, manifest: ToolManifest, permission_level: str | None = None,
+                 enabled: bool = True):
+        super().__init__(manifest, permission_level=permission_level, enabled=enabled)
+        self._lookup = lookup
+
+    async def run(self, ctx: AgentContext, **params) -> SkillResult:
+        obs = await self._lookup.forecast(params.get("place"), params.get("date_offset"))
+        return self._from_observation(obs)

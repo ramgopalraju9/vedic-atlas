@@ -8,17 +8,33 @@ fail, the original error is raised and the user is told plainly.
 
 from __future__ import annotations
 
+from datetime import datetime
+
+from core.enums import ErrorMessage, ExceptionCode
 from core.logging_config import logger
 from domain.entities.fact_query import FactQuery
 from domain.entities.place import Place
 from domain.entities.tool_observation import ToolObservation
-from exceptions.exception import ToolUnavailableError
+from exceptions.exception import AppException, ToolUnavailableError
 from service.lookup.lookup_service import LookupService
 from service.lookup.place_resolver import PlaceResolver
+
+MAX_DAYS_AHEAD = 6  # Open-Meteo's free forecast window we expose; mirrored by the provider's own check
 
 
 def _num(value) -> str:
     return f"{value:g}" if isinstance(value, (int, float)) else str(value)
+
+
+def _day_label(offset: int, iso_date: str) -> str:
+    if offset == 0:
+        return "today"
+    if offset == 1:
+        return "tomorrow"
+    try:
+        return "on " + datetime.strptime(iso_date, "%Y-%m-%d").strftime("%A")
+    except ValueError:
+        return f"in {offset} days"
 
 
 class WeatherLookup:
@@ -56,6 +72,28 @@ class WeatherLookup:
         text = f"WEATHER for {place.label()} (source {answer.provider_id}{', cached' if answer.cached else ''}): {answer.text}"
         return ToolObservation(
             text=text, spoken=spoken, source=answer.provider_id, as_of=as_of, cached=answer.cached,
+            data={**d, "place": place.label(), "place_source": place.source},
+        )
+
+    async def forecast(self, place_name: str | None, date_offset) -> ToolObservation:
+        """Daily forecast 0-6 days ahead. The model only picks the offset; range checks and the day name are code."""
+        if isinstance(date_offset, bool) or not isinstance(date_offset, int) or not 0 <= date_offset <= MAX_DAYS_AHEAD:
+            raise AppException(
+                class_name="WeatherLookup", code=ExceptionCode.VALIDATION_ERROR, error_message=ErrorMessage.GENERIC,
+                detail=f"I can only forecast 0 to {MAX_DAYS_AHEAD} days ahead",
+            )
+        place = await self._places.resolve(place_name)
+        answer = await self._lookup.fetch(
+            FactQuery(category="forecast", params={"lat": place.lat, "lon": place.lon, "date_offset": date_offset})
+        )
+        d = answer.data
+        spoken = f"In {place.name} {_day_label(date_offset, d.get('date', ''))}, {d['condition']}"
+        if d.get("rain_chance_pct") is not None:
+            spoken += f", {round(d['rain_chance_pct'])} percent chance of rain"
+        spoken += f", {round(d['temp_min_c'])} to {round(d['temp_max_c'])} degrees."
+        text = f"FORECAST for {place.label()} (source {answer.provider_id}{', cached' if answer.cached else ''}): {answer.text}"
+        return ToolObservation(
+            text=text, spoken=spoken, source=answer.provider_id, as_of=d.get("as_of", ""), cached=answer.cached,
             data={**d, "place": place.label(), "place_source": place.source},
         )
 
