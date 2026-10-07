@@ -77,6 +77,7 @@ from service.lookup.ttl_cache import TtlCache
 from service.lookup.registry import FactProviderRegistry
 from service.memory.knowledge_base import KnowledgeBase
 from service.privacy.capture_gate import CaptureGate
+from service.sensing.ambient_dispatcher import AmbientDispatcher
 from service.sensing.event_bus import EventBus
 from service.skills.builtin.file_ops import FileOpsSkill
 from service.skills.builtin.terminal import TerminalSkill
@@ -935,16 +936,18 @@ def bootstrap(app: FastAPI) -> None:
     app.state.orchestrator = orchestrator
     supervisor = SupervisorAgent(
         agent_registry=agent_registry, client=inference_client, default_agent="responder",
-        model=cfg.agents.supervisor.model, debounce_window_sec=cfg.sensing.debounce_window_sec,
-        rate_limit_max=cfg.sensing.rate_limit_max, rate_limit_window_sec=cfg.sensing.rate_limit_window_sec,
-        proactivity=cfg.sensing.proactivity, memory=memory_repo, governance=governance,
-        conversation=conversation,
+        model=cfg.agents.supervisor.model, memory=memory_repo, governance=governance,
         routing_num_predict=cfg.inference.routing_num_predict, llm_router=llm_router,
         routing_mode=routing_mode, router_on_failure=cfg.routing.on_failure, orchestrator=orchestrator,
     )
     agent_registry.register(supervisor)
     app.state.agent_registry = agent_registry
     app.state.supervisor = supervisor
+    app.state.ambient_dispatcher = AmbientDispatcher(
+        debounce_window_sec=cfg.sensing.debounce_window_sec, rate_limit_max=cfg.sensing.rate_limit_max,
+        rate_limit_window_sec=cfg.sensing.rate_limit_window_sec, proactivity=cfg.sensing.proactivity,
+        conversation=conversation,
+    )
 
     app.state.notifier = _build_notifier()
     app.state.egress_allow_list = frozenset(cfg.privacy.online.allowlist)

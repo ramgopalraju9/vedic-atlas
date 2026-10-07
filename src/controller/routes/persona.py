@@ -2,7 +2,7 @@
 
 Donor: veda/routes/persona.py, read in full and copied near-verbatim.
 Persistence: data/cli_persona.json (single-user, single file). When
-persona changes, seeds proactivity via supervisor.set_proactivity() the
+persona changes, seeds proactivity via ambient.set_proactivity() the
 same way the Angular PersonaStore does, so the brain matches the UI/CLI
 in one round-trip.
 """
@@ -14,11 +14,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from controller.dependencies.providers import get_supervisor
+from controller.dependencies.providers import get_ambient_dispatcher
 from core.constants import DATA_DIR
 from core.logging_config import logger
 from schemas.persona import PERSONA_CATALOG, PersonaState, PersonaUpdateRequest, lookup
-from service.agent.supervisor import SupervisorAgent
+from service.sensing.ambient_dispatcher import AmbientDispatcher
 
 router = APIRouter()
 
@@ -54,7 +54,7 @@ async def get_persona() -> dict[str, Any]:
 
 @router.post("/persona")
 async def set_persona(
-    body: PersonaUpdateRequest, supervisor: SupervisorAgent = Depends(get_supervisor)
+    body: PersonaUpdateRequest, ambient: AmbientDispatcher = Depends(get_ambient_dispatcher)
 ) -> dict[str, Any]:
     state = _load()
 
@@ -67,7 +67,7 @@ async def set_persona(
             )
         state.persona = info.id
         try:
-            supervisor.set_proactivity(info.proactivity)
+            ambient.set_proactivity(info.proactivity)
             logger.info(f"persona: set to {info.id!r}; proactivity seeded to {info.proactivity!r}")
         except Exception as e:
             logger.warning(f"persona: proactivity seed failed: {e}")

@@ -18,6 +18,7 @@ from fastapi import HTTPException, Request
 if TYPE_CHECKING:
     from domain.ports.governance_port import GovernanceProvider
     from service.agent.supervisor import SupervisorAgent
+    from service.sensing.ambient_dispatcher import AmbientDispatcher
     from service.approval.approval_broker import ApprovalBroker
     from domain.ports.trace_repository_port import TraceRepositoryPort
     from service.lookup.health_service import LookupHealthService
@@ -34,6 +35,10 @@ def _require(request: Request, attr: str, label: str):
 
 def get_supervisor(request: Request) -> "SupervisorAgent":
     return _require(request, "supervisor", "supervisor")
+
+
+def get_ambient_dispatcher(request: Request) -> "AmbientDispatcher":
+    return _require(request, "ambient_dispatcher", "ambient dispatcher")
 
 
 def get_approval_broker(request: Request) -> "ApprovalBroker":

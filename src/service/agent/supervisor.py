@@ -15,15 +15,8 @@ Donor: veda/agents/supervisor.py, read in full and adapted:
     evidenced feature of the donor's routing and doesn't depend on the
     code agent.
 
-Correction (2026-09-22): `dispatch_ambient` was missing from this port
-entirely — the first read of veda/agents/supervisor.py (270 of the real
-308 lines) never reached it. Added below, read in full this batch. The
-donor's summary-mirroring branch (folding a NOTIFICATION event's
-`is_summary` payload into conversation history) existed specifically for
-the code-runner's task summaries — the code agent is out of scope, so
-that payload shape will never actually occur in this build, but the
-mechanism is harmless to keep (it simply never fires) and removing it
-buys nothing.
+The ambient-event path (`dispatch_ambient`, proactivity, debounce/rate limit) used to live here; it moved
+unchanged to service/sensing/ambient_dispatcher.py, since it never handled a user turn.
 """
 
 from __future__ import annotations
@@ -34,9 +27,6 @@ from typing import AsyncIterator
 from domain.entities.agent_context import AgentContext
 from domain.entities.agent_profile import AgentProfile
 from domain.entities.agent_result import AgentResult
-from domain.events.ambient_event import AmbientEvent
-from domain.events.event_kind import EventKind
-from domain.value_objects.urgency import Urgency
 from domain.ports.governance_port import GovernanceProvider
 from domain.ports.inference_port import InferencePort
 from domain.ports.memory_repository_port import MemoryRepositoryPort
@@ -45,8 +35,6 @@ from domain.policies.routing_policy import is_confident, match_agent_detail
 from service.agent.base_agent import BaseAgent
 from service.agent.registry import AgentRegistry
 from service.agent.router_policy import RouterPolicy
-from service.sensing.event_bus import EventBus
-from service.sensing.rate_limiter import Debouncer, RateLimiter
 from core.logging_config import logger
 
 
@@ -60,14 +48,9 @@ class SupervisorAgent(BaseAgent):
         client: InferencePort,
         default_agent: str = "responder",
         model: str | None = None,
-        debounce_window_sec: float = 30.0,
-        rate_limit_max: int = 6,
-        rate_limit_window_sec: float = 60.0,
-        proactivity: str = "medium",
         memory: MemoryRepositoryPort | None = None,
         governance: GovernanceProvider | None = None,
         router: RouterPolicy | None = None,
-        conversation=None,
         routing_num_predict: int = 64,
         llm_router: RouterPort | None = None,
         routing_mode: str | None = None,
@@ -81,7 +64,6 @@ class SupervisorAgent(BaseAgent):
         self.memory = memory
         self.governance = governance
         self.router = router or RouterPolicy()
-        self.conversation = conversation  # ConversationManager, optional — used only to mirror ambient summaries into history
         self.routing_num_predict = routing_num_predict
         # When set, EVERY turn goes to the orchestrator and none of the routing below runs (docs/10).
         self.orchestrator = orchestrator
@@ -90,24 +72,6 @@ class SupervisorAgent(BaseAgent):
         # only for a message no rule recognised (what `agents.llm_routing: true` always did).
         self.routing_mode = routing_mode
         self.router_on_failure = router_on_failure if router_on_failure in {"keyword", "chat"} else "keyword"
-        self._rate_limit_max = rate_limit_max
-        self._rate_limit_window_sec = rate_limit_window_sec
-        self.proactivity = proactivity if proactivity in {"conservative", "medium", "chatty"} else "medium"
-        self._debouncer = Debouncer(window_sec=debounce_window_sec)
-        self._rate_limiter = RateLimiter(max_events=self._effective_rate_max(), window_sec=rate_limit_window_sec)
-
-    def _effective_rate_max(self) -> int:
-        from domain.policies.proactivity_policy import rate_limit_multiplier
-        from domain.value_objects.proactivity_level import ProactivityLevel
-        return self._rate_limit_max * rate_limit_multiplier(ProactivityLevel(self.proactivity))
-
-    def set_proactivity(self, level: str) -> str:
-        if level not in {"conservative", "medium", "chatty"}:
-            raise ValueError(f"invalid proactivity {level!r}; expected conservative|medium|chatty")
-        self.proactivity = level
-        self._rate_limiter = RateLimiter(max_events=self._effective_rate_max(), window_sec=self._rate_limit_window_sec)
-        logger.info(f"supervisor proactivity -> {level}")
-        return level
 
     # -- Routing ---------------------------------------------------------
 
@@ -257,35 +221,3 @@ class SupervisorAgent(BaseAgent):
             if cancel_event is not None and cancel_event.is_set():
                 break
             yield chunk
-
-    # -- Ambient path ------------------------------------------------------
-
-    async def dispatch_ambient(self, event: AmbientEvent) -> str | None:
-        """Decide how to narrate an ambient event, or None to suppress.
-
-        Donor: veda/agents/supervisor.py::dispatch_ambient, read in full.
-        Returns the text to voice/display, verbatim (no paraphrasing).
-        """
-        if event.kind == EventKind.HEARTBEAT:
-            return None
-        # Proactivity gate for LOW events.
-        if event.urgency == Urgency.LOW and self.proactivity != "chatty":
-            return None
-        # Conservative mode also drops NORMAL observations that aren't clearly notifications.
-        if self.proactivity == "conservative" and event.urgency == Urgency.NORMAL and event.kind == EventKind.OBSERVATION:
-            return None
-        if not self._debouncer.should_emit(event.dedupe_key):
-            logger.info(f"ambient dedup: suppressed {event.source}/{event.dedupe_key}")
-            return None
-        if event.urgency != Urgency.HIGH and not self._rate_limiter.allow():
-            logger.info(f"ambient rate-limited: {event.source}/{event.event_id}")
-            return None
-        # Mirror summary-flagged notifications into dialog history so the next
-        # user turn can resolve pronouns against what Veda just said in an
-        # ambient bubble. Other ambient sources stay out of history — too noisy.
-        if self.conversation is not None and event.kind == EventKind.NOTIFICATION and event.payload.get("is_summary"):
-            try:
-                self.conversation.add_turn("assistant", event.description)
-            except Exception as e:
-                logger.warning(f"supervisor: failed to record summary in history: {e}")
-        return event.description
