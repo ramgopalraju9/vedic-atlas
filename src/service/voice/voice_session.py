@@ -113,6 +113,7 @@ class VoiceSession:
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         self._speaking = False
+        self._turn_active = False   # a heard utterance is being transcribed / thought about / answered
         self._turns = 0
         self._last_transcript = ""
         self._last_reply = ""
@@ -232,6 +233,7 @@ class VoiceSession:
         """
         cancel = asyncio.Event()
         task = asyncio.create_task(self._handle(utterance, cancel), name="VoiceTurn")
+        self._turn_active = True
         try:
             while True:
                 done, _ = await asyncio.wait({task}, timeout=0.1)
@@ -244,6 +246,8 @@ class VoiceSession:
         except asyncio.CancelledError:
             task.cancel()
             raise
+        finally:
+            self._turn_active = False
 
     async def _abort_turn(self, task: asyncio.Task, cancel: asyncio.Event) -> None:
         logger.info("[voice] muted mid-turn: cancelling the turn and stopping playback")
@@ -441,6 +445,25 @@ class VoiceSession:
     async def speak(self, text: str) -> None:
         """Speak arbitrary text through the same echo-guarded path as a reply."""
         await self._speak(text)
+
+    # -- Announcements (reminders): speak only when nothing else is going on -------------
+
+    def available(self) -> bool:
+        return self.is_running
+
+    def is_busy(self) -> bool:
+        """True while we are speaking, the user is talking (or the wake window is open for them to), or a turn is in
+        flight. Being muted is NOT busy: a closed mic does not stop the speaker."""
+        return self._speaking or self._turn_active or self._collector.is_speaking or self._is_armed()
+
+    async def announce(self, text: str) -> bool:
+        """Speak `text` only if idle right now; False means busy, try later. The idle check and `_speaking = True`
+        (set at the top of `_speak`) happen with no `await` between them, so a turn cannot start in the gap, and the
+        mic stays closed while we talk exactly as for a reply."""
+        if not self.is_running or self.is_busy():
+            return False
+        await self._speak(text)
+        return True
 
     async def _speak(self, text: str) -> None:
         """Synthesise and play with the mic held closed until playback truly ends."""

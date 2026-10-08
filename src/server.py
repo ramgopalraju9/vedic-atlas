@@ -29,7 +29,7 @@ from fastapi import FastAPI
 from controller.middleware.request_context import request_context
 from controller.routes import (
     admin, approval, config as config_route, governance as governance_route,
-    health, knowledge, lookup, persona, privacy, speakers, stream,
+    google as google_route, health, knowledge, lookup, persona, privacy, reminders as reminders_route, speakers, stream,
     tasks as tasks_route, trace as trace_route, voice,
 )
 from core.config import active_profile, ensure_dirs, load_full_config
@@ -90,6 +90,10 @@ from tpa.online.providers.geocode import GeocodingProvider
 from tpa.online.providers.tavily import TavilyProvider
 from tpa.online.providers.forecast import ForecastProvider
 from tpa.online.providers.weather import WeatherProvider
+from tpa.online.google.calendar_client import GoogleCalendarClient
+from tpa.online.google.consent import SCOPES as GOOGLE_SCOPES
+from tpa.online.google.gmail_client import GmailClient
+from tpa.online.google.google_auth import GoogleAuth
 from tpa.persistence.migrations import init_tables
 from tpa.persistence.repositories.agent_memory_repository import AgentMemoryRepository
 from tpa.persistence.repositories.conversation_repository import ConversationRepository
@@ -448,6 +452,39 @@ def _build_speaker_enrollment_service(cfg: AppConfig, audio_capture):
         return None
 
 
+def _build_reminders(cfg: AppConfig, *, calendar, tasks, voice_session, calendar_changed):
+    """Spoken reminders for calendar events and due tasks. A timer, not an agent: no model, no tools, no prompt. It speaks
+    through the voice session only when that is idle, and always leaves the text for the terminal. None when disabled."""
+    rc = cfg.reminders
+    if not rc.enabled:
+        logger.info("[reminders] disabled (reminders.enabled=false)")
+        return None
+    from domain.policies.reminder_policy import ReminderRules
+    from service.reminders.announcer import ReminderAnnouncer
+    from service.reminders.feed import ReminderFeed
+    from service.reminders.reminder_service import ReminderService
+    from service.reminders.scheduler import ReminderScheduler
+    from service.reminders.sources import CalendarReminderSource, TaskReminderSource
+    from tpa.persistence.repositories.reminder_ledger_repository import SqliteReminderLedger
+
+    rules = ReminderRules(
+        enabled=True, lead_minutes=tuple(rc.lead_minutes), at_start=rc.at_start, skip_all_day=rc.skip_all_day,
+    )
+    sources = []
+    if calendar is not None:
+        sources.append(CalendarReminderSource(calendar))
+    if rc.include_tasks:
+        sources.append(TaskReminderSource(tasks))
+    ledger, feed = SqliteReminderLedger(), ReminderFeed()
+    announcer = ReminderAnnouncer(ledger, feed, voice_session, rules, idle_settle_sec=rc.idle_settle_sec)
+    scheduler = ReminderScheduler(
+        sources, ledger, announcer, rules, poll_sec=rc.poll_sec, horizon_hours=rc.horizon_hours, tick_sec=rc.tick_sec,
+    )
+    service = ReminderService(scheduler, announcer, feed)
+    calendar_changed.subscribe(service.nudge)
+    return service
+
+
 def _build_voice_session(cfg: AppConfig, *, audio, capture_gate, supervisor, event_bus, speaker_id=None):
     """Assemble the always-on voice loop. None if any required piece is missing."""
     if not cfg.audio.voice_enabled:
@@ -668,6 +705,50 @@ def _build_skills(cfg: AppConfig, hooks: HookRegistry) -> tuple[SkillRegistry, S
     return registry, SkillRunner(skill_registry=registry, hook_registry=hooks)
 
 
+_GOOGLE_TOOLS = ("gmail_search", "gmail_read", "gmail_draft", "gmail_send", "calendar_agenda", "calendar_create")
+
+
+def _register_google_tools(
+    online, tool_manifests: dict, skill_registry: SkillRegistry, on_calendar_change=None,
+) -> tuple[GoogleAuth | None, GoogleCalendarClient | None]:
+    """Gmail + Calendar skills over one shared Google sign-in. They are registered even when the account is not yet
+    linked, so asking about mail gets "it isn't set up" (and scripts/google_auth.py tells the user how) instead of a
+    wrong answer from another tool."""
+    from service.mail.draft_outbox import DraftOutbox
+    from service.skills.builtin.calendar_agenda import CalendarAgendaSkill
+    from service.skills.builtin.calendar_create import CalendarCreateSkill
+    from service.skills.builtin.gmail import GmailDraftSkill, GmailReadSkill, GmailSearchSkill, GmailSendSkill
+
+    if not any(name in tool_manifests for name in _GOOGLE_TOOLS):
+        return None, None
+    http = AllowListedHttpClient(allow_list=frozenset(online.allowlist))
+    auth = GoogleAuth(
+        http,
+        client_id=lambda: os.environ.get(online.google_client_id_env),
+        client_secret=lambda: os.environ.get(online.google_client_secret_env),
+        refresh_token=lambda: os.environ.get(online.google_refresh_token_env),
+        required_scopes=GOOGLE_SCOPES,
+    )
+    mail, calendar, outbox = GmailClient(http, auth), GoogleCalendarClient(http, auth), DraftOutbox()
+    builders = {
+        "gmail_search": lambda m: GmailSearchSkill(mail, m),
+        "gmail_read": lambda m: GmailReadSkill(mail, m),
+        "gmail_draft": lambda m: GmailDraftSkill(mail, m, outbox),
+        "gmail_send": lambda m: GmailSendSkill(mail, m, outbox),
+        "calendar_agenda": lambda m: CalendarAgendaSkill(calendar, m),
+        "calendar_create": lambda m: CalendarCreateSkill(calendar, m, on_created=on_calendar_change),
+    }
+    for name, build in builders.items():
+        if name in tool_manifests:
+            skill_registry.register(build(tool_manifests[name]))
+    missing = auth.missing()
+    if missing:
+        logger.info(f"[google] not linked (missing {', '.join(missing)}): mail and calendar tools will say so. Run `veda login`")
+    else:
+        logger.info("[google] Gmail and Calendar tools ready")
+    return auth, calendar
+
+
 def bootstrap(app: FastAPI) -> None:
     """Build every subsystem and attach it to `app.state`."""
     cfg = load_full_config()
@@ -749,7 +830,10 @@ def bootstrap(app: FastAPI) -> None:
 
     from tpa.persistence.repositories.task_repository import SqliteTaskRepository
     from service.tasks.task_service import TaskService
-    task_service = TaskService(SqliteTaskRepository())
+    from service.reminders.reminder_service import ChangeSignal
+    calendar_changed = ChangeSignal()   # fired when the calendar or the task list changes, so reminders re-read at once
+    app.state.calendar_changed = calendar_changed
+    task_service = TaskService(SqliteTaskRepository(), on_change=calendar_changed.fire)
     app.state.task_service = task_service
 
     hooks, permissions = _build_guardrails(cfg)
@@ -792,6 +876,9 @@ def bootstrap(app: FastAPI) -> None:
             WebSearchSkill(SearchLookup(lookup_service), tool_manifests["web_search"]),
         ):
             skill_registry.register(skill)
+    app.state.google_auth, calendar_port = (
+        _register_google_tools(online, tool_manifests, skill_registry, calendar_changed.fire) if online.enabled else (None, None)
+    )
     app.state.lookup_service = lookup_service
     app.state.lookup_health = (
         _build_lookup_health(lookup_service, lookup_search, online.search_api_key_env) if lookup_service else None
@@ -809,6 +896,9 @@ def bootstrap(app: FastAPI) -> None:
         manifest = tool_manifests.get(tool_name)
         if manifest is not None:
             skill_registry.register(skill_cls(system_control, manifest, governance=governance))
+    if 'current_time' in tool_manifests:
+        from service.skills.builtin.clock import CurrentTimeSkill
+        skill_registry.register(CurrentTimeSkill(tool_manifests['current_time']))
     agent_registry = AgentRegistry()
     trace_repo = SqliteTraceRepository()
     app.state.trace_repo = trace_repo
@@ -885,6 +975,11 @@ def bootstrap(app: FastAPI) -> None:
         supervisor=supervisor, event_bus=event_bus, speaker_id=speaker_recognizer,
     )
 
+    app.state.reminders = _build_reminders(
+        cfg, calendar=calendar_port, tasks=task_service, voice_session=app.state.voice_session,
+        calendar_changed=calendar_changed,
+    )
+
     logger.info(f"Bootstrap: {agent_registry.count} agents, {len(skill_registry.list_all())} skills registered")
 
 
@@ -926,6 +1021,28 @@ async def _housekeeping_loop(task_service, trace_repo, session_state=None, inter
         except Exception as e:
             logger.warning(f"[housekeeping] failed: {e}")
         await asyncio.sleep(interval_sec)
+
+
+_GOOGLE_HINTS = {
+    "not_linked": "not signed in: run `veda login` (mail and calendar answer \"isn't set up\" until then)",
+    "rejected": "Google refused the saved sign-in (expired or revoked): run `veda login`",
+    "needs_permission": "the saved sign-in lacks permission for: {scopes}: run `veda login` to grant it",
+    "unreachable": "could not reach Google to check the sign-in (offline?); it will be tried again when used",
+}
+
+
+async def _log_google_status(auth) -> None:
+    """One line at boot saying whether mail/calendar will work, and exactly how to fix it if not. Never blocks or raises."""
+    try:
+        status = await asyncio.wait_for(auth.status(), timeout=15)
+    except Exception as e:
+        logger.info(f"[google] sign-in not checked ({type(e).__name__})")
+        return
+    state = status.get("state", "ok")
+    if state == "ok":
+        logger.info("[google] sign-in OK (mail, calendar, reminders)")
+    else:
+        logger.warning("[google] " + _GOOGLE_HINTS.get(state, state).format(scopes=", ".join(status.get("missing_scopes", []))))
 
 
 @asynccontextmanager
@@ -986,7 +1103,20 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"VoiceSession failed to start: {e}")
 
+    if getattr(app.state, "google_auth", None) is not None:
+        asyncio.create_task(_log_google_status(app.state.google_auth))
+
+    if getattr(app.state, "reminders", None) is not None:
+        app.state.reminders.start()   # after the voice loop, so its first announcement can already be spoken
+        logger.info("[reminders] started")
+
     yield
+
+    if getattr(app.state, "reminders", None) is not None:
+        try:
+            await app.state.reminders.stop()
+        except Exception as e:
+            logger.warning(f"Reminders failed to stop cleanly: {e}")
 
     if getattr(app.state, "voice_session", None) is not None:
         try:
@@ -1024,7 +1154,7 @@ logger.info(f"{PROJECT_NAME} v{VERSION} application initialized")
 
 for _mod in (
     admin, approval, config_route, governance_route,
-    health, knowledge, lookup, persona, privacy, speakers, stream, tasks_route, trace_route, voice,
+    google_route, health, knowledge, lookup, persona, privacy, reminders_route, speakers, stream, tasks_route, trace_route, voice,
 ):
     app.include_router(_mod.router, prefix="/api")
 

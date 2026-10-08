@@ -13,11 +13,18 @@ chat turn. Ctrl-C cancels an in-flight stream; Ctrl-D / ``:quit`` exits.
 
 from __future__ import annotations
 
+import os
+import sys
+import threading
+
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.patch_stdout import patch_stdout
 from rich.console import Console
+from rich.markup import escape
 
+from controller.cli import google_login
 from controller.cli.client import VedaClient
 from controller.cli.commands import render_doctor, render_traces
 from controller.cli.logo import render_banner, status_line
@@ -40,7 +47,11 @@ _HELP = """
   /doctor            check the online tools (weather, search, currency)
   /trace [n]         show what the tools actually did on the last n turns
   /task              list tasks · /task add <title> · /task done <id>
+  /reminders         show reminder settings · on|off · lead 15,5 (minutes before; "lead off" = none) · start on|off
 """
+
+_REMINDER_POLL_SEC = 3.0
+_REMINDER_RETRY_SEC = 30.0   # after a failed poll (server restarting, reminders disabled)
 
 
 class Repl:
@@ -51,6 +62,13 @@ class Repl:
         self.session: PromptSession[str] = PromptSession(history=self.history)
         self.persona: str | None = None
         self.brain: str = "?"
+        # Spoken reminders also arrive here as text. A poller thread fetches them; they are printed above the prompt
+        # while it waits for input, and held back while a reply is streaming so they never garble it.
+        self._reminder_cursor: int | None = None
+        self._reminder_inbox: list[str] = []
+        self._reminder_lock = threading.Lock()
+        self._prompting = False
+        self._stop_polling = threading.Event()
 
     def run(self) -> int:
         self._refresh_meta()
@@ -58,10 +76,26 @@ class Repl:
             persona=self.persona, server_url=self.client.server_url, brain=self.brain,
             warm_pool=True, state="idle", console=self.console,
         )
+        self._ensure_google()
+        threading.Thread(target=self._poll_reminders, name="ReminderPoller", daemon=True).start()
+        try:
+            return self._loop()
+        finally:
+            self._stop_polling.set()
+
+    def _loop(self) -> int:
         while True:
             try:
+                self._flush_reminders()
                 self.console.print(status_line(persona=self.persona, brain=self.brain))
-                line = self.session.prompt(HTML("<ansicyan><b>veda</b></ansicyan> > "))
+                with patch_stdout(raw=True):
+                    with self._reminder_lock:
+                        self._prompting = True
+                    try:
+                        line = self.session.prompt(HTML("<ansicyan><b>veda</b></ansicyan> > "))
+                    finally:
+                        with self._reminder_lock:
+                            self._prompting = False
             except (EOFError, KeyboardInterrupt):
                 self.console.print()
                 return 0
@@ -73,6 +107,111 @@ class Repl:
                     return 0
                 continue
             self._send_chat(line)
+
+    # ---------- google sign-in ----------
+
+    _GOOGLE_PROBLEMS = {
+        "not_linked": "Gmail and Calendar are not signed in yet.",
+        "rejected": "Google refused the saved sign-in (it expired or was revoked).",
+        "needs_permission": "The saved Google sign-in lacks a permission ({scopes}); mail/calendar writes and reminders need it.",
+    }
+
+    def _ensure_google(self) -> None:
+        """At start: if Google mail/calendar cannot work, say why and offer to fix it right here (works on a headless Pi too)."""
+        if os.environ.get("VEDA_SKIP_GOOGLE_PROMPT", "").strip().lower() in ("1", "true", "yes"):
+            return
+        try:
+            status = self.client.google_status()
+        except Exception:
+            return   # online tools off, or the server could not be asked: nothing to offer
+        problem = self._GOOGLE_PROBLEMS.get(status.get("state", "ok"))
+        if problem is None:
+            return
+        self.console.print("[yellow]" + problem.format(scopes=", ".join(status.get("missing_scopes", []))) + "[/yellow]")
+        if any(s in ("client id", "client secret") for s in status.get("missing_secrets", [])):
+            self.console.print("[dim]Add GOOGLE_API_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env, then run `veda login`.[/dim]")
+            return
+        if not sys.stdin.isatty():
+            self.console.print("[dim]Run `veda login` to sign in.[/dim]")
+            return
+        try:
+            answer = self.session.prompt(HTML("Sign in to Google now? <ansiyellow>[Y/n]</ansiyellow> "))
+        except (EOFError, KeyboardInterrupt):
+            return
+        if answer.strip().lower() in ("n", "no"):
+            self.console.print("[dim]Run `veda login` whenever you want to.[/dim]")
+            return
+        if google_login.run_link() != 0:
+            self.console.print("[dim]Not signed in. Run `veda login` to try again.[/dim]")
+            return
+        try:
+            after = self.client.google_reload()
+        except Exception as e:
+            self.console.print(f"[red]Saved, but the server could not reload it ({e}); restart Veda.[/red]")
+            return
+        if after.get("state") == "ok":
+            self.console.print("[green]Google is signed in: mail, calendar and reminders are ready.[/green]")
+        else:
+            self.console.print(f"[yellow]Saved, but Google still reports: {after.get('state')} {after.get('missing_scopes') or ''}[/yellow]")
+
+    # ---------- reminders ----------
+
+    def _show_reminder(self, text: str) -> None:
+        self.console.print(f"[bold yellow]⏰ {escape(text)}[/bold yellow]")
+
+    def _flush_reminders(self) -> None:
+        with self._reminder_lock:
+            pending, self._reminder_inbox = self._reminder_inbox, []
+        for text in pending:
+            self._show_reminder(text)
+
+    def _poll_reminders(self) -> None:
+        wait = _REMINDER_POLL_SEC
+        while not self._stop_polling.wait(wait):
+            try:
+                data = self.client.reminders_recent(self._reminder_cursor)
+            except Exception:
+                wait = _REMINDER_RETRY_SEC
+                continue
+            wait = _REMINDER_POLL_SEC
+            if self._reminder_cursor is None:   # first contact: start from now, never replay old reminders
+                self._reminder_cursor = int(data.get("last", 0))
+                continue
+            for item in data.get("items", []):
+                self._reminder_cursor = max(self._reminder_cursor, int(item["seq"]))
+                with self._reminder_lock:
+                    show_now = self._prompting
+                    if not show_now:
+                        self._reminder_inbox.append(item["text"])
+                if show_now:
+                    self._show_reminder(item["text"])
+
+    def _cmd_reminders(self, rest: str) -> None:
+        parts = rest.lower().split()
+        try:
+            if parts:
+                head, arg = parts[0], parts[1:]
+                if head in ("on", "off"):
+                    self.client.set_reminders(enabled=head == "on")
+                elif head == "start" and arg and arg[0] in ("on", "off"):
+                    self.client.set_reminders(at_start=arg[0] == "on")
+                elif head == "lead" and arg:
+                    leads = [] if arg[0] == "off" else [int(x) for x in "".join(arg).split(",") if x]
+                    self.client.set_reminders(lead_minutes=leads)
+                else:
+                    self.console.print("[red]usage: /reminders [on|off | lead 15,5 | lead off | start on|off][/red]")
+                    return
+            status = self.client.reminders_status()
+        except Exception as e:
+            self.console.print(f"[red]reminders failed:[/red] {e}")
+            return
+        cfg = status.get("config", {})
+        leads = ", ".join(f"{m} min" for m in cfg.get("lead_minutes", [])) or "none"
+        self.console.print(
+            f"reminders: [bold]{'on' if cfg.get('enabled') else 'off'}[/bold] · heads-up: {leads} before "
+            f"· at start: {'yes' if cfg.get('at_start') else 'no'} · pending: {status.get('pending', 0)}"
+            f" · next: {status.get('next_due_at') or '-'}"
+        )
 
     # ---------- slash commands ----------
 
@@ -110,6 +249,9 @@ class Repl:
             return True
         if cmd == "task":
             self._cmd_task(rest)
+            return True
+        if cmd == "reminders":
+            self._cmd_reminders(rest)
             return True
         if cmd == "trace":
             try:

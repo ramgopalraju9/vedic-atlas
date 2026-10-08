@@ -12,9 +12,16 @@ online:
   enabled: true                    # false = fully offline, no online tools registered
   default_place: Hyderabad          # weather with no place named
   search_api_key_env: TAVILY_API_KEY  # name of the env var (set the key in .env)
+  # Google OAuth (Gmail + Calendar tools). The VALUES live in .env; run scripts/google_auth.py once to create the refresh token.
+  google_client_id_env: GOOGLE_API_CLIENT_ID
+  google_client_secret_env: GOOGLE_CLIENT_SECRET
+  google_refresh_token_env: GOOGLE_REFRESH_TOKEN
   allowlist:
     - api.open-meteo.com            # weather
     - geocoding-api.open-meteo.com  # place name -> coordinates
     - api.frankfurter.dev           # currency (ECB reference rates)
     - open.er-api.com               # currency fallback for the ~130 currencies ECB doesn't carry
     - api.tavily.com                # web search (needs TAVILY_API_KEY)
+    - oauth2.googleapis.com         # Google sign-in token refresh (Gmail / Calendar tools)
+    - gmail.googleapis.com          # Gmail: search, read, drafts, send
+    - www.googleapis.com            # Google Calendar (read-only)

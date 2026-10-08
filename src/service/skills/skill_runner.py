@@ -55,6 +55,8 @@ class SkillRunner:
 
         logger.info(f"Executing skill '{skill_name}' (permission: {skill.permission_level}, agent: {ctx.current_agent})")
         result = await skill.execute(ctx, **params)
+        # A private skill's output (mail, calendar) must not reach the audit log or the API's skill_calls.
+        shown = "" if getattr(skill, "sensitive_output", False) else (str(result.output)[:500] if result.output else "")
 
         if self.hook_registry:
             await self.hook_registry.fire(
@@ -63,14 +65,14 @@ class SkillRunner:
                 skill_name=skill_name,
                 params=params,
                 success=result.success,
-                output=str(result.output)[:500] if result.output else "",
+                output=shown,
                 error=result.error or "",
             )
 
         ctx.skill_results.append({
             "skill": skill_name,
             "success": result.success,
-            "output": str(result.output)[:500] if result.output else None,
+            "output": shown or None,
             "error": result.error,
         })
 

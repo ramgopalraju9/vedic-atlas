@@ -213,6 +213,13 @@ def test_failed_call_gets_plain_failure_text_never_an_invented_result():
     assert result.response == "I couldn't do that: provider down 5 USD is 4.3 EUR."
 
 
+def test_a_failed_call_that_carries_its_own_sentence_is_spoken_with_that_sentence():
+    failed = SkillResult(skill_name="x", success=False, error="no app name", metadata={"spoken": "Which app do you mean?"})
+    e = env([dec([call("get_weather", place="Tokyo")], live=True)], {"get_weather": failed})
+    _, result = turn(e, "x")
+    assert result.response == "Which app do you mean?"
+
+
 def test_a_skill_that_raises_is_a_failed_call_not_a_crash():
     e = env([dec([call("get_weather", place="Tokyo")], live=True)], {"get_weather": RuntimeError("boom")})
     _, result = turn(e, "x")

@@ -7,6 +7,7 @@ all go through one place.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Callable
 
 from domain.entities.task import Task
 from domain.policies.retention_policy import COMPLETED_TASK_RETENTION_DAYS
@@ -17,22 +18,35 @@ from domain.ports.task_repository_port import TaskRepositoryPort
 class TaskService:
     """Add, list, complete, and delete user tasks."""
 
-    def __init__(self, repo: TaskRepositoryPort):
+    def __init__(self, repo: TaskRepositoryPort, on_change: Callable[[], None] | None = None):
         self._repo = repo
+        self._on_change = on_change   # e.g. tells the reminder scheduler to re-read, so a finished task stops reminding
+
+    def _changed(self) -> None:
+        if self._on_change is not None:
+            try:
+                self._on_change()
+            except Exception:
+                pass
 
     def add(self, title: str, *, notes: str = "", due_at: datetime | None = None) -> Task:
         task = Task(id=None, title=title, notes=notes, due_at=due_at)
         task.id = self._repo.add(task)
+        self._changed()
         return task
 
     def list(self, *, include_done: bool = False) -> list[Task]:
         return self._repo.list(include_done=include_done)
 
     def complete(self, task_id: int) -> bool:
-        return self._repo.set_done(task_id, True)
+        done = self._repo.set_done(task_id, True)
+        self._changed()
+        return done
 
     def delete(self, task_id: int) -> bool:
-        return self._repo.delete(task_id)
+        gone = self._repo.delete(task_id)
+        self._changed()
+        return gone
 
     def add_unique(
         self, title: str, *, notes: str = "", due_at: datetime | None = None

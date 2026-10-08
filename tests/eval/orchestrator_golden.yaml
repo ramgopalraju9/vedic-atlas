@@ -11,7 +11,8 @@
 #     clarification:   true | false           true = a clarification question, no call
 #   phase4:     optional override of `expect` once get_weather_forecast exists
 #
-# Tools that exist today: get_weather, convert_currency, web_search, tasks, remember.
+# Tools that exist today: get_weather, get_weather_forecast, convert_currency, web_search, tasks, remember, app_control,
+# volume_control, device_status, gmail_search, gmail_read, gmail_draft, gmail_send, calendar_agenda, calendar_create, current_time.
 
 # ---- explicit tool requests ----------------------------------------------------------------------
 - {say: "what's the weather in Tokyo", category: explicit, expect: {calls: [{tool: get_weather, args: {place: Tokyo}}]}}
@@ -61,7 +62,7 @@
 
 # ---- mention without request (Bug B) -------------------------------------------------------------
 - {say: "I didn't ask about Singapore weather, what's 1+1?", category: mention, expect: {calls: [], needs_live_data: false}}
-- {say: "don't tell me the weather, just the time", category: negation, expect: {calls: []}}
+- {say: "don't tell me the weather, just the time", category: negation, expect: {calls: [{tool: current_time, args: {}}]}}
 - {say: "she asked 'how hot is it' and I laughed", category: quotation, expect: {calls: [], needs_live_data: false}}
 - {say: "what does the word forecast mean?", category: meta, expect: {calls: [], needs_live_data: false}}
 - {say: "my app shows the temperature wrong, how do I debug it?", category: technical, expect: {calls: [], needs_live_data: false}}
@@ -79,8 +80,18 @@
 
 # ---- live data with no tool available: refuse, never hallucinate --------------------------------
 - {say: "will it rain tomorrow in Pune", category: no-tool, expect: {calls: [], needs_live_data: true}, phase4: {calls: [{tool: get_weather_forecast, args: {place: Pune, date_offset: 1}}]}}
-- {say: "what's on my calendar today", category: no-tool, expect: {calls: [], needs_live_data: true}}
-- {say: "do I have any new email", category: no-tool, expect: {calls: [], needs_live_data: true}}
+- {say: "how bad is the traffic near my office right now", category: no-tool, expect: {calls: [], needs_live_data: true}}
+# Gmail + Calendar exist now (read-only calendar; mail is read, drafted and sent in two separate turns)
+- {say: "what's on my calendar today", category: google, expect: {calls: [{tool: calendar_agenda, args: {}}]}}
+- {say: "what meetings do I have this week", category: google, expect: {calls: [{tool: calendar_agenda, args: {days: 7}}]}}
+- {say: "do I have any new email", category: google, expect: {calls: [{tool: gmail_search, args: {unread_only: true}}]}}
+- {say: "summarise my last email from Priya", category: google, expect: {calls: [{tool: gmail_read, args: {query: priya}}]}}
+- {say: "write an email to Sam saying the report is ready", category: google, expect: {calls: [{tool: gmail_draft, args: {to: Sam}}]}}
+- say: "yes go ahead and send that"
+  category: google
+  state: {tool: gmail_draft, slots: {to: sam@example.com, subject: Report ready}}
+  expect: {calls: [{tool: gmail_send, args: {}}]}
+- {say: "my manager keeps emailing me at night and it annoys me", category: mention, expect: {calls: [], needs_live_data: false}}
 
 # ---- no active state: clarify, never invent a topic ----------------------------------------------
 - {say: "what about tomorrow?", category: no-state, expect: {calls: [], clarification: true}}
@@ -144,4 +155,31 @@
 - {say: "why is the sky blue?", category: general, expect: {calls: [], needs_live_data: false}}
 - {say: "explain what a forecast model does", category: general, expect: {calls: [], needs_live_data: false}}
 - {say: "and there?", category: no-state, expect: {calls: [], clarification: true}}
-- {say: "did I get any email from Priya today?", category: no-tool, expect: {calls: [], needs_live_data: true}}
+- {say: "did I get any email from Priya today?", category: google, expect: {calls: [{tool: gmail_search, args: {query: priya}}]}}
+
+# ---- failures seen in a real session (calendar writes went to tasks, the clock to device_status, mail sent was invisible) ----
+- {say: "put a design review on my calendar tomorrow at 3 pm", category: calendar-write, expect: {calls: [{tool: calendar_create, args: {title: review, date_offset: 1, time: "15:00"}}]}}
+- {say: "schedule a team sync today at 6 pm", category: calendar-write, expect: {calls: [{tool: calendar_create, args: {title: sync, date_offset: 0, time: "18:00"}}]}}
+# no time given: the model must LEAVE `time` OUT (the tool then asks "What time should I set it for?"). The judge cannot check an absent
+# arg, so these two pass on the tool + title; read the raw output for a time that was made up.
+- {say: "put the dentist on my calendar", category: calendar-write, expect: {calls: [{tool: calendar_create, args: {title: dentist}}]}}
+- say: "then block my calendar for that time"
+  category: calendar-write
+  history: [{user: "what did he say?", veda: "Manoj Routhu said yes, he will be available."}]
+  state: {tool: gmail_read, slots: {query: from:manoj}}
+  expect: {calls: [{tool: calendar_create, args: {}}]}
+- {say: "what is my schedule tomorrow?", category: calendar-write, expect: {calls: [{tool: calendar_agenda, args: {date_offset: 1}}]}}
+- {say: "what are my tasks for tomorrow", category: calendar-write, expect: {calls: [{tool: tasks, args: {action: list}}]}}
+- {say: "what is the time?", category: clock, expect: {calls: [{tool: current_time, args: {}}]}}
+- {say: "what's the date today", category: clock, expect: {calls: [{tool: current_time, args: {what: date}}]}}
+- {say: "what mail did I send to manoj", category: google, expect: {calls: [{tool: gmail_search, args: {folder: sent}}]}}
+- {say: "did we send any mail to manojrouthu26@gmail.com", category: google, expect: {calls: [{tool: gmail_search, args: {folder: sent}}]}}
+- {say: "where are you?", category: meta, expect: {calls: [], needs_live_data: false}}
+- say: "where did he live?"
+  category: followup
+  history: [{user: "who wrote the Mahabharata?", veda: "Tradition credits the sage Vyasa. Source: britannica."}]
+  state: {tool: web_search, slots: {query: author of the Mahabharata, topic: general}}
+  expect: {calls: [{tool: web_search, args: {query: vyasa}}]}
+- say: "what is happening there?"
+  category: no-state
+  expect: {calls: [], clarification: true}

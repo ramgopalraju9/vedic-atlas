@@ -130,7 +130,7 @@ class AssistantOrchestrator(BaseAgent):
     async def _run_tools(self, ctx: AgentContext, calls: Sequence[dict], outcome: TurnOutcome) -> str:
         t0 = time.perf_counter()
         for call in calls:
-            outcome.calls.append(await execute_call(self._skill_runner, ctx, call))
+            outcome.calls.append(await execute_call(self._skill_runner, ctx, call, private=self._manifests[call["tool"]].private))
         outcome.timings_ms["execute"] = int((time.perf_counter() - t0) * 1000)
 
         t1 = time.perf_counter()
@@ -158,7 +158,9 @@ class AssistantOrchestrator(BaseAgent):
         narration_placed = False
         for c, kind in zip(calls, kinds):
             if kind == FAILED:
-                pieces.append(failure_text(c.error))
+                # The skill's own sentence when it gave one ("Which app do you mean?", "I can't check your email yet because
+                # it isn't set up"); the generic text with the raw error only for a failure that came with no sentence.
+                pieces.append(c.spoken or failure_text(c.error))
             elif kind == SPOKEN:
                 pieces.append(spoken_text(c.spoken, c.observation))
             elif narration is not None:
@@ -208,7 +210,7 @@ class AssistantOrchestrator(BaseAgent):
                 request_id=ctx.request_id, agent=self.name, user_message=ctx.user_message[:300], reply=reply[:400],
                 decided=_DECIDED[route], narrated=outcome.narrated, total_ms=int((time.perf_counter() - started) * 1000),
                 calls=[
-                    {"tool": c.tool, "args": c.args, "ok": c.ok, "ms": c.ms, "result": (c.observation or "")[:300], "error": c.error}
+                    {"tool": c.tool, "args": c.args, "ok": c.ok, "ms": c.ms, "result": "" if self._manifests[c.tool].private else (c.observation or "")[:300], "error": c.error}
                     for c in outcome.calls
                 ],
                 prompt_tokens=outcome.prompt_tokens, timings_ms=outcome.timings_ms, notes=list(outcome.notes),

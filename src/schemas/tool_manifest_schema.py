@@ -60,6 +60,7 @@ class ToolManifestSchema(BaseModel):
     destructive: bool = False
     destructive_when: dict[str, list[str]] = Field(default_factory=dict)
     target_params: list[str] = Field(default_factory=list)
+    private: bool = False
 
     @field_validator("name")
     @classmethod
@@ -137,4 +138,5 @@ class ToolManifestSchema(BaseModel):
             destructive=self.destructive,
             destructive_when=tuple((p, tuple(v)) for p, v in self.destructive_when.items()),
             target_params=tuple(self.target_params),
+            private=self.private,
         )
