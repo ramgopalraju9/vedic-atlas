@@ -36,3 +36,33 @@ Needs `data/Qwen3-4B-Q4_K_M.gguf` (gitignored; path in `config/inference.yaml`) 
 - `docs/` and `data/` are gitignored; docs here were force-added (`git add -f docs/...`).
 - Do not commit: `.idea/`, `vedic-atlas-env/`, `wakeword_training/`, `src/*.egg-info/`, `tests/eval/results/routing-v1-prompt-*.json`.
 - Commit trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+
+## Setting up on another laptop (what git does NOT carry)
+```bash
+git clone https://github.com/ramgopalraju9/vedic-atlas.git && cd vedic-atlas
+git checkout feature/unified-orchestrator          # NOT main: main is the old routing design
+python -m venv .venv && . .venv/Scripts/activate   # Linux/Pi: source .venv/bin/activate, and run scripts/setup_pi.sh instead of the pip line
+pip install -e .                                   # llama-cpp-python compiles from source where no wheel exists (10-30 min on a Pi)
+pip install pytest pytest-asyncio                  # not in pyproject
+pytest -q                                          # expect all green except test_tts_selection (needs pyttsx3 on Windows / piper elsewhere)
+```
+**Copy these by hand into `data/` (gitignored; none of it is in the repo):**
+| File | Path | Size | Notes |
+|---|---|---|---|
+| Qwen3-4B Q4_K_M GGUF | `data/Qwen3-4B-Q4_K_M.gguf` | 2.4 GB | path set in `config/inference.yaml`; the exact file used for every measurement here |
+| Whisper base.en | `data/models/whisper-base.en/` (config.json, model.bin, tokenizer.json, vocabulary.txt) | 140 MB | only for voice |
+| Wake word | `data/models/openwakeword/hey_veda.onnx` + `.onnx.data` | tiny | trained model; only for voice |
+| bge-small embeddings | `data/bge-small-en-v1.5/` (`onnx/model.onnx`, `tokenizer.json`) | 130 MB | semantic memory; without it recall is off, not broken |
+| Piper voice (optional) | set `audio.tts_model_path` | 60 MB | Linux/Pi TTS |
+Secrets: `.env` (gitignored) holds `TAVILY_API_KEY` (web search) and optionally `VEDA_PROFILE=qwen3-4b|qwen3-1.7b|qwen3-0.6b`. Without the Tavily key `web_search` says it isn't set up; everything else works. A fresh `data/veda.db` is created on first run (the previous machine's conversations/tasks/saved facts are NOT transferred).
+
+**First 15 minutes on the new machine**
+1. `pytest -q` (no model needed; includes the isolated bootstrap smoke test).
+2. `python scripts/spike_decision_protocol.py --variants A5` with NOTHING else running: expect ~43/51 (84%) on the tuned set; note the decision-ms median (laptop: ~12 s; this is the number that matters on the Pi).
+3. `python scripts/spike_decision_protocol.py --variants A5 --golden tests/eval/orchestrator_heldout.yaml`: expect ~28/40 (70%). Never tune a prompt against this file.
+4. Then run the app (`python -m controller.cli`, typed chat first) and try: weather in Tokyo -> "should I bring an umbrella?"; "I didn't ask about Singapore weather, what's 1+1?"; "what about tomorrow?" in a fresh session (should ask); add/list/"delete it" (should ask which)/delete by name; "open notepad"; "what's on my calendar" (should refuse).
+5. On a Raspberry Pi: do step 2 first and write down the decision median, `prompt_cache_mb` use and prefix-cache hits. Small profiles (`VEDA_PROFILE=...`) use `n_ctx: 3072`; 0.6B/1.7B quality on this prompt is unmeasured.
+
+**Reading order for the next agent:** this file -> `docs/10-orchestrator-review-and-plan.md` §6d-§6k (measurements, decisions, why) -> `docs/03-service-layer.md` + `docs/08-tool-harness.md` (current architecture) -> `docs/unified-assistant-orchestrator.md` (original design; Part 1-2 principles still apply) -> `docs/implementation_guide.md` (historical step list; phases are all done).
+**Data notes:** `tests/eval/results/spike-protocol-20261008-002323.json` and `...-103421.json` were scored by a stale parser (they show 1/51 and 0/40 INVALID); the raw model output in them is valid — use `--rejudge <file> [--golden ...] --phase4` to score them correctly (43/51 and 28/40).
+**Open decisions for the user:** larger control model vs accepting false calls vs fixing only the harmful classes (private data -> `tasks`, no-context guesses); whether to restore the old `veda.db`/`knowledge.json` from `vedic-atlas\data` (older state, 2-4 Oct) on the original laptop; merging to `main` (no flag: merging commits to this design).
