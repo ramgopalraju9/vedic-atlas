@@ -258,12 +258,7 @@ class Runner:
             raw, ms, usage = self.m.chat(system, p.prompt, max_tokens=DECIDE_TOKENS, schema=schema,
                                          temperature=0.0 if variant == "A5" else None)
             r.update(decide_ms=ms, prompt_tokens=usage.get("prompt_tokens"), out_tokens=usage.get("completion_tokens"), raw=raw)
-            try:
-                d = json.loads(raw)
-                calls, needs, clar = d["calls"], d["needs_live_data"], d["clarification"]
-                r["valid"] = True
-            except (ValueError, KeyError, TypeError):
-                calls, needs, clar, r["valid"] = [], None, None, False
+            calls, needs, clar, r["valid"] = parse_a(raw)
             r["turn_ms"] = ms + (self._chat_followup(case) if not calls and not clar and needs is False else 0)
         elif variant == "B":
             user = f"TODAY: {NOW.strftime('%A %d %b %Y, %H:%M')}.\nUSER: {case['say']}"
@@ -331,6 +326,16 @@ def summarise(name: str, rows: list[dict]) -> None:
             print(f"      x {r['failure']:<11} {r['say']!r}  ->  calls={[(c['tool'], c['args']) for c in r['calls']]} live={r['needs_live_data']} clar={r['clarification']!r}")
 
 
+def parse_a(raw: str):
+    """(calls, needs_live_data, clarification, valid) for the A* protocols. `clarification` is OPTIONAL in the schema
+    (absent = not asking), so a missing key is valid; a missing `calls` or `needs_live_data` is not."""
+    try:
+        d = json.loads(raw)
+        return d["calls"], d["needs_live_data"], d.get("clarification"), True
+    except (ValueError, KeyError, TypeError):
+        return [], None, None, False
+
+
 def apply_phase4(cases: list[dict], tool_names: set[str]) -> None:
     """A `phase4:` block replaces `expect` once the tools it names exist (get_weather_forecast)."""
     for case in cases:
@@ -353,6 +358,8 @@ def rejudge(path: Path, cases: list[dict]) -> int:
             case = by_say.get(r["say"])
             if case is None:
                 continue
+            if "raw" in r:   # re-derive the decision from the saved text: the parser may have changed since the run
+                r["calls"], r["needs_live_data"], r["clarification"], r["valid"] = parse_a(r["raw"])
             res = resolve(ControlDecision(calls=tuple(r["calls"]), needs_live_data=r["needs_live_data"],
                                           clarification=r["clarification"], valid=r["valid"]), manifests, user_message=r["say"])
             ok, failure = judge_route(case["expect"], res)
