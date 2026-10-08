@@ -35,6 +35,23 @@ def is_destructive(manifest: ToolManifest, args: Mapping[str, Any]) -> bool:
     return any(str(args.get(param)) in values for param, values in manifest.destructive_when)
 
 
+def target_names_nothing(manifest: ToolManifest, args: Mapping[str, Any]) -> bool:
+    """True when a target argument the model filled is only a pronoun, ordinal or filler word ("it", "first one",
+    "the task"). Applies to EVERY call with `target_params`, not just destructive ones: `tasks complete title="it"`
+    would match any task containing those letters. A real name inherited from the conversation ("milk") passes;
+    unlike `target_is_explicit` this never looks at the user's message."""
+    for param in manifest.target_params:
+        value = str(args.get(param) or "").strip().lower()
+        if not value:
+            continue
+        if value in _PLACEHOLDERS:
+            return True
+        raw = _WORD.findall(value)
+        if raw and not [w for w in raw if len(w) >= _MIN_WORD and w not in _GENERIC] and any(len(w) >= _MIN_WORD for w in raw):
+            return True
+    return False
+
+
 def target_is_explicit(manifest: ToolManifest, args: Mapping[str, Any], user_message: str) -> bool:
     """True when the call may proceed: it is not destructive, the tool has no target rule, or the user's own
     message names (a significant word of) the target the model chose. False = ask instead."""

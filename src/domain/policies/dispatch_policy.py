@@ -5,6 +5,7 @@ Table (first match wins):
   invalid output, or calls that name no real tool        -> FAIL_CLOSED  fixed apology, nothing runs
   calls non-empty                                        -> TOOLS        (clarification is ignored)
   ... and several calls with any destructive one         -> CLARIFY      one step at a time
+  ... and any call whose target argument is only a pronoun/ordinal/filler -> CLARIFY   ask which one; nothing runs
   ... and a destructive call whose target the user never named -> CLARIFY  ask which one; nothing runs
   calls empty, clarification text                        -> CLARIFY      ask, no further model call
   calls empty, needs_live_data is True                   -> REFUSE       fixed refusal, NEVER free chat
@@ -22,7 +23,7 @@ from typing import Mapping
 
 from domain.entities.control_decision import ControlDecision
 from domain.entities.tool_manifest import ToolManifest
-from domain.policies.destructive_policy import is_destructive, target_is_explicit
+from domain.policies.destructive_policy import is_destructive, target_is_explicit, target_names_nothing
 from domain.policies.tool_call_schema import MAX_CALLS
 
 REFUSAL_REPLY = "I can't look that up right now."
@@ -71,6 +72,8 @@ def resolve(
             return Resolution(Route.FAIL_CLOSED, text=UNPARSEABLE_REPLY)
         if len(calls) > 1 and any(is_destructive(manifests[c["tool"]], c["args"]) for c in calls):
             return Resolution(Route.CLARIFY, text=ONE_AT_A_TIME_REPLY)   # destructive tools never join a multi-call
+        if any(target_names_nothing(manifests[c["tool"]], c["args"]) for c in calls):
+            return Resolution(Route.CLARIFY, text=TARGET_REQUIRED_REPLY)   # "mark it as done": a pronoun is not a target
         if user_message is not None and not all(
             target_is_explicit(manifests[c["tool"]], c["args"], user_message) for c in calls
         ):

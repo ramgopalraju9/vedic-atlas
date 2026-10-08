@@ -287,3 +287,26 @@ def test_dispatch_runs_a_delete_the_user_named_and_the_veto_only_applies_when_a_
     assert resolve(dec([call("tasks", action="delete", title="bank")]), MANIFESTS).route is Route.TOOLS   # no message supplied
     safe = resolve(dec([call("tasks", action="add", title="milk")]), MANIFESTS, user_message="completely different words")
     assert safe.route is Route.TOOLS
+
+
+# ---- a pronoun is not a target, even for a non-destructive write ----------------------------------------------
+
+from domain.policies.destructive_policy import target_names_nothing  # noqa: E402
+
+
+def test_a_pronoun_or_ordinal_target_names_nothing_for_any_call_with_a_target():
+    for title in ("it", "that", "first one", "the task", "them"):
+        assert target_names_nothing(TASKS, {"action": "complete", "title": title}), title
+    assert not target_names_nothing(TASKS, {"action": "complete", "title": "milk"})        # inherited real name: fine
+    assert not target_names_nothing(TASKS, {"action": "list"})                              # no target at all: fine
+    assert not target_names_nothing(MANIFESTS["get_weather"], {"place": "it"})     # no target_params: not this rule
+
+
+def test_dispatch_asks_instead_of_completing_a_task_called_it():
+    from domain.entities.control_decision import ControlDecision
+    from domain.policies.dispatch_policy import Route, TARGET_REQUIRED_REPLY, resolve
+    d = ControlDecision(calls=({"tool": "tasks", "args": {"action": "complete", "title": "it"}},), needs_live_data=True)
+    r = resolve(d, MANIFESTS, user_message="mark it as done")
+    assert (r.route, r.text) == (Route.CLARIFY, TARGET_REQUIRED_REPLY)
+    ok = ControlDecision(calls=({"tool": "tasks", "args": {"action": "complete", "title": "milk"}},), needs_live_data=True)
+    assert resolve(ok, MANIFESTS, user_message="mark that one done").route == Route.TOOLS
