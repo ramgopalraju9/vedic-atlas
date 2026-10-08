@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime
-from typing import AsyncIterator, Callable, Mapping, Sequence
+from typing import AsyncIterator, Callable, Mapping, Sequence, Awaitable
 
 from core.logging_config import logger
 from domain.entities.agent_context import AgentContext
@@ -66,6 +66,9 @@ class AssistantOrchestrator(BaseAgent):
         narrate_num_predict: int = 90,
         narrate_temperature: float = 0.2,
         grounding_check: Callable[[str, Sequence[str], str], bool] | None = None,
+        conversation_intent: Callable[[str], Awaitable[float]] | None = None,
+        conversation_intent_min: float = 0.82,
+        conversation_intent_soft_min: float = 0.76,
     ):
         super().__init__(
             name="assistant", model=model,
@@ -85,6 +88,14 @@ class AssistantOrchestrator(BaseAgent):
         self._narrate_num_predict = narrate_num_predict
         self._narrate_temperature = narrate_temperature
         self._grounding_check = grounding_check or self._default_grounding
+        # "What are we discussing?" is about the conversation itself, which only chat (with its history and memory) can
+        # answer. The routing model has answered it with a clarifying question and even a web search. A question that is
+        # nearly one of the example phrasings (by embedding, not keywords) goes to chat whatever the router said; a softer
+        # match (a typo, a polite wrapper: "can you tell me what are we discusing lately") goes to chat only INSTEAD OF a
+        # clarifying question or a refusal, because asking "what do you mean?" is never the right answer to it.
+        self._conversation_intent = conversation_intent
+        self._intent_min = conversation_intent_min
+        self._intent_soft_min = conversation_intent_soft_min
 
     @staticmethod
     def _default_grounding(reply: str, results: Sequence[str], user_message: str) -> bool:
@@ -111,6 +122,19 @@ class AssistantOrchestrator(BaseAgent):
         history = self._conversation.turns if self._conversation is not None else []
         result = await self._decoder.decide(ctx.user_message, history, active)
         resolution = resolve(result.decision, self._manifests, user_message=ctx.user_message)
+        if self._conversation_intent is not None:
+            try:
+                score = await self._conversation_intent(ctx.user_message)
+                strong = score >= self._intent_min
+                soft = score >= self._intent_soft_min and resolution.route in (Route.CLARIFY, Route.REFUSE)
+                if strong or soft:
+                    ctx.metadata["about_conversation"] = True   # chat then answers from the newest conversations
+                    if resolution.route is not Route.CHAT:
+                        logger.info(f"[control] question about the conversation itself (score {score:.2f}): route "
+                                    f"{resolution.route.value} -> chat")
+                        resolution = Resolution(Route.CHAT)
+            except Exception as e:   # the check is an extra; never let it take the turn down
+                logger.warning(f"[control] conversation-intent check failed: {type(e).__name__}")
         outcome = TurnOutcome(reply=None)
         outcome.timings_ms["control"] = result.ms
         outcome.prompt_tokens["control"] = result.prompt_tokens

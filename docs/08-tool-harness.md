@@ -69,8 +69,24 @@ Ports `MailPort` / `CalendarPort`; adapters `tpa/online/google/{google_auth,gmai
   `approve()`), so an `approve` tool would always time out; the user's separate "send it" after hearing the draft is the confirmation.
 - **Privacy:** manifests set `private: true`: results are kept out of the trace, the `[tool-call]` log, the audit log and the API's `skill_calls`. Mail/calendar text is
   untrusted input; `clean_text` flattens it before it is spoken (and therefore saved into history).
-- **Calendar:** primary calendar. `calendar_agenda` reads: the model picks `date_offset` 0..6 and `days` 1..7, code does the dates. `calendar_create(title, date_offset 0..6, time "HH:MM", duration_minutes?)` adds one event in one turn: it sets NO attendees (nobody is invited), refuses a time already past, does not add an identical event twice, and reads the confirmation back from the event Google stored. A sign-in without `calendar.events` answers "I don't have permission to add calendar events yet". Tasks and the calendar are separate: the `tasks` tool refuses a title that describes a calendar entry (`calendar_policy.looks_like_calendar_entry`) and says so, instead of filing "block calendar for Manoj" as a to-do.
-- **Search follow-ups:** `web_search` refuses a query that is only a pronoun ("where is it", "what is happening there": `query_policy.has_unresolved_reference`) and asks what is meant, because the control model is supposed to rewrite a follow-up with the subject named from ACTIVE/RECENT. Spoken search answers split sentences after initials ("N. R. Murthy") and titles ("Dr.") correctly.
+- **Calendar:** primary calendar. `calendar_agenda` reads: the model picks `date_offset` 0..6 and `days` 1..7, code does the dates. `calendar_create(title, date_offset 0..6, time "HH:MM", duration_minutes?)` adds one event in one turn: it sets NO attendees (nobody is invited), refuses a time already past, does not add an identical event twice, and reads the confirmation back from the event Google stored. Tasks and the calendar are separate: the `tasks` tool refuses a title that names the calendar or starts with "block"/"event" (`calendar_policy.looks_like_calendar_entry`) and says so, instead of filing "block calendar for Manoj" as a to-do. A sign-in without `calendar.events` answers "I don't have permission to add calendar events yet".
+- **Search follow-ups:** the control model rewrites a follow-up with the subject named from ACTIVE/RECENT (prompt rule + one example); `web_search` refuses a query that is only a pronoun ("where is it", "what is happening there": `query_policy.has_unresolved_reference`) and asks what is meant. Spoken search answers split sentences after initials ("N. R. Murthy") and titles ("Dr.") correctly.
+
+## Write guards (the model's output is checked against the user's own words)
+A live probe of 27 edge utterances (`tests/eval/orchestrator_edge.yaml`, 14/27 at the decision level) showed the 4B model answers requests it has
+no tool for with a write tool, sometimes copying a prompt example. The prompt is at its size cap, so the tools check instead, in code
+(`tests/test_guards.py`):
+* `calendar_create` refuses "cancel / move / delete / reschedule ..." with no adding verb ("I can't move, cancel or delete calendar events yet"),
+  needs a clock time in the user's words (else asks "What time should I set it for?"), and needs a title made of words the user said (else
+  asks what to call it). It also reads "5 PM", "5pm", "17:00:00" and "12 am" in the model's `time`.
+* `gmail_draft` asks "What should the email say?" when the request is only "email Priya" (the model would invent a body).
+* `current_time` says "It's 2:30 PM here. I can't check the time anywhere else." for "what time is it in Tokyo".
+* `tasks` refuses only titles that name the calendar or start with "block"/"event"; "schedule dentist appointment" is a real to-do.
+* `web_search` asks "What do you mean?" for a query that is only a pronoun.
+* A reminder being spoken is never planned a second time by a calendar re-read; finishing or deleting a task makes the reminders re-read at once.
+There is deliberately NO greeting guard: "Hey veda!" goes to the model, which can re-run the previous tool when all its arguments are inherited
+from ACTIVE (seen once with a mail search). Known, accepted: "cancel my 5 pm meeting" may still be answered by reading the calendar;
+"remind me at 6 pm to call mom" becomes a calendar event (which does remind), not a task with a due time.
 
 ## The remember tool
 `config/tools/remember.yaml` keeps lasting facts about the user: preferences, allergies, names, routines. Actions: `save` (topic + value), `forget` (topic), `list`.

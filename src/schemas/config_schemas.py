@@ -114,6 +114,12 @@ class EmbeddingConfig(BaseModel):
     cache_dir: str | None = "data/embeddings"
     top_k: int = 5
     min_score: float = 0.3  # minimum cosine similarity to inject a memory
+    margin: float | None = None  # also keep hits within this of the best one (up to top_k); None = no margin rule
+    max_hit_chars: int = 280     # each recalled memory is cut to this
+    min_score_by_source: dict[str, float] = {}  # a stricter floor for one source, e.g. exchange: short notes score higher
+    conversation_intent_soft_min: float = 0.76  # a looser match counts only instead of a clarifying question or a refusal
+    conversation_intent_min: float | None = None  # "what are we discussing" is answered from the newest conversations (None = off)
+    max_total_chars: int = 800   # and the whole recalled block to this (prompt tokens are Raspberry Pi prefill time)
     sources: list[str] = ["fact", "summary"]  # which memory sources recall searches
 
 

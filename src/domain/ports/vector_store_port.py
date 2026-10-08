@@ -36,6 +36,14 @@ class VectorStorePort(Protocol):
         """True if a vector already exists for this key (for idempotent backfill)."""
         ...
 
+    def ref_ids(self, *, source: str, model_id: str) -> set[str]:
+        """Every reference id stored for a source and model (to find what still needs indexing, or what is stale)."""
+        ...
+
+    def delete_refs(self, *, source: str, ref_ids: set[str]) -> int:
+        """Remove the vectors of many references of one source. Returns how many rows went."""
+        ...
+
     def delete(self, *, source: str, ref_id: str) -> None:
         """Remove the vector(s) for one reference."""
         ...

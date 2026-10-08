@@ -776,20 +776,40 @@ def bootstrap(app: FastAPI) -> None:
     from service.memory.semantic_recall import SemanticRecall
     vector_store = SqliteVectorStore()
     memory_indexer = MemoryIndexer(vector_store, app.state.embedding_provider)
+    conversation_repo = ConversationRepository()
+    app.state.conversation_repo = conversation_repo
+
+    def _memory_date(hit):
+        """The day a recalled summary or exchange is from (None for anything else, e.g. a saved fact)."""
+        if hit.source == "summary":
+            return conversation_repo.summary_created_at(int(hit.ref_id))
+        if hit.source == "exchange":
+            return conversation_repo.turn_created_at(int(hit.ref_id))
+        return None
+
     semantic_recall = SemanticRecall(
         vector_store, app.state.embedding_provider,
         top_k=cfg.embedding.top_k, min_score=cfg.embedding.min_score,
-        sources=tuple(cfg.embedding.sources),
+        sources=tuple(cfg.embedding.sources), margin=cfg.embedding.margin, when=_memory_date,
+        max_hit_chars=cfg.embedding.max_hit_chars, max_total_chars=cfg.embedding.max_total_chars,
+        conversation_intent_min=cfg.embedding.conversation_intent_min, min_score_by_source=cfg.embedding.min_score_by_source,
     )
     app.state.vector_store = vector_store
     app.state.memory_indexer = memory_indexer
     app.state.semantic_recall = semantic_recall
-
-    conversation_repo = ConversationRepository()
-    app.state.conversation_repo = conversation_repo
     memory_repo = AgentMemoryRepository(conversation_repo=conversation_repo)
+    def _index_exchange(turn_id: int, note: str) -> None:
+        """Embed a finished question-and-answer in the background, off the reply path (it is a no-op without embeddings)."""
+        if not memory_indexer.enabled:
+            return
+        try:
+            asyncio.get_running_loop().create_task(memory_indexer.index("exchange", str(turn_id), note))
+        except RuntimeError:
+            pass   # no running loop (e.g. a test): the startup backfill will pick it up
+
     conversation = ConversationManager(
         repo=conversation_repo, max_history=cfg.app.max_history, summaries_limit=cfg.app.chat_summaries,
+        on_exchange=_index_exchange,
     )
     # Exposed so controller/routes/health.py can actually probe the DB;
     # without this its check silently reported False forever.
@@ -930,6 +950,9 @@ def bootstrap(app: FastAPI) -> None:
         composer=composer, skill_runner=skill_runner, manifests=tool_manifests, responder=responder,
         client=inference_client, conversation=conversation, claims_action=guard.claims_action,
         session_state=session_state, traces=trace_repo, memory=memory_repo, model=cfg.agents.responder.model,
+        conversation_intent=semantic_recall.conversation_intent_score if cfg.embedding.conversation_intent_min is not None else None,
+        conversation_intent_min=cfg.embedding.conversation_intent_min or 0.82,
+        conversation_intent_soft_min=cfg.embedding.conversation_intent_soft_min,
     )
     app.state.orchestrator = orchestrator
     supervisor = SupervisorAgent(model=cfg.agents.supervisor.model, orchestrator=orchestrator)
@@ -983,6 +1006,26 @@ def bootstrap(app: FastAPI) -> None:
     logger.info(f"Bootstrap: {agent_registry.count} agents, {len(skill_registry.list_all())} skills registered")
 
 
+async def _index_exchanges(app: FastAPI) -> None:
+    """Index every saved question-and-answer that has no vector yet, and drop vectors whose turn is gone (the 30-day cleanup
+    deletes old turns, and what was deleted must not stay recallable). Cheap after the first run: only the new ones embed."""
+    from domain.policies.exchange_note_policy import exchange_note
+
+    store, repo = app.state.vector_store, app.state.conversation_repo
+    model_id = app.state.embedding_provider.model_id
+    pairs = repo.exchanges()
+    existing = store.ref_ids(source="exchange", model_id=model_id)
+    stale = existing - {str(turn_id) for turn_id, *_ in pairs}
+    if stale:
+        store.delete_refs(source="exchange", ref_ids=stale)
+    added = 0
+    for turn_id, _sid, question, answer, _when in pairs:
+        note = exchange_note(question, answer)
+        if note and str(turn_id) not in existing and await app.state.memory_indexer.index("exchange", str(turn_id), note):
+            added += 1
+    logger.info(f"[memory-index] exchanges: {added} indexed, {len(stale)} stale removed")
+
+
 async def _backfill_memory_index(app: FastAPI) -> None:
     """Index existing facts and summaries once at startup (best-effort, background)."""
     indexer = getattr(app.state, "memory_indexer", None)
@@ -995,6 +1038,7 @@ async def _backfill_memory_index(app: FastAPI) -> None:
             await indexer.index("fact", str(i), fact)
         for summ in app.state.conversation_repo.recent_summaries(limit=1000):
             await indexer.index("summary", str(summ.id), summ.content, skip_existing=True)
+        await _index_exchanges(app)
         logger.info("[memory-index] backfill complete")
     except Exception as e:
         logger.warning(f"[memory-index] backfill failed: {e}")
