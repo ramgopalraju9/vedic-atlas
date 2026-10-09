@@ -738,7 +738,7 @@ def _register_google_tools(
         required_scopes=GOOGLE_SCOPES,
     )
     mail, calendar, outbox = GmailClient(http, auth), GoogleCalendarClient(http, auth), DraftOutbox()
-    mail, calendar, outbox = GmailClient(http, auth), GoogleCalendarClient(http, auth), DraftOutbox()
+    mail_contacts = load_mail_contacts()      # config/mail_contacts.yaml: name -> address; a missing file is an empty map
     builders = {
         "gmail_search": lambda m: GmailSearchSkill(mail, m),
         "gmail_read": lambda m: GmailReadSkill(mail, m),
