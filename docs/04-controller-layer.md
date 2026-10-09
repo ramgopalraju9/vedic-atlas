@@ -92,8 +92,9 @@ same as any other client would.
   `ensure_up()` makes sure a server answers and says what it did in `client.how`:
   **reused** (already running: left alone), **waited** (an earlier `veda` spawned one that is still loading the model:
   wait for it, never start a second; its pid is kept in `data/veda-server-<port>.pid`), **started** (spawned
-  `python -m uvicorn server:app` with `PYTHONPATH` set to `src/`) or **restarted**. The server answers only after the
-  model is loaded and warmed (about a minute on a laptop, more on a Pi), so the wait is 240 s (`VEDA_START_TIMEOUT`),
+  `python -m uvicorn server:app` with `PYTHONPATH` set to `src/` and Uvicorn access logs disabled) or **restarted**.
+  The server answers only after the model is loaded and warmed (about a minute on a laptop, more on a Pi), so the wait is
+  240 s (`VEDA_START_TIMEOUT`),
   progress is logged every 15 s, and if the server process dies the last lines of `data/veda-server.log` are shown at once.
   Bare `veda` continues a running server; `veda --restart` (or `VEDA_RESTART_ON_START=1`) first calls `stop_server()` for a
   fresh one (psutil finds the listener, refuses anything that is not recognisably a Veda server, tries

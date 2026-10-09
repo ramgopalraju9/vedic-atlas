@@ -20,6 +20,21 @@ _request_id: ContextVar[str] = ContextVar("request_id", default="-")
 _voice_turn_id: ContextVar[str] = ContextVar("voice_turn_id", default="-")
 
 
+class _ReminderAccessLogFilter(logging.Filter):
+    """Suppress successful reminder-poll access logs while keeping request errors visible."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        request_line = message.partition('"')[2].partition('"')[0].split()
+        status = message.rpartition('" ')[2]
+        is_reminder_poll = (
+            len(request_line) >= 2
+            and request_line[0] == "GET"
+            and request_line[1].split("?", 1)[0] == "/api/reminders/recent"
+        )
+        return not (is_reminder_poll and status.startswith("200 "))
+
+
 def set_request_id(identifier: str) -> None:
     """Bind a request identifier to the current async task / thread context."""
     _request_id.set(identifier)
@@ -55,6 +70,10 @@ def configure_logging(level: str = "INFO") -> logging.Logger:
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     if not any(isinstance(item, _RequestIdFilter) for item in logger.filters):
         logger.addFilter(_RequestIdFilter())
+
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(isinstance(item, _ReminderAccessLogFilter) for item in access_logger.filters):
+        access_logger.addFilter(_ReminderAccessLogFilter())
 
     if not any(getattr(handler, "_veda_configured", False) for handler in logger.handlers):
         handler = logging.StreamHandler()

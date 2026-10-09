@@ -19,5 +19,5 @@ def cmd_server(*, port: int | None = None, host: str = "127.0.0.1") -> int:
     use_port = port or cfg.app.port
     logger.info(f"{PROJECT_NAME} v{VERSION} - Personal AI Assistant")
     logger.info(f"Starting on http://{host}:{use_port}")
-    uvicorn.run("server:app", host=host, port=use_port, log_level="warning", reload=False)
+    uvicorn.run("server:app", host=host, port=use_port, log_level="warning", reload=False, access_log=False)
     return 0

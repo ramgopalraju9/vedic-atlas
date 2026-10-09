@@ -46,6 +46,8 @@ from service.voice.utterance_collector import UtteranceCollector
 _WORD_RE = re.compile(r"[a-z0-9']+")
 _SENTENCE_END_RE = re.compile(r"[.!?]+(?=\s)")
 _WAKE_ACKNOWLEDGEMENT = "Hey there, what's up?"
+_PROCESSING_ACKNOWLEDGEMENT = "Working on that."
+_PROCESSING_ACK_DELAY_SEC = 1.0
 
 
 def _format_request_duration(elapsed_ms: float) -> str:
@@ -128,6 +130,7 @@ class VoiceSession:
 
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
+        self._speech_lock = asyncio.Lock()
         self._speaking = False
         self._processing_turn = False
         self._turn_active = False   # a heard utterance is being transcribed / thought about / answered
@@ -139,6 +142,7 @@ class VoiceSession:
         self._capture_started_at: float | None = None
         self._last_transcript = ""
         self._last_reply = ""
+        self._last_processing_acknowledgement = ""
 
     # -- Lifecycle --------------------------------------------------------
 
@@ -762,15 +766,15 @@ class VoiceSession:
         self._emit("reply", {"text": reply})
 
     def _is_echo(self, heard: str) -> bool:
-        """True if `heard` looks like our own last reply coming back."""
-        if not self._last_reply:
-            return False
-        said = {w for w in _WORD_RE.findall(self._last_reply.lower()) if len(w) > 2}
+        """True if `heard` looks like our own recent speech coming back."""
         got = {w for w in _WORD_RE.findall(heard.lower()) if len(w) > 2}
-        if not said or not got:
+        if not got:
             return False
-        overlap = len(said & got) / len(got)
-        return overlap >= 0.6
+        for spoken in (self._last_reply, self._last_processing_acknowledgement):
+            said = {w for w in _WORD_RE.findall(spoken.lower()) if len(w) > 2}
+            if said and len(said & got) / len(got) >= 0.6:
+                return True
+        return False
 
     async def speak(self, text: str) -> None:
         """Speak arbitrary text through the same echo-guarded path as a reply."""
@@ -826,6 +830,11 @@ class VoiceSession:
         first_chunk_ms: float | None = None
         chunk_count = 0
         stream_finished_ms: float | None = None
+        reply_audio_started = asyncio.Event()
+        acknowledgement_started = asyncio.Event()
+        acknowledgement_task = asyncio.create_task(
+            self._speak_processing_acknowledgement(reply_audio_started, acknowledgement_started)
+        )
         try:
             async for chunk in self._supervisor.execute_stream(ctx, cancel_event=cancel):
                 if not chunk:
@@ -841,11 +850,13 @@ class VoiceSession:
                 buffer += chunk
                 sentence, buffer = self._pop_sentence(buffer)
                 while sentence:
+                    reply_audio_started.set()
                     spoke, _ = await self._say_pcm(sentence, timing)
                     spoke_anything = spoke or spoke_anything
                     sentence, buffer = self._pop_sentence(buffer)
             tail = buffer.strip()
             if tail:
+                reply_audio_started.set()
                 spoke, _ = await self._say_pcm(tail, timing)
                 spoke_anything = spoke or spoke_anything
             stream_finished_ms = (time.perf_counter() - stream_started) * 1000
@@ -869,8 +880,33 @@ class VoiceSession:
                 f"first_chunk_ms={first_chunk} first_audio_queued_ms={first_audio} "
                 f"chunks={chunk_count} chars={sum(map(len, parts))}"
             )
+            if not acknowledgement_started.is_set() and not acknowledgement_task.done():
+                acknowledgement_task.cancel()
+            try:
+                await acknowledgement_task
+            except asyncio.CancelledError:
+                pass
             await self._after_speaking()
         return "".join(parts).strip()
+
+    async def _speak_processing_acknowledgement(
+        self,
+        reply_audio_started: asyncio.Event,
+        acknowledgement_started: asyncio.Event,
+    ) -> None:
+        await asyncio.sleep(_PROCESSING_ACK_DELAY_SEC)
+        try:
+            async with self._speech_lock:
+                if reply_audio_started.is_set():
+                    return
+                acknowledgement_started.set()
+                self._last_processing_acknowledgement = _PROCESSING_ACKNOWLEDGEMENT
+                logger.info("[voice][flow] stage=processing_acknowledgement")
+                spoke, _ = await self._synthesize_pcm(_PROCESSING_ACKNOWLEDGEMENT)
+                if spoke:
+                    await self._wait_playback()
+        except Exception as e:
+            logger.warning(f"[voice] processing acknowledgement failed: {e}")
 
     @staticmethod
     def _pop_sentence(buffer: str) -> tuple[str, str]:
@@ -881,6 +917,10 @@ class VoiceSession:
         return buffer[:cut].strip(), buffer[cut:]
 
     async def _say_pcm(self, text: str, timing: dict | None = None) -> tuple[bool, float]:
+        async with self._speech_lock:
+            return await self._synthesize_pcm(text, timing)
+
+    async def _synthesize_pcm(self, text: str, timing: dict | None = None) -> tuple[bool, float]:
         started = time.perf_counter()
         spoke = False
         audio_bytes = 0

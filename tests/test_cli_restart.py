@@ -109,6 +109,22 @@ def test_spawn_uses_the_port_from_the_server_url(monkeypatch):
     monkeypatch.setattr("subprocess.Popen", lambda cmd, **k: seen.setdefault("cmd", cmd))
     c.ensure_up(restart=False, wait_secs=2)
     assert seen["cmd"][seen["cmd"].index("--port") + 1] == "8123"
+    assert "--no-access-log" in seen["cmd"]
+
+
+def test_background_server_spawn_disables_access_logs(monkeypatch, tmp_path):
+    c = VedaClient(server_url="http://127.0.0.1:8123")
+    seen = {}
+
+    def fake_popen(cmd, **kwargs):
+        seen["cmd"] = cmd
+        return type("Proc", (), {"pid": None})()
+
+    monkeypatch.setattr("subprocess.Popen", fake_popen)
+
+    c._spawn(tmp_path, tmp_path / "veda-server.log")
+
+    assert "--no-access-log" in seen["cmd"]
 
 
 # ---- reuse / wait / start ---------------------------------------------------------------------------------------------

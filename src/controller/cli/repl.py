@@ -50,8 +50,8 @@ _HELP = """
   /reminders         show reminder settings · on|off · lead 15,5 (minutes before; "lead off" = none) · start on|off
 """
 
-_REMINDER_POLL_SEC = 3.0
-_REMINDER_RETRY_SEC = 30.0   # after a failed poll (server restarting, reminders disabled)
+_REMINDER_POLL_SEC = 840.0
+_REMINDER_RETRY_SEC = 840.0   # after a failed poll (server restarting, reminders disabled)
 
 
 class Repl:

@@ -163,6 +163,53 @@ def test_voice_turn_logs_stage_timings(caplog):
         assert f"stage={stage}" in caplog.text
 
 
+def test_slow_voice_turn_speaks_processing_acknowledgement(monkeypatch):
+    class RecordingTTS(_FakeTTS):
+        def __init__(self):
+            self.spoken_texts = []
+
+        async def synthesize(self, text):
+            self.spoken_texts.append(text)
+            yield b"\x00\x00" * 10
+
+    monkeypatch.setattr("service.voice.voice_session._PROCESSING_ACK_DELAY_SEC", 0.01)
+    tts = RecordingTTS()
+    session = VoiceSession(
+        audio=object(), collector=_Collector(), stt=_STT("what are my tasks"), tts=tts,
+        speaker=_PlayingSpeaker(), supervisor=_Supervisor(work_sec=0.05),
+        capture_gate=_Gate(), speak_replies=True,
+    )
+
+    asyncio.run(session._handle(_utterance()))
+
+    assert "Working on that." in tts.spoken_texts
+    assert "hello." in tts.spoken_texts
+    assert session._is_echo("Working on that")
+
+
+def test_fast_voice_turn_skips_processing_acknowledgement(monkeypatch):
+    class RecordingTTS(_FakeTTS):
+        def __init__(self):
+            self.spoken_texts = []
+
+        async def synthesize(self, text):
+            self.spoken_texts.append(text)
+            yield b"\x00\x00" * 10
+
+    monkeypatch.setattr("service.voice.voice_session._PROCESSING_ACK_DELAY_SEC", 1.0)
+    tts = RecordingTTS()
+    session = VoiceSession(
+        audio=object(), collector=_Collector(), stt=_STT("what are my tasks"), tts=tts,
+        speaker=_PlayingSpeaker(), supervisor=_Supervisor(work_sec=0.001),
+        capture_gate=_Gate(), speak_replies=True,
+    )
+
+    asyncio.run(session._handle(_utterance()))
+
+    assert "Working on that." not in tts.spoken_texts
+    assert "hello." in tts.spoken_texts
+
+
 def test_wake_window_refreshes_after_a_completed_command(caplog):
     session = VoiceSession(
         audio=object(), collector=_Collector(), stt=_STT("hello"), tts=None,
