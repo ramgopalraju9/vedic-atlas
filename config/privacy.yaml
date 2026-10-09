@@ -1,12 +1,13 @@
 # Mute switch adapter: software | keyboard | hid | gpio.
 # 'keyboard' uses the global hotkey from config/audio.yaml (hotkey:).
 # Falls back to 'software' if the chosen adapter cannot start.
-mute_switch: software
+mute_switch: gpio
 
 # Privacy by default: boot muted. An explicit opt-in is required to listen.
 start_muted: true
 
-mute_gpio_pin: 17
+mute_gpio_pin: 17          # BCM 17 = header pin 11; switch also on 3V3 (pin 1) and GND (pin 6)
+mute_gpio_muted_level: low  # pin level meaning MUTED; flip to 'high' if the switch is the other way round
 indicator_gpio_pin: 27
 online:
   enabled: true                    # false = fully offline, no online tools registered

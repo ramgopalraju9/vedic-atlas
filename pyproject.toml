@@ -89,7 +89,7 @@ speaker-id = ["pveagle>=3.0.0"]
 wake-porcupine = ["pvporcupine>=3.0.0"]
 
 # Raspberry Pi / hardware peripherals (mute switch, status LED, LCD, USB HID).
-hardware-gpio = ["RPi.GPIO>=0.7.1; sys_platform == 'linux'", "RPLCD>=1.3.1"]
+hardware-gpio = ["rpi-lgpio>=0.6; sys_platform == 'linux'", "RPLCD>=1.3.1"]
 hardware-hid = ["hidapi>=0.14.0"]
 hardware-blinkstick = ["blinkstick>=1.2.0"]
 

@@ -143,6 +143,11 @@ class CaptureGate:
     def set_muted(self, muted: bool, source: str = "api") -> CaptureState:
         """Software mute path (UI / API / CLI). Same code path as hardware."""
         previous = self.is_muted()
+        # A physical switch in the muted position wins: software may not unmute over it.
+        forced = getattr(self._mute_switch, "is_forced_muted", None)
+        if not muted and callable(forced) and forced():
+            logger.warning(f"[capture-gate] unmute from {source!r} refused: hardware switch is in the MUTED position")
+            return self.state
         self._apply(muted=muted, source=source, previous=previous)
         # Keep an input device's toggle baseline aligned so a later hotkey
         # press toggles from the gate's real state — the gate stays the one

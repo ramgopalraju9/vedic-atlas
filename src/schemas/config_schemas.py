@@ -288,6 +288,7 @@ class PrivacyConfig(BaseModel):
     mute_switch: str = "software"  # software | keyboard | hid | gpio
     start_muted: bool = True  # boot muted; explicit opt-in required to listen
     mute_gpio_pin: int = 17
+    mute_gpio_muted_level: str = "low"  # pin level that means MUTED (low | high)
     indicator_gpio_pin: int = 27
     online: OnlineConfig = OnlineConfig()
 

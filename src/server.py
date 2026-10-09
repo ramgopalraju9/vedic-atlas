@@ -145,7 +145,7 @@ def _build_mute_switch(cfg: AppConfig):
             switch = KeyboardMuteFallback(hotkey=cfg.audio.hotkey, start_muted=start_muted)
         elif choice == "gpio":
             from tpa.hardware.gpio_mute_switch import GpioMuteSwitch
-            switch = GpioMuteSwitch(pin=cfg.privacy.mute_gpio_pin)
+            switch = GpioMuteSwitch(pin=cfg.privacy.mute_gpio_pin, muted_level=cfg.privacy.mute_gpio_muted_level)
         elif choice == "hid":
             raise RuntimeError("hid mute switch needs vendor_id/product_id (not configured)")
         else:
