@@ -15,7 +15,7 @@ from domain.entities.utterance import Utterance
 from domain.policies.transcript_policy import artifact_reason
 from domain.value_objects.audio_window import AudioWindow
 from domain.value_objects.transcript import Transcript
-from service.voice.voice_session import VoiceSession
+from service.voice.voice_session import VoiceSession, _format_request_duration
 
 
 # ---- transcript policy -------------------------------------------------------
@@ -240,9 +240,28 @@ def test_voice_flow_logs_wake_command_turn_and_follow_up(caplog):
         def reset(self):
             self.is_speaking = False
 
+    class CapturingTTS:
+        sample_rate = 16000
+
+        def __init__(self):
+            self.spoken = []
+
+        async def synthesize(self, text):
+            self.spoken.append(text)
+            yield b"\x00\x00"
+
+    class Speaker(_Speaker):
+        def play_pcm(self, pcm, rate):
+            pass
+
+        def wait_done(self, timeout):
+            return True
+
+    tts = CapturingTTS()
+    speaker = Speaker()
     session = VoiceSession(
-        audio=Audio(), collector=Collector(), stt=_STT("hello there"), tts=None,
-        speaker=_Speaker(), supervisor=_Supervisor(), capture_gate=_Gate(),
+        audio=Audio(), collector=Collector(), stt=_STT("hello there"), tts=tts,
+        speaker=speaker, supervisor=_Supervisor(), capture_gate=_Gate(),
         wake_word=Wake(), wake_engine="openwakeword", wake_window_sec=4.0,
         speak_replies=False,
     )
@@ -261,10 +280,12 @@ def test_voice_flow_logs_wake_command_turn_and_follow_up(caplog):
         if "[voice][flow]" in record.message and "stage=" in record.message
     ]
     for expected in (
-        "wake_detected", "command_window_open", "speech_detected", "utterance_ready",
+        "wake_detected", "wake_acknowledgement_started", "wake_acknowledgement_complete",
+        "command_window_open", "speech_detected", "utterance_ready",
         "turn_started", "turn_finished", "command_window_refreshed",
     ):
         assert expected in stages
+    assert tts.spoken == ["Hey there, what's up?"]
     assert "MIC IS ON 'U CAN TALK'" in caplog.text
     turn_records = [
         record for record in caplog.records
@@ -323,6 +344,45 @@ def test_an_unmuted_turn_runs_to_completion():
 
     completed, sup = asyncio.run(scenario())
     assert completed is True and sup.calls == 1
+
+
+def test_request_processing_duration_is_logged(caplog):
+    async def scenario():
+        session = _session(_Gate(), _Supervisor())
+        return await session._run_turn(_utterance(), "T0001")
+
+    with caplog.at_level(logging.INFO, logger="veda"):
+        assert asyncio.run(scenario()) is True
+
+    assert "TIME TAKEN TO PROCESS THE REQUEST :" in caplog.text
+    assert "turn=T0001 status=turn_complete" in caplog.text
+    assert "elapsed_ms=" in caplog.text
+
+
+def test_request_processing_duration_is_logged_after_tts_playback(caplog):
+    session = VoiceSession(
+        audio=object(), collector=_Collector(), stt=_STT("what are my tasks"), tts=_FakeTTS(),
+        speaker=_PlayingSpeaker(), supervisor=_Supervisor(), capture_gate=_Gate(), speak_replies=True,
+    )
+
+    with caplog.at_level(logging.INFO, logger="veda"):
+        assert asyncio.run(session._run_turn(_utterance(), "T0002")) is True
+
+    messages = [record.getMessage() for record in caplog.records]
+    playback_done = next(i for i, message in enumerate(messages) if "stage=playback_wait" in message)
+    duration_logged = next(
+        i for i, message in enumerate(messages)
+        if "TIME TAKEN TO PROCESS THE REQUEST :" in message
+    )
+    assert playback_done < duration_logged
+
+
+@pytest.mark.parametrize(
+    ("elapsed_ms", "expected"),
+    [(999, "999 ms"), (60_000, "1.00 mins"), (3_600_000, "1.00 hr")],
+)
+def test_request_duration_uses_readable_units(elapsed_ms, expected):
+    assert _format_request_duration(elapsed_ms) == expected
 
 
 def test_turn_discards_audio_queued_while_assistant_is_processing(caplog):

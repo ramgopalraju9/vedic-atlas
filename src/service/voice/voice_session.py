@@ -425,7 +425,7 @@ class VoiceSession:
         finally:
             elapsed_ms = (time.perf_counter() - turn_started) * 1000
             logger.info(
-                "[voice][timing] Time taken to process the request : "
+                "[voice][timing] TIME TAKEN TO PROCESS THE REQUEST : "
                 f"{_format_request_duration(elapsed_ms)} "
                 f"(elapsed_ms={elapsed_ms:.0f}) turn={turn_id} status={completion_reason}"
             )

@@ -16,6 +16,7 @@ from domain.policies import calendar_policy as cal
 from domain.policies import mail_policy as mail
 from domain.policies.dispatch_policy import Route, resolve
 from exceptions.exception import AppException, ToolUnavailableError
+from service.mail.contact_book import load_mail_contacts
 from service.mail.draft_outbox import DraftOutbox
 from service.skills.builtin.calendar_agenda import CalendarAgendaSkill
 from service.skills.builtin.gmail import GmailDraftSkill, GmailReadSkill, GmailSearchSkill, GmailSendSkill
@@ -355,10 +356,22 @@ def test_read_returns_a_document_and_its_spoken_fallback_never_carries_the_body(
     assert not none.success and "couldn't find" in none.metadata["spoken"]
 
 
-def draft_skills(fm=None, outbox=None):
+def test_read_email_omits_url_hyperlinks_but_keeps_surrounding_text():
+    body = "Please review https://example.com/offer. The details are also at www.example.org."
+    fm = FakeMail([msg()], message=msg(body=body, received_at=NOW))
+    res = run(GmailReadSkill(fm, MANIFESTS["gmail_read"]).execute(ctx()))
+
+    assert res.success
+    assert "Please review. The details are also at." in res.output
+    assert "https://example.com" not in res.output and "www.example.org" not in res.output
+
+
+def draft_skills(fm=None, outbox=None, contacts=None):
     fm = fm or FakeMail([msg()])
     outbox = outbox or DraftOutbox()
-    return fm, outbox, GmailDraftSkill(fm, MANIFESTS["gmail_draft"], outbox), GmailSendSkill(fm, MANIFESTS["gmail_send"], outbox)
+    return fm, outbox, GmailDraftSkill(
+        fm, MANIFESTS["gmail_draft"], outbox, contacts=contacts,
+    ), GmailSendSkill(fm, MANIFESTS["gmail_send"], outbox)
 
 
 def test_drafting_to_a_name_resolves_one_address_reads_it_back_and_sends_nothing():
@@ -370,6 +383,27 @@ def test_drafting_to_a_name_resolves_one_address_reads_it_back_and_sends_nothing
     assert outbox.peek("s1").id == "d1"
     q = fm.searches[0][0]
     assert q == 'from:"Priya" OR to:"Priya"'
+
+
+def test_configured_contact_name_resolves_without_searching_gmail():
+    fm, outbox, draft, _ = draft_skills(
+        contacts={"Manoj": "manoj@example.com"},
+    )
+    res = run(draft.execute(ctx(), to="manoj", subject="Update", body="Project is ready."))
+
+    assert res.success and fm.drafts[0].to == "manoj@example.com"
+    assert fm.searches == [] and outbox.peek("s1").id == "d1"
+    assert "manoj@example.com" in res.metadata["spoken"]
+
+
+def test_mail_contact_config_loads_map_and_rejects_invalid_addresses(tmp_path):
+    path = tmp_path / "mail_contacts.yaml"
+    path.write_text("Manoj: manoj@example.com\n", encoding="utf-8")
+    assert load_mail_contacts(path) == {"Manoj": "manoj@example.com"}
+
+    path.write_text("Manoj: not-an-email\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid email address"):
+        load_mail_contacts(path)
 
 
 @pytest.mark.parametrize("found,needle", [

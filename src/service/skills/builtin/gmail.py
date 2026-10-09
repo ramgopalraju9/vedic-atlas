@@ -16,6 +16,9 @@ The user's content is private: manifests set `private: true`, so results stay ou
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
+
 from domain.entities.agent_context import AgentContext
 from domain.entities.skill_result import SkillResult
 from domain.entities.tool_manifest import ToolManifest
@@ -31,6 +34,17 @@ _DEFAULT_SCOPE = "in:inbox"
 _ADDRESS_LOOKUP_LIMIT = 10
 _MAX_BODY_CHARS = 4000
 _MAX_SUBJECT_CHARS = 150
+_URL = re.compile(r"\b(?:https?://|www\.)[^\s<>()]+", re.IGNORECASE)
+
+
+def _without_urls(text: str) -> str:
+    def keep_trailing_punctuation(match: re.Match[str]) -> str:
+        value = match.group()
+        punctuation = value[len(value.rstrip(".,!?;:")):]
+        return punctuation
+
+    without_urls = _URL.sub(keep_trailing_punctuation, text)
+    return re.sub(r"[ \t]+([.,!?;:])", r"\1", re.sub(r"[ \t]{2,}", " ", without_urls))
 
 
 class _MailSkill(ManifestSkill):
@@ -71,7 +85,8 @@ class GmailReadSkill(_MailSkill):
         when = msg.received_at.strftime("%d %b %Y %H:%M") if msg.received_at else "unknown date"
         document = (
             f"EMAIL from {clean_text(msg.sender_label(), 60)} <{msg.sender_address}>, {when}\n"
-            f"Subject: {clean_text(msg.subject, 120) or 'no subject'}\n\n{msg.body[:_MAX_BODY_CHARS] or msg.snippet}"
+            f"Subject: {clean_text(msg.subject, 120) or 'no subject'}\n\n"
+            f"{_without_urls(msg.body[:_MAX_BODY_CHARS] or msg.snippet)}"
         )
         # `spoken` is only the fallback when summarising fails: it must never carry the body.
         fallback = f"The latest email is from {clean_text(msg.sender_label(), 40)}: {clean_text(msg.subject, 60) or 'no subject'}."
@@ -83,9 +98,17 @@ class GmailDraftSkill(_MailSkill):
 
     what = "write that email"
 
-    def __init__(self, mail: MailPort, manifest: ToolManifest, outbox: DraftOutbox, **kw):
+    def __init__(
+        self,
+        mail: MailPort,
+        manifest: ToolManifest,
+        outbox: DraftOutbox,
+        contacts: Mapping[str, str] | None = None,
+        **kw,
+    ):
         super().__init__(mail, manifest, **kw)
         self._outbox = outbox
+        self._contacts = dict(contacts or {})
 
     async def _resolve(self, to: str) -> tuple[str | None, str | None]:
         """(address, None) or (None, a spoken sentence saying what is needed)."""
@@ -94,6 +117,15 @@ class GmailDraftSkill(_MailSkill):
             return who, None
         if not who:
             return None, "Who should I send it to?"
+        contact_matches = {
+            address.strip()
+            for name, address in self._contacts.items()
+            if " ".join(name.casefold().split()) == " ".join(who.casefold().split())
+        }
+        if len(contact_matches) == 1:
+            return contact_matches.pop(), None
+        if len(contact_matches) > 1:
+            return None, f"I found more than one configured address for {who}: {', '.join(sorted(contact_matches)[:3])}. Which one?"
         q = f"from:{quote_for_query(who)} OR to:{quote_for_query(who)}"
         found = pick_address(who, await self._mail.search(q, limit=_ADDRESS_LOOKUP_LIMIT))
         if len(found) == 1:

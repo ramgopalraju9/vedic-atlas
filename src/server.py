@@ -722,6 +722,7 @@ def _register_google_tools(
     linked, so asking about mail gets "it isn't set up" (and scripts/google_auth.py tells the user how) instead of a
     wrong answer from another tool."""
     from service.mail.draft_outbox import DraftOutbox
+    from service.mail.contact_book import load_mail_contacts
     from service.skills.builtin.calendar_agenda import CalendarAgendaSkill
     from service.skills.builtin.calendar_create import CalendarCreateSkill
     from service.skills.builtin.gmail import GmailDraftSkill, GmailReadSkill, GmailSearchSkill, GmailSendSkill
@@ -737,10 +738,11 @@ def _register_google_tools(
         required_scopes=GOOGLE_SCOPES,
     )
     mail, calendar, outbox = GmailClient(http, auth), GoogleCalendarClient(http, auth), DraftOutbox()
+    mail, calendar, outbox = GmailClient(http, auth), GoogleCalendarClient(http, auth), DraftOutbox()
     builders = {
         "gmail_search": lambda m: GmailSearchSkill(mail, m),
         "gmail_read": lambda m: GmailReadSkill(mail, m),
-        "gmail_draft": lambda m: GmailDraftSkill(mail, m, outbox),
+        "gmail_draft": lambda m: GmailDraftSkill(mail, m, outbox, contacts=mail_contacts),
         "gmail_send": lambda m: GmailSendSkill(mail, m, outbox),
         "calendar_agenda": lambda m: CalendarAgendaSkill(calendar, m),
         "calendar_create": lambda m: CalendarCreateSkill(calendar, m, on_created=on_calendar_change),
