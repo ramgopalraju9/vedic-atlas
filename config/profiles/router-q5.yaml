@@ -1,0 +1,18 @@
+# Fine-tuned router (Q5_K_M), trained on training/datasets/build_v2. Use with  VEDA_PROFILE=router-q5
+# Same trimmed-prompt settings as qwen3-0.6b; only the model differs, so timings compare like for like.
+inference:
+  model_path: data/router/router-Q5_K_M.gguf
+  n_ctx: 3072
+  # The control decode's static prompt (persona + every tool + rules/examples) is ~2,200 estimated tokens, so 2048 can
+  # no longer hold it. 3072 holds it plus history, the question and the 200-token decision (test_profiles_fit_the_control_prompt).
+  num_predict: 80
+app:
+  max_history: 4
+  chat_summaries: 0
+  chat_persona: compact  # ~250-token persona instead of the full ~560-token one
+embedding:
+  top_k: 4             # the margin rule in embedding.yaml decides how many are shown; the block is capped at ~800 chars
+  min_score: 0.62
+prompting:
+  budgets:
+    control: 2800      # n_ctx 3072 minus the 200-token decision and a margin; history is trimmed first to fit (shallow merge: other budgets keep their defaults)
