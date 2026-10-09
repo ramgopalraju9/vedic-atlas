@@ -7,7 +7,7 @@ mute_switch: gpio
 start_muted: true
 
 mute_gpio_pin: 17          # BCM 17 = header pin 11; switch also on 3V3 (pin 1) and GND (pin 6)
-mute_gpio_muted_level: low  # pin level meaning MUTED; flip to 'high' if the switch is the other way round
+mute_gpio_muted_level: high  # pin level meaning MUTED (live position reads low on this unit)
 indicator_gpio_pin: 27
 online:
   enabled: true                    # false = fully offline, no online tools registered
