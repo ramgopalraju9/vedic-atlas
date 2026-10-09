@@ -194,8 +194,11 @@ class AudioConfig(BaseModel):
     # Local STT model directory (faster-whisper format). No auto-download.
     stt_model: str = "base.en"
     stt_model_path: str | None = None
+    # Per-utterance spectral gate before Whisper. Best for steady room noise.
+    noise_suppression_enabled: bool = True
+    noise_suppression_strength: float = Field(default=0.75, ge=0.0, le=1.0)
 
-    tts_engine: str = "auto"  # "auto" (pyttsx3 on Windows, piper elsewhere) | "pyttsx3" | "piper"
+    tts_engine: str = "auto"  # "auto" (pyttsx3 on Windows, Piper elsewhere) | "pyttsx3" | "piper"
     tts_voice: str = "zira"
     tts_model_path: str | None = None  # required when tts_engine == "piper"
 

@@ -4,6 +4,7 @@ No audio hardware or model: fakes only. Run: pytest tests/test_voice_mute_and_ar
 """
 
 import asyncio
+import logging
 import time
 from datetime import datetime
 
@@ -56,9 +57,20 @@ def test_genuine_speech_is_never_dropped(text, dur):
 class _Gate:
     def __init__(self):
         self.muted = False
+        self.paused = False
+        self.capture_events = []
 
     def is_muted(self):
         return self.muted
+
+    def pause_capture(self, source="voice_turn"):
+        self.paused = True
+        self.capture_events.append(("pause", source))
+
+    def resume_capture(self, source="voice_turn"):
+        self.paused = False
+        self.capture_events.append(("resume", source))
+        return not self.muted
 
 
 class _Collector:
@@ -134,6 +146,133 @@ def test_a_real_transcript_still_gets_an_answer():
     assert sup.calls == 1 and session.status()["turns"] == 1
 
 
+def test_voice_turn_logs_stage_timings(caplog):
+    session = VoiceSession(
+        audio=object(), collector=_Collector(), stt=_STT("what are my tasks"), tts=_FakeTTS(),
+        speaker=_PlayingSpeaker(), supervisor=_Supervisor(work_sec=0.01),
+        capture_gate=_Gate(), speak_replies=True,
+    )
+    with caplog.at_level(logging.INFO, logger="veda"):
+        asyncio.run(session._handle(_utterance()))
+
+    for stage in (
+        "utterance_capture", "stt", "assistant_generation_started",
+        "model_first_chunk", "first_audio_queued", "tts_synthesis_complete",
+        "playback_wait", "model_stream_complete", "turn_complete",
+    ):
+        assert f"stage={stage}" in caplog.text
+
+
+def test_wake_window_refreshes_after_a_completed_command(caplog):
+    session = VoiceSession(
+        audio=object(), collector=_Collector(), stt=_STT("hello"), tts=None,
+        speaker=_Speaker(), supervisor=_Supervisor(), capture_gate=_Gate(),
+        wake_word=object(), wake_engine="openwakeword", wake_window_sec=4.0,
+    )
+    session._wake_id = "W0001"
+
+    with caplog.at_level(logging.INFO, logger="veda"):
+        session._arm(reason="wake_word")
+        session._arm(reason="follow_up")
+
+    assert "stage=command_window_open wake=W0001 reason=wake_word" in caplog.text
+    assert "stage=command_window_refreshed wake=W0001 reason=follow_up" in caplog.text
+    assert session._is_armed()
+
+
+def test_passive_wake_monitor_logs_score_and_threshold_at_one_second_intervals(caplog):
+    class Wake:
+        last_score = 0.31
+        threshold = 0.4
+        model_name = "hey_veda"
+
+    session = VoiceSession(
+        audio=object(), collector=_Collector(), stt=_STT("hello"), tts=None,
+        speaker=_Speaker(), supervisor=_Supervisor(), capture_gate=_Gate(),
+        wake_word=Wake(), wake_engine="openwakeword",
+    )
+    session._last_wake_score_log_at = 10.0
+    session._record_wake_audio_level(b"\x00\x40\x00\xc0")
+
+    with caplog.at_level(logging.INFO, logger="veda"):
+        session._log_wake_score(detected=False, now=10.5)
+        assert "stage=score" not in caplog.text
+        session._wake.last_score = 0.39
+        session._log_wake_score(detected=False, now=10.8)
+        session._wake.last_score = 0.37
+        session._log_wake_score(detected=False, now=11.1)
+
+    assert "model=hey_veda score=0.370 peak_1s=0.390 threshold=0.400" in caplog.text
+    assert (
+        "raw_audio_rms=0.50000 raw_audio_peak=0.50000 "
+        "raw_audio_rms_dbfs=-6.0 raw_audio_peak_dbfs=-6.0 raw_audio_samples=2"
+    ) in caplog.text
+    assert "detected=false" in caplog.text
+
+
+def test_voice_flow_logs_wake_command_turn_and_follow_up(caplog):
+    class Wake:
+        frame_length = 1
+        last_score = 0.9
+        threshold = 0.5
+
+        def process(self, _pcm):
+            return True
+
+    class Audio:
+        def read(self, _timeout):
+            return _utterance().audio
+
+    class Collector:
+        is_speaking = False
+
+        def __init__(self):
+            self.pushes = 0
+
+        def push(self, _frame):
+            self.pushes += 1
+            if self.pushes == 1:
+                self.is_speaking = True
+                return None
+            self.is_speaking = False
+            return _utterance()
+
+        def reset(self):
+            self.is_speaking = False
+
+    session = VoiceSession(
+        audio=Audio(), collector=Collector(), stt=_STT("hello there"), tts=None,
+        speaker=_Speaker(), supervisor=_Supervisor(), capture_gate=_Gate(),
+        wake_word=Wake(), wake_engine="openwakeword", wake_window_sec=4.0,
+        speak_replies=False,
+    )
+
+    async def scenario():
+        await session._tick()  # "Hey Veda" detected; its audio is not transcribed
+        await session._tick()  # VAD confirms command speech
+        await session._tick()  # silence closes utterance; process the turn
+
+    with caplog.at_level(logging.INFO, logger="veda"):
+        asyncio.run(scenario())
+
+    stages = [
+        record.message.split("stage=", 1)[1].split()[0]
+        for record in caplog.records
+        if "[voice][flow]" in record.message and "stage=" in record.message
+    ]
+    for expected in (
+        "wake_detected", "command_window_open", "speech_detected", "utterance_ready",
+        "turn_started", "turn_finished", "command_window_refreshed",
+    ):
+        assert expected in stages
+    assert "MIC IS ON 'U CAN TALK'" in caplog.text
+    turn_records = [
+        record for record in caplog.records
+        if getattr(record, "voice_turn_id", None) == "T0001"
+    ]
+    assert turn_records
+
+
 # ---- mute interrupts the turn ----------------------------------------------------
 
 def test_mute_mid_turn_cancels_it_and_stops_playback():
@@ -146,14 +285,16 @@ def test_mute_mid_turn_cancels_it_and_stops_playback():
         gate.muted = True               # the user mutes
         started = time.monotonic()
         completed = await asyncio.wait_for(turn, timeout=3)
-        return completed, time.monotonic() - started, speaker, collector, session
+        return completed, time.monotonic() - started, speaker, collector, session, gate
 
-    completed, elapsed, speaker, collector, session = asyncio.run(scenario())
+    completed, elapsed, speaker, collector, session, gate = asyncio.run(scenario())
     assert completed is False                 # reported as cancelled
     assert elapsed < 1.0                      # stopped promptly, not after the 5 s of work
     assert speaker.interrupted == 1           # playback cut off
     assert collector.resets >= 1
     assert session.status()["turns"] == 0 and session.status()["speaking"] is False
+    assert gate.capture_events[0][0] == "pause"
+    assert gate.capture_events[-1][0] == "resume" and gate.paused is False
 
 
 def test_the_streaming_model_is_told_to_stop_on_mute():
@@ -182,6 +323,56 @@ def test_an_unmuted_turn_runs_to_completion():
 
     completed, sup = asyncio.run(scenario())
     assert completed is True and sup.calls == 1
+
+
+def test_turn_discards_audio_queued_while_assistant_is_processing(caplog):
+    class Audio:
+        def __init__(self):
+            self.drain_calls = 0
+
+        def drain(self):
+            self.drain_calls += 1
+            return 1
+
+    async def scenario():
+        audio = Audio()
+        gate = _Gate()
+        processing_started = asyncio.Event()
+        session = None
+
+        class PauseAwareSupervisor(_Supervisor):
+            async def execute(self, ctx):
+                assert gate.paused
+                assert session is not None
+                assert session.status()["processing"] is True
+                assert session.status()["listening"] is False
+                processing_started.set()
+                return await super().execute(ctx)
+
+        session = VoiceSession(
+            audio=audio, collector=_Collector(), stt=_STT("what are my tasks"), tts=None,
+            speaker=_Speaker(), supervisor=PauseAwareSupervisor(work_sec=0.25),
+            capture_gate=gate, speak_replies=False,
+        )
+        turn = asyncio.create_task(session._run_turn(_utterance(), "T0001"))
+        await processing_started.wait()
+        completed = await turn
+        return completed, audio, gate, session
+
+    with caplog.at_level(logging.INFO, logger="veda"):
+        completed, audio, gate, session = asyncio.run(scenario())
+
+    assert completed
+    assert audio.drain_calls >= 2  # before processing and before capture resumes
+    assert gate.capture_events == [
+        ("pause", "voice_turn:T0001"),
+        ("resume", "voice_turn:T0001"),
+    ]
+    assert session.status()["processing"] is False
+    assert "stage=turn_audio_discarded" in caplog.text
+    assert "reason=audio_queued_at_turn_boundary" in caplog.text
+    assert "stage=input_listening_state turn=T0001 listening=false microphone_stream=paused" in caplog.text
+    assert "stage=input_listening_state turn=T0001 listening=true" in caplog.text
 
 
 class _FakeTTS:

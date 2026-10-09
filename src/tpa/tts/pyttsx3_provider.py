@@ -15,6 +15,8 @@ import wave
 from pathlib import Path
 from typing import AsyncIterator
 
+from core.logging_config import logger
+
 
 class Pyttsx3Provider:
     """Implements TTSPort via the local pyttsx3 (SAPI/eSpeak) engine."""
@@ -48,10 +50,12 @@ class Pyttsx3Provider:
                 sampwidth = wf.getsampwidth()
                 raw = wf.readframes(wf.getnframes())
             if sampwidth != 2:
+                logger.error(f"[voice] pyttsx3 produced unsupported sample width: {sampwidth} bytes")
                 return None
             return raw, sr
         except Exception:
             self._broken = True
+            logger.exception("[voice] pyttsx3 synthesis failed; disabling this TTS provider")
             return None
         finally:
             try:

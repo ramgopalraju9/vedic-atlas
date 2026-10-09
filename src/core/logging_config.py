@@ -14,9 +14,10 @@ declared in VedaConfig.log_level but never read).
 """
 
 import logging
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 
 _request_id: ContextVar[str] = ContextVar("request_id", default="-")
+_voice_turn_id: ContextVar[str] = ContextVar("voice_turn_id", default="-")
 
 
 def set_request_id(identifier: str) -> None:
@@ -24,11 +25,27 @@ def set_request_id(identifier: str) -> None:
     _request_id.set(identifier)
 
 
+def set_voice_turn_id(identifier: str) -> Token[str]:
+    """Bind a voice turn identifier to the current async task / thread context."""
+    return _voice_turn_id.set(identifier)
+
+
+def get_voice_turn_id() -> str:
+    """Return the voice turn identifier active in this execution context."""
+    return _voice_turn_id.get()
+
+
+def reset_voice_turn_id(token: Token[str]) -> None:
+    """Restore the voice turn identifier that was active before this scope."""
+    _voice_turn_id.reset(token)
+
+
 class _RequestIdFilter(logging.Filter):
     """Injects the current context's request id into every log record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.identifier = _request_id.get()
+        record.voice_turn_id = _voice_turn_id.get()
         return True
 
 
@@ -36,15 +53,18 @@ def configure_logging(level: str = "INFO") -> logging.Logger:
     """Build and return the app logger. Call once at process startup."""
     logger = logging.getLogger("veda")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    logger.addFilter(_RequestIdFilter())
+    if not any(isinstance(item, _RequestIdFilter) for item in logger.filters):
+        logger.addFilter(_RequestIdFilter())
 
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        "[%(asctime)s][%(levelname)-7s][%(identifier)s][%(funcName)s]"
-        "[%(module)s:%(filename)s].(%(lineno)d)] : %(message)s"
-    )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    if not any(getattr(handler, "_veda_configured", False) for handler in logger.handlers):
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "[%(asctime)s][%(levelname)-7s][%(identifier)s][voice_turn=%(voice_turn_id)s][%(funcName)s]"
+            "[%(module)s:%(filename)s].(%(lineno)d)] : %(message)s"
+        )
+        handler.setFormatter(formatter)
+        setattr(handler, "_veda_configured", True)
+        logger.addHandler(handler)
     return logger
 
 

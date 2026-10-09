@@ -128,7 +128,7 @@ class VedaClient:
         logger.info(f"Stopped existing Veda server (pid {pid}) on port {self._port}")
         return pid
 
-    def ensure_up(self, *, allow_spawn: bool = True, wait_secs: float = 30.0, restart: bool = False) -> int | None:
+    def ensure_up(self, *, allow_spawn: bool = True, wait_secs: float = 90.0, restart: bool = False) -> int | None:
         """Block until the server responds; spawn it if missing.
 
         ``restart=True`` first stops any existing Veda server on the port, so a

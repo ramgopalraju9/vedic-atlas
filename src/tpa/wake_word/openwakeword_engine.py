@@ -70,10 +70,19 @@ class OpenWakeWordEngine:
         self._chunk_samples = chunk_samples
         self._sample_rate = sample_rate
         self._buf = bytearray()
+        self.last_score = 0.0
 
     @property
     def frame_length(self) -> int:
         return self._chunk_samples
+
+    @property
+    def threshold(self) -> float:
+        return self._threshold
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
 
     @property
     def sample_rate(self) -> int:
@@ -89,7 +98,8 @@ class OpenWakeWordEngine:
             chunk, self._buf = bytes(self._buf[:chunk_bytes]), self._buf[chunk_bytes:]
             pcm = np.frombuffer(chunk, dtype=np.int16)
             scores = self._model.predict(pcm)
-            if scores.get(self._model_name, 0.0) >= self._threshold:
+            self.last_score = float(scores.get(self._model_name, 0.0))
+            if self.last_score >= self._threshold:
                 triggered = True
         return triggered
 

@@ -28,12 +28,13 @@ Three properties that matter more than the happy path:
 from __future__ import annotations
 
 import asyncio
+import math
 import re
 import time
 from datetime import datetime
 from typing import Any, Callable
 
-from core.logging_config import logger
+from core.logging_config import logger, reset_voice_turn_id, set_voice_turn_id
 from domain.entities.agent_context import AgentContext
 from domain.entities.utterance import Utterance
 from domain.policies.transcript_policy import artifact_reason
@@ -95,6 +96,12 @@ class VoiceSession:
         self._wake_frame_bytes = (getattr(wake_word, "frame_length", 0) or 0) * 2
         self._wake_buffer = b""
         self._armed_until = 0.0
+        self._armed_since: float | None = None
+        self._wake_score_peak: float | None = None
+        self._wake_audio_square_sum = 0.0
+        self._wake_audio_sample_count = 0
+        self._wake_audio_peak = 0
+        self._last_wake_score_log_at = time.monotonic()
 
         # Multi-speaker recognition. Scored continuously, frame by frame,
         # while armed/collecting (same slicing idiom as the wake buffer
@@ -113,7 +120,13 @@ class VoiceSession:
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         self._speaking = False
+        self._processing_turn = False
         self._turns = 0
+        self._turn_sequence = 0
+        self._wake_sequence = 0
+        self._wake_id: str | None = None
+        self._active_turn_id: str | None = None
+        self._capture_started_at: float | None = None
         self._last_transcript = ""
         self._last_reply = ""
 
@@ -125,7 +138,24 @@ class VoiceSession:
         self._stop.clear()
         self._speaker.start()
         self._task = asyncio.create_task(self._run(), name="VoiceSession")
-        logger.info("[voice] session started")
+        mode = (
+            f"wake-gated engine={self._wake_engine!r} window_sec={self._wake_window_sec:.1f}"
+            if self._wake is not None
+            else "continuous while unmuted"
+        )
+        logger.info(
+            f"[voice][flow] session started mode={mode}; "
+            "say the wake phrase, wait for ARMED, then speak the command"
+        )
+        if self._wake is not None:
+            threshold = getattr(self._wake, "threshold", None)
+            if isinstance(threshold, (int, float)):
+                logger.info(
+                    "[voice][wake] monitoring started "
+                    f"engine={self._wake_engine!r} "
+                    f"model={getattr(self._wake, 'model_name', 'configured')} "
+                    f"threshold={threshold:.3f} score_log_interval_sec=1.0"
+                )
 
     async def stop(self) -> None:
         self._stop.set()
@@ -158,7 +188,12 @@ class VoiceSession:
             "running": self.is_running,
             "muted": self._gate.is_muted(),
             "speaking": self._speaking,
-            "listening": self.is_running and not self._gate.is_muted() and not self._speaking and (self._wake is None or self._is_armed()),
+            "processing": self._processing_turn,
+            "listening": (
+                self.is_running and not self._gate.is_muted()
+                and not self._speaking and not self._processing_turn
+                and (self._wake is None or self._is_armed())
+            ),
             "collecting_utterance": self._collector.is_speaking,
             "turns": self._turns,
             "last_transcript": self._last_transcript,
@@ -186,8 +221,14 @@ class VoiceSession:
         # frames must not enter the process (REQ-M-04).
         if self._gate.is_muted():
             if self._collector.is_speaking:
+                logger.info(
+                    "[voice][flow] stage=speech_capture_aborted "
+                    f"turn={self._active_turn_id or 'unassigned'} reason=muted"
+                )
                 self._collector.reset()
-            self._disarm(silent=True)
+                self._active_turn_id = None
+                self._capture_started_at = None
+            self._disarm(silent=True, reason="muted")
             await asyncio.sleep(0.15)
             return
 
@@ -204,46 +245,183 @@ class VoiceSession:
         # wake engine is configured (_wake is None) this block is skipped and
         # the loop transcribes continuously, exactly as before.
         if self._wake is not None and not self._is_armed():
-            if self._wake_triggered(frame):
-                self._arm()
+            self._record_wake_audio_level(frame.pcm)
+            wake_detected = self._wake_triggered(frame)
+            self._log_wake_score(detected=wake_detected)
+            if wake_detected:
+                self._wake_sequence += 1
+                self._wake_id = f"W{self._wake_sequence:04d}"
+                score = getattr(self._wake, "last_score", None)
+                threshold = getattr(self._wake, "threshold", None)
+                score_text = f"{score:.3f}" if isinstance(score, (int, float)) else "n/a"
+                threshold_text = f"{threshold:.3f}" if isinstance(threshold, (int, float)) else "n/a"
+                logger.info(
+                    "[voice][flow] stage=wake_detected "
+                    f"wake={self._wake_id} engine={self._wake_engine!r} "
+                    f"score={score_text} threshold={threshold_text}; "
+                    "wake phrase opens the command window and is not sent as a command"
+                )
+                self._arm(reason="wake_word")
             return
 
         if self._speaker_id is not None:
             self._feed_speaker_frame(frame)
 
+        was_collecting = self._collector.is_speaking
         utterance = self._collector.push(frame)
+        if not was_collecting and self._collector.is_speaking:
+            self._turn_sequence += 1
+            self._active_turn_id = f"T{self._turn_sequence:04d}"
+            self._capture_started_at = time.perf_counter()
+            logger.info(
+                "[voice][flow] stage=speech_detected "
+                f"turn={self._active_turn_id} wake={self._wake_id or 'none'} "
+                f"mode={'armed' if self._wake is not None else 'continuous'}; "
+                "VAD confirmed speech, collecting command audio"
+            )
         if utterance is not None:
-            if not await self._run_turn(utterance):
+            if self._active_turn_id is None:
+                self._turn_sequence += 1
+                self._active_turn_id = f"T{self._turn_sequence:04d}"
+            turn_id = self._active_turn_id
+            capture_ms = (
+                (time.perf_counter() - self._capture_started_at) * 1000
+                if self._capture_started_at is not None
+                else 0.0
+            )
+            logger.info(
+                "[voice][flow] stage=utterance_ready "
+                f"turn={turn_id} capture_ms={capture_ms:.0f} "
+                f"audio_sec={utterance.duration_sec:.2f} "
+                f"end_reason={'max_duration' if utterance.truncated else 'silence'} "
+                f"frames={utterance.frame_count}"
+            )
+            try:
+                completed = await self._run_turn(utterance, turn_id)
+            finally:
+                self._active_turn_id = None
+                self._capture_started_at = None
+            if not completed:
                 return  # muted mid-turn: it was cancelled and dropped; stay passive
+            if self._gate.is_muted():
+                self._disarm(silent=True, reason="muted")
+                return
             if self._wake is not None:
-                # Extend the window so a quick follow-up needs no second trigger.
-                self._arm()
+                # Allow a quick follow-up without requiring the wake phrase again.
+                self._arm(reason="follow_up")
+            logger.info("[voice][flow] MIC IS ON 'U CAN TALK'")
         elif self._wake is not None and self._armed_expired():
-            self._disarm()
+            self._disarm(reason="timeout")
 
     # -- Running a turn, with mute as an interrupt -------------------------------
 
-    async def _run_turn(self, utterance: Utterance) -> bool:
+    async def _run_turn(self, utterance: Utterance, turn_id: str | None = None) -> bool:
         """Run one turn as a task and watch the mute switch while it runs.
 
         Muting must mean *stop*: not just "no new audio", but also no further
         thinking, no tool calls started and no reply spoken for something heard
         before the mute. Returns False if the turn was cancelled by a mute.
         """
+        if turn_id is None:
+            self._turn_sequence += 1
+            turn_id = f"T{self._turn_sequence:04d}"
+        token = set_voice_turn_id(turn_id)
+        turn_started = time.perf_counter()
+        self._processing_turn = True
+        self._gate.pause_capture(source=f"voice_turn:{turn_id}")
+        logger.info(
+            "[voice][flow] stage=turn_started "
+            f"turn={turn_id} audio_sec={utterance.duration_sec:.2f}; "
+            "microphone capture paused until this reply finishes"
+        )
+        logger.info(
+            "[voice][flow] stage=input_listening_state "
+            f"turn={turn_id} listening=false microphone_stream=paused "
+            "action=pause_capture_during_reply"
+        )
+        discarded_frames = self._discard_captured_audio()
         cancel = asyncio.Event()
         task = asyncio.create_task(self._handle(utterance, cancel), name="VoiceTurn")
+        completion_reason = "turn_failed"
         try:
             while True:
                 done, _ = await asyncio.wait({task}, timeout=0.1)
                 if done:
                     task.result()  # re-raise a turn failure to the loop's error handler, as before
+                    discarded_frames += self._discard_captured_audio()
+                    completion_reason = "turn_complete"
+                    logger.info(
+                        "[voice][flow] stage=turn_finished "
+                        f"turn={turn_id} elapsed_ms={(time.perf_counter() - turn_started) * 1000:.0f}; "
+                        "turn complete, resuming capture"
+                    )
+                    logger.info(
+                        "[voice][flow] stage=turn_audio_discarded "
+                        f"turn={turn_id} frames={discarded_frames} "
+                        "reason=audio_queued_at_turn_boundary"
+                    )
                     return True
                 if self._gate.is_muted():
                     await self._abort_turn(task, cancel)
+                    completion_reason = "muted"
                     return False
         except asyncio.CancelledError:
             task.cancel()
+            discarded_frames += self._discard_captured_audio()
+            logger.info(
+                "[voice][flow] stage=turn_audio_discarded "
+                f"turn={turn_id} frames={discarded_frames} reason=session_cancelled"
+            )
+            logger.info(
+                "[voice][flow] stage=input_listening_state "
+                f"turn={turn_id} listening=false microphone_stream=paused "
+                "reason=session_cancelled"
+            )
+            completion_reason = "session_cancelled"
             raise
+        except Exception:
+            discarded_frames += self._discard_captured_audio()
+            logger.info(
+                "[voice][flow] stage=turn_audio_discarded "
+                f"turn={turn_id} frames={discarded_frames} reason=turn_failed"
+            )
+            logger.info(
+                "[voice][flow] stage=input_listening_state "
+                f"turn={turn_id} listening=false microphone_stream=paused "
+                "reason=turn_failed"
+            )
+            logger.exception(
+                "[voice][flow] stage=turn_failed "
+                f"turn={turn_id} elapsed_ms={(time.perf_counter() - turn_started) * 1000:.0f}"
+            )
+            raise
+        finally:
+            capture_resumed = self._gate.resume_capture(
+                source=f"voice_turn:{turn_id}"
+            )
+            self._processing_turn = False
+            listening = capture_resumed and (
+                self._wake is None or self._is_armed()
+            )
+            logger.info(
+                "[voice][flow] stage=input_listening_state "
+                f"turn={turn_id} listening={str(listening).lower()} "
+                f"microphone_stream={'active' if capture_resumed else 'stopped'} "
+                f"reason={completion_reason if capture_resumed else 'muted'}"
+            )
+            reset_voice_turn_id(token)
+
+    def _discard_captured_audio(self) -> int:
+        """Drop mic frames queued as capture pauses or resumes."""
+        drain = getattr(self._audio, "drain", None)
+        if not callable(drain):
+            return 0
+        try:
+            discarded = drain()
+        except Exception as e:
+            logger.warning(f"[voice][flow] failed to discard queued mic audio: {e}")
+            return 0
+        return discarded if isinstance(discarded, int) else 0
 
     async def _abort_turn(self, task: asyncio.Task, cancel: asyncio.Event) -> None:
         logger.info("[voice] muted mid-turn: cancelling the turn and stopping playback")
@@ -262,6 +440,11 @@ class VoiceSession:
         self._speaking = False
         self._collector.reset()
         self._reset_speaker_scoring()
+        discarded_frames = self._discard_captured_audio()
+        logger.info(
+            "[voice][flow] stage=turn_audio_discarded "
+            f"frames={discarded_frames} reason=turn_cancelled"
+        )
         self._disarm(silent=True)
         self._emit("turn_cancelled", {"reason": "muted"})
 
@@ -270,30 +453,118 @@ class VoiceSession:
     def _is_armed(self) -> bool:
         return self._armed_until > time.monotonic()
 
-    def _arm(self) -> None:
+    def _arm(self, *, reason: str = "wake_word") -> None:
         was_armed = self._is_armed()
         self._armed_until = time.monotonic() + self._wake_window_sec
         if not was_armed:
-            logger.info("[voice] wake trigger -> ARMED (listening window open)")
+            self._armed_since = time.monotonic()
+        if not was_armed:
+            logger.info(
+                "[voice][flow] stage=command_window_open "
+                f"wake={self._wake_id or 'none'} reason={reason} "
+                f"duration_sec={self._wake_window_sec:.1f}; waiting for command speech"
+            )
             self._emit("wake", {"armed": True})
+        else:
+            logger.info(
+                "[voice][flow] stage=command_window_refreshed "
+                f"wake={self._wake_id or 'none'} reason={reason} "
+                f"duration_sec={self._wake_window_sec:.1f}; follow-up can be spoken without repeating wake phrase"
+            )
 
-    def _disarm(self, *, silent: bool = False) -> None:
+    def _disarm(self, *, silent: bool = False, reason: str = "timeout") -> None:
         self._reset_speaker_scoring()
         if self._armed_until == 0.0:
             return
+        elapsed = (
+            time.monotonic() - self._armed_since
+            if self._armed_since is not None
+            else 0.0
+        )
         self._armed_until = 0.0
+        self._armed_since = None
         self._wake_buffer = b""
         if self._collector.is_speaking:
             self._collector.reset()
+        logger.info(
+            "[voice][flow] stage=command_window_closed "
+            f"wake={self._wake_id or 'none'} reason={reason} elapsed_sec={elapsed:.1f}"
+        )
         if not silent:
-            logger.info("[voice] wake window closed -> PASSIVE")
             self._emit("wake", {"armed": False})
+        if reason in {"timeout", "turn_complete"}:
+            self._wake_id = None
 
     def _armed_expired(self) -> bool:
         return (
             self._armed_until > 0.0
             and time.monotonic() >= self._armed_until
             and not self._collector.is_speaking
+        )
+
+    def _log_wake_score(self, *, detected: bool, now: float | None = None) -> None:
+        """Log periodic wake scores without emitting an entry for every audio frame."""
+        score = getattr(self._wake, "last_score", None)
+        threshold = getattr(self._wake, "threshold", None)
+        if not isinstance(score, (int, float)) or not isinstance(threshold, (int, float)):
+            self._wake_audio_square_sum = 0.0
+            self._wake_audio_sample_count = 0
+            self._wake_audio_peak = 0
+            return
+
+        score = float(score)
+        threshold = float(threshold)
+        self._wake_score_peak = (
+            score if self._wake_score_peak is None else max(self._wake_score_peak, score)
+        )
+        current = time.monotonic() if now is None else now
+        if not detected and current - self._last_wake_score_log_at < 1.0:
+            return
+
+        peak = self._wake_score_peak
+        if self._wake_audio_sample_count:
+            audio_rms = (
+                self._wake_audio_square_sum / self._wake_audio_sample_count
+            ) ** 0.5
+            audio_peak = self._wake_audio_peak / 32768.0
+            audio_rms_dbfs = 20.0 * math.log10(max(audio_rms, 1e-8))
+            audio_peak_dbfs = 20.0 * math.log10(max(audio_peak, 1e-8))
+            audio_level = (
+                f"raw_audio_rms={audio_rms:.5f} raw_audio_peak={audio_peak:.5f} "
+                f"raw_audio_rms_dbfs={audio_rms_dbfs:.1f} "
+                f"raw_audio_peak_dbfs={audio_peak_dbfs:.1f} "
+                f"raw_audio_samples={self._wake_audio_sample_count}"
+            )
+        else:
+            audio_level = (
+                "raw_audio_rms=n/a raw_audio_peak=n/a raw_audio_rms_dbfs=n/a "
+                "raw_audio_peak_dbfs=n/a raw_audio_samples=0"
+            )
+        logger.info(
+            "[voice][wake] stage=score "
+            f"engine={self._wake_engine!r} model={getattr(self._wake, 'model_name', 'configured')} "
+            f"score={score:.3f} peak_1s={peak:.3f} threshold={threshold:.3f} "
+            f"{audio_level} detected={str(detected).lower()}"
+        )
+        self._wake_score_peak = None
+        self._wake_audio_square_sum = 0.0
+        self._wake_audio_sample_count = 0
+        self._wake_audio_peak = 0
+        self._last_wake_score_log_at = current
+
+    def _record_wake_audio_level(self, pcm: bytes) -> None:
+        """Accumulate raw mic levels for the periodic wake-score diagnostic."""
+        import numpy as np
+
+        usable_bytes = len(pcm) - (len(pcm) % 2)
+        if usable_bytes == 0:
+            return
+        samples = np.frombuffer(pcm[:usable_bytes], dtype=np.int16).astype(np.int32)
+        normalized = samples.astype(np.float32) / 32768.0
+        self._wake_audio_square_sum += float(np.dot(normalized, normalized))
+        self._wake_audio_sample_count += int(samples.size)
+        self._wake_audio_peak = max(
+            self._wake_audio_peak, int(np.max(np.abs(samples)))
         )
 
     def _wake_triggered(self, frame) -> bool:
@@ -365,11 +636,28 @@ class VoiceSession:
     # -- One turn ---------------------------------------------------------
 
     async def _handle(self, utterance: Utterance, cancel: asyncio.Event | None = None) -> None:
-        logger.info(f"[voice] utterance {utterance.duration_sec:.1f}s -> transcribing")
+        turn_started = time.perf_counter()
+        capture_elapsed_ms = max(
+            0.0, (datetime.now() - utterance.started_at).total_seconds() * 1000
+        )
+        logger.info(
+            "[voice][timing] stage=utterance_capture "
+            f"elapsed_ms={capture_elapsed_ms:.0f} audio_sec={utterance.duration_sec:.2f} "
+            f"frames={utterance.frame_count} truncated={utterance.truncated}"
+        )
         self._emit("utterance", {"duration_sec": round(utterance.duration_sec, 2)})
 
+        stt_started = time.perf_counter()
         transcript = await self._stt.transcribe(utterance.audio)
+        stt_ms = (time.perf_counter() - stt_started) * 1000
         text = (transcript.text or "").strip()
+        logger.info(
+            "[voice][timing] stage=stt "
+            f"elapsed_ms={stt_ms:.0f} audio_sec={utterance.duration_sec:.2f} "
+            f"rtf={stt_ms / max(utterance.duration_sec * 1000, 1):.2f} "
+            f"language={transcript.language} language_probability={transcript.confidence:.3f} "
+            f"chars={len(text)}"
+        )
         if len(text) < self._min_chars:
             logger.info("[voice] transcript too short; ignoring")
             return
@@ -419,11 +707,23 @@ class VoiceSession:
             # of the reply is still generating (low time-to-first-audio).
             reply = await self._stream_and_speak(ctx, cancel)
         else:
+            generation_started = time.perf_counter()
+            logger.info("[voice][flow] stage=assistant_generation_started mode=non_streaming")
             result = await self._supervisor.execute(ctx)
+            logger.info(
+                "[voice][flow] stage=assistant_generation_complete "
+                f"elapsed_ms={(time.perf_counter() - generation_started) * 1000:.0f} "
+                "mode=non_streaming"
+            )
             reply = (result.response or "").strip()
 
         self._last_reply = reply
         self._turns += 1
+        logger.info(
+            "[voice][timing] stage=turn_complete "
+            f"elapsed_ms={(time.perf_counter() - turn_started) * 1000:.0f} "
+            f"reply_chars={len(reply)}"
+        )
         logger.info(f"[voice] reply: {reply[:120]!r}")
         self._emit("reply", {"text": reply})
 
@@ -447,7 +747,8 @@ class VoiceSession:
         self._speaking = True
         self._emit("speaking", {"text": text})
         try:
-            if await self._say_pcm(text):
+            spoke, _ = await self._say_pcm(text)
+            if spoke:
                 await self._wait_playback()
         except Exception as e:
             logger.error(f"[voice] TTS failed: {e}")
@@ -463,27 +764,58 @@ class VoiceSession:
         """
         self._speaking = True
         self._emit("speaking", {"text": ""})
+        stream_started = time.perf_counter()
+        timing = {"stream_started": stream_started, "tts_ms": 0.0, "first_audio_ms": None}
+        logger.info("[voice][flow] stage=assistant_generation_started mode=streaming")
         parts: list[str] = []
         buffer = ""
         spoke_anything = False
+        first_chunk_ms: float | None = None
+        chunk_count = 0
+        stream_finished_ms: float | None = None
         try:
             async for chunk in self._supervisor.execute_stream(ctx, cancel_event=cancel):
                 if not chunk:
                     continue
+                chunk_count += 1
+                if first_chunk_ms is None:
+                    first_chunk_ms = (time.perf_counter() - stream_started) * 1000
+                    logger.info(
+                        "[voice][timing] stage=model_first_chunk "
+                        f"elapsed_ms={first_chunk_ms:.0f}"
+                    )
                 parts.append(chunk)
                 buffer += chunk
                 sentence, buffer = self._pop_sentence(buffer)
                 while sentence:
-                    spoke_anything = await self._say_pcm(sentence) or spoke_anything
+                    spoke, _ = await self._say_pcm(sentence, timing)
+                    spoke_anything = spoke or spoke_anything
                     sentence, buffer = self._pop_sentence(buffer)
             tail = buffer.strip()
             if tail:
-                spoke_anything = await self._say_pcm(tail) or spoke_anything
+                spoke, _ = await self._say_pcm(tail, timing)
+                spoke_anything = spoke or spoke_anything
+            stream_finished_ms = (time.perf_counter() - stream_started) * 1000
             if spoke_anything:
                 await self._wait_playback()
         except Exception as e:
             logger.error(f"[voice] streaming speak failed: {e}")
         finally:
+            stream_ms = stream_finished_ms or (time.perf_counter() - stream_started) * 1000
+            first_chunk = f"{first_chunk_ms:.0f}" if first_chunk_ms is not None else "n/a"
+            first_audio = (
+                f"{timing['first_audio_ms']:.0f}"
+                if timing["first_audio_ms"] is not None
+                else "n/a"
+            )
+            logger.info(
+                "[voice][timing] stage=model_stream_complete "
+                f"elapsed_ms={stream_ms:.0f} "
+                f"work_excluding_tts_ms={max(0.0, stream_ms - timing['tts_ms']):.0f} "
+                f"tts_ms={timing['tts_ms']:.0f} "
+                f"first_chunk_ms={first_chunk} first_audio_queued_ms={first_audio} "
+                f"chunks={chunk_count} chars={sum(map(len, parts))}"
+            )
             await self._after_speaking()
         return "".join(parts).strip()
 
@@ -495,18 +827,45 @@ class VoiceSession:
         cut = match.end()
         return buffer[:cut].strip(), buffer[cut:]
 
-    async def _say_pcm(self, text: str) -> bool:
+    async def _say_pcm(self, text: str, timing: dict | None = None) -> tuple[bool, float]:
+        started = time.perf_counter()
         spoke = False
+        audio_bytes = 0
+        logger.info(f"[voice][flow] stage=tts_synthesis_started chars={len(text)}")
         async for pcm in self._tts.synthesize(text):
             if pcm:
                 self._speaker.play_pcm(pcm, self._tts.sample_rate)
                 spoke = True
-        return spoke
+                audio_bytes += len(pcm)
+                if timing is not None and timing["first_audio_ms"] is None:
+                    timing["first_audio_ms"] = (time.perf_counter() - timing["stream_started"]) * 1000
+                    logger.info(
+                        "[voice][timing] stage=first_audio_queued "
+                        f"elapsed_ms={timing['first_audio_ms']:.0f}"
+                    )
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        if timing is not None:
+            timing["tts_ms"] += elapsed_ms
+        logger.info(
+            "[voice][flow] stage=tts_synthesis_complete "
+            f"elapsed_ms={elapsed_ms:.0f} chars={len(text)} "
+            f"audio_sec={audio_bytes / (2 * max(self._tts.sample_rate, 1)):.2f} "
+            f"produced_audio={spoke}"
+        )
+        if not spoke:
+            logger.warning("[voice] TTS produced no audio for this text")
+        return spoke, elapsed_ms
 
     async def _wait_playback(self) -> None:
         wait_done = getattr(self._speaker, "wait_done", None)
         if callable(wait_done):
+            started = time.perf_counter()
             finished = await asyncio.to_thread(wait_done, self._speak_timeout_sec)
+            logger.info(
+                "[voice][timing] stage=playback_wait "
+                f"elapsed_ms={(time.perf_counter() - started) * 1000:.0f} "
+                f"finished={finished}"
+            )
             if not finished:
                 logger.warning("[voice] playback did not finish within timeout")
         else:
@@ -515,8 +874,8 @@ class VoiceSession:
             await asyncio.sleep(1.0)
 
     async def _after_speaking(self) -> None:
-        # Settle THEN drain, so the tail of our own voice doesn't land in the
-        # buffer after the drain. Then reopen the mic.
+        # Settle THEN drain so the tail of our own voice cannot leak into the
+        # next turn. The outer turn resumes capture after all processing ends.
         await asyncio.sleep(self._post_speak_settle_sec)
         drain = getattr(self._audio, "drain", None)
         if callable(drain):

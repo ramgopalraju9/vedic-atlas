@@ -16,8 +16,14 @@ from __future__ import annotations
 
 import queue
 import threading
+import time
 
-from core.logging_config import logger
+from core.logging_config import (
+    get_voice_turn_id,
+    logger,
+    reset_voice_turn_id,
+    set_voice_turn_id,
+)
 
 
 class SpeakerPlayback:
@@ -25,7 +31,7 @@ class SpeakerPlayback:
 
     def __init__(self, device_index: int | None = None):
         self.device_index = device_index
-        self._queue: "queue.Queue[tuple[bytes, int] | None]" = queue.Queue()
+        self._queue: "queue.Queue[tuple[bytes, int, float, str] | None]" = queue.Queue()
         self._worker: threading.Thread | None = None
         self._stop = threading.Event()
         # Set while nothing is queued AND nothing is mid-playback.
@@ -56,25 +62,41 @@ class SpeakerPlayback:
             item = self._queue.get()
             if item is None:
                 return
-            pcm_bytes, sample_rate = item
+            pcm_bytes, sample_rate, queued_at, turn_id = item
+            token = set_voice_turn_id(turn_id)
             try:
+                queue_ms = (time.perf_counter() - queued_at) * 1000
+                audio_sec = len(pcm_bytes) / (2 * max(sample_rate, 1))
+                playback_started = time.perf_counter()
+                logger.info(
+                    "[speaker][timing] stage=playback_start "
+                    f"queue_ms={queue_ms:.0f} audio_sec={audio_sec:.2f} "
+                    f"device={self.device_index if self.device_index is not None else 'default'}"
+                )
                 pcm = np.frombuffer(pcm_bytes, dtype=np.int16)
                 sd.play(pcm, samplerate=sample_rate, device=self.device_index, blocking=True)
             except Exception as e:
                 logger.error(f"[speaker] playback error: {e}")
             finally:
+                logger.info(
+                    "[speaker][timing] stage=playback_complete "
+                    f"elapsed_ms={(time.perf_counter() - playback_started) * 1000:.0f} "
+                    f"audio_sec={audio_sec:.2f}"
+                )
                 with self._lock:
                     self._pending -= 1
                     if self._pending <= 0:
                         self._pending = 0
                         self._idle.set()
+                reset_voice_turn_id(token)
 
     def play_pcm(self, pcm_bytes: bytes, sample_rate: int) -> None:
         """Queue a PCM chunk for playback. Non-blocking."""
         with self._lock:
             self._pending += 1
             self._idle.clear()
-        self._queue.put_nowait((pcm_bytes, sample_rate))
+        turn_id = get_voice_turn_id()
+        self._queue.put_nowait((pcm_bytes, sample_rate, time.perf_counter(), turn_id))
 
     def interrupt(self) -> None:
         """Stop what is playing NOW and drop everything queued (used when the user mutes mid-reply)."""

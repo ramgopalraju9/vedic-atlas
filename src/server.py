@@ -228,6 +228,10 @@ def _build_stt(cfg: AppConfig):
         from core.constants import PROJECT_ROOT
         from tpa.stt.faster_whisper import FasterWhisperProvider
 
+        provider_options = {
+            "noise_suppression_enabled": cfg.audio.noise_suppression_enabled,
+            "noise_suppression_strength": cfg.audio.noise_suppression_strength,
+        }
         path = cfg.audio.stt_model_path
         if path:
             resolved = (PROJECT_ROOT / path) if not Path(path).is_absolute() else Path(path)
@@ -235,8 +239,8 @@ def _build_stt(cfg: AppConfig):
                 logger.warning(f"[voice] STT model not found at {resolved}; STT disabled")
                 return None
             # faster-whisper accepts a directory in place of a size name.
-            return FasterWhisperProvider(model_size=str(resolved))
-        return FasterWhisperProvider(model_size=cfg.audio.stt_model)
+            return FasterWhisperProvider(model_size=str(resolved), **provider_options)
+        return FasterWhisperProvider(model_size=cfg.audio.stt_model, **provider_options)
     except Exception as e:
         logger.info(f"[voice] STT unavailable ({e})")
         return None
@@ -344,7 +348,10 @@ def _build_wake_word(cfg: AppConfig):
                 model_path=str(resolved),
                 threshold=cfg.audio.wake_threshold,
             )
-            logger.info(f"[voice] wake engine 'openwakeword' active ({cfg.audio.wake_oww_model})")
+            logger.info(
+                "[voice] wake engine 'openwakeword' active "
+                f"(model={cfg.audio.wake_oww_model!r}, threshold={cfg.audio.wake_threshold:.3f})"
+            )
             return wake
         if engine == "porcupine":
             access_key = _picovoice_access_key()
