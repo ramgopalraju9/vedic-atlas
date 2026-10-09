@@ -34,6 +34,9 @@ from service.conversation.conversation_manager import ConversationManager
 from service.memory.semantic_recall import SemanticRecall
 
 
+_FOLLOW_UP_WORDS = 6   # a message this short probably leans on the one before it
+
+
 class ResponderAgent(LLMAgent):
     """General conversational agent wired to Veda's persona + persistent memory."""
 
@@ -132,7 +135,25 @@ class ResponderAgent(LLMAgent):
     async def _prepare_semantic_context(self, ctx: AgentContext) -> None:
         if self._recall is None or not self._recall.enabled:
             return
-        hits = await self._recall.recall(ctx.user_message)
+        shown = {str(t.id) for t in self.conversation.turns if getattr(t, "id", None) is not None}
+
+        async def recalled(query: str):
+            hits = await self._recall.recall(query)
+            # An exchange already in the recent history above would only be repeated.
+            return [h for h in hits if not (h.source == "exchange" and h.ref_id in shown)]
+
+        if ctx.metadata.get("about_conversation") or await self._recall.asks_about_conversation(ctx.user_message):
+            block = self.conversation.recent_summaries_block()
+            if block:
+                ctx.metadata["semantic_knowledge_context"] = block
+                return
+        hits = await recalled(ctx.user_message)
+        if not hits and len(ctx.user_message.split()) <= _FOLLOW_UP_WORDS:
+            # "what did he say?" names nothing: search it together with the question before it. Only tried when the
+            # message alone found nothing, so an unrelated short question does not drag the last topic back in.
+            previous = next((t.content for t in reversed(self.conversation.turns) if t.role == "user"), "")
+            if previous:
+                hits = await recalled(f"{previous} {ctx.user_message}")
         block = self._recall.as_context_block(hits)
         if block:
             ctx.metadata["semantic_knowledge_context"] = block

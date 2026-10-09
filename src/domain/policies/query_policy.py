@@ -99,3 +99,26 @@ def results_look_relevant(query: str, texts: list[str], min_fraction: float = 0.
     haystack = " ".join(texts).lower()
     found = sum(1 for group in terms if any(alt in haystack for alt in group))
     return found / len(terms) >= min_fraction
+
+
+_REFERENCE_WORDS = frozenset({
+    "it", "its", "they", "them", "their", "theirs", "there", "that", "those", "these", "this", "he", "she", "him", "her",
+    "his", "hers", "one", "ones",
+})
+# Verbs and fillers that ask a question ABOUT something without naming it ("where are they from", "what is happening there").
+_VAGUE = frozenset({
+    "happening", "happened", "going", "located", "location", "based", "born", "founded", "started", "come", "comes",
+    "came", "doing", "done", "mean", "means", "meaning", "about", "tell", "more", "else", "other", "also", "same",
+    "founder", "founders", "owner", "owners", "made", "make", "makes", "work", "works", "like", "know",
+})
+
+
+def has_unresolved_reference(query: str) -> bool:
+    """True when a search query leans on an earlier turn it cannot see: it contains a pronoun ("it", "they", "there") and
+    nothing in it names a subject. The control model is meant to rewrite such a follow-up into a self-contained query; when
+    it passes the pronoun through, a search returns whatever the engine finds for "there", so the caller asks instead."""
+    words = _WORD_RE.findall((query or "").lower())
+    if not any(w in _REFERENCE_WORDS for w in words):
+        return False
+    named = [w for w in words if w not in _REFERENCE_WORDS and w not in _VAGUE and w not in _GENERIC and len(w) >= 3 and not w.isdigit()]
+    return not named

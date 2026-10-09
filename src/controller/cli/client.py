@@ -31,6 +31,11 @@ from core.logging_config import logger
 _DEFAULT_URL = os.environ.get("VEDA_SERVER_URL", "http://127.0.0.1:8000")
 
 
+def _pid_file(port: int) -> Path:
+    """Per port, so a server on another port is never mistaken for this one."""
+    return Path(__file__).resolve().parents[3] / "data" / f"veda-server-{port}.pid"
+
+
 class CliError(RuntimeError):
     """Raised for any CLI-level failure (connection, server error, etc)."""
 
@@ -42,6 +47,7 @@ class VedaClient:
     def __init__(self, server_url: str | None = None, timeout: float = 30.0) -> None:
         self.server_url = (server_url or _DEFAULT_URL).rstrip("/")
         self._http = httpx.Client(timeout=timeout)
+        self.how = ""   # what ensure_up did: reused | waited | started | restarted
 
     def close(self) -> None:
         try:
@@ -128,18 +134,47 @@ class VedaClient:
         logger.info(f"Stopped existing Veda server (pid {pid}) on port {self._port}")
         return pid
 
-    def ensure_up(self, *, allow_spawn: bool = True, wait_secs: float = 90.0, restart: bool = False) -> int | None:
-        """Block until the server responds; spawn it if missing.
+    def _starting_pid(self) -> int | None:
+        """The pid of a Veda server that an earlier `veda` spawned and that is still loading (the port is not open
+        until startup, which includes loading and warming the model, has finished). None when there is none."""
+        import psutil
 
-        ``restart=True`` first stops any existing Veda server on the port, so a
-        fresh process (with the current code and config) is always the one served.
-        Returns the pid that was stopped by a restart, else None.
+        try:
+            pid = int(_pid_file(self._port).read_text().strip())
+            proc = psutil.Process(pid)
+            return pid if proc.is_running() and self._is_veda_server(proc) else None
+        except (OSError, ValueError, psutil.Error):
+            return None
 
-        Raises :class:`CliError` if the server can't be reached after the
-        wait window (or ``allow_spawn=False`` and no server is running).
+    @staticmethod
+    def _log_tail(log_path: Path, lines: int = 8) -> str:
+        try:
+            rows = [r for r in log_path.read_text(encoding="utf-8", errors="replace").splitlines() if r.strip()]
+        except OSError:
+            return ""
+        return "\n".join(r[:240] for r in rows[-lines:])
+
+    def ensure_up(self, *, allow_spawn: bool = True, wait_secs: float | None = None, restart: bool = False) -> int | None:
+        """Make sure a Veda server is answering, then return.
+
+        * Already running: use it (nothing is stopped or started).
+        * Starting up (spawned by an earlier `veda` and still loading the model): wait for that one; never start a second.
+        * Not running: spawn one and wait for it.
+        ``restart=True`` first stops any existing Veda server so a fresh process (current code and config) is served.
+        ``self.how`` says which of reused | waited | started | restarted happened. Returns the pid a restart stopped.
+
+        The wait defaults to 240 s (VEDA_START_TIMEOUT) because the first answer comes only after the model is loaded and
+        warmed (about a minute on a laptop, longer on a Pi). Raises :class:`CliError` when it does not come up in time,
+        when ``allow_spawn=False`` and none is running, or at once when the server process dies (with its last log lines).
         """
+        if wait_secs is None:
+            try:
+                wait_secs = float(os.environ.get("VEDA_START_TIMEOUT") or 240)
+            except ValueError:
+                wait_secs = 240.0
         stopped = self.stop_server() if (restart and allow_spawn) else None
         if self.is_up():
+            self.how = "restarted" if stopped else "reused"
             return stopped
         if not allow_spawn:
             raise CliError(
@@ -147,12 +182,58 @@ class VedaClient:
                 f"Start it with `veda server` or drop --no-spawn."
             )
         repo_root = Path(__file__).resolve().parents[3]
+        log_path = repo_root / "data" / "veda-server.log"
+        proc = None
+        waiting_on = self._starting_pid()
+        if waiting_on is not None:
+            self.how = "waited"
+            logger.info(f"A Veda server (pid {waiting_on}) is still starting; waiting for it instead of starting another")
+        else:
+            proc = self._spawn(repo_root, log_path)
+            self.how = "restarted" if stopped else "started"
+            waiting_on = getattr(proc, "pid", None)
+            logger.info("Starting the Veda server: loading the model takes a minute or more the first time")
+
+        began = time.monotonic()
+        next_note = 15.0
+        while time.monotonic() - began < wait_secs:
+            if self.is_up():
+                return stopped
+            if self._died(proc, waiting_on):
+                raise CliError(
+                    "The Veda server stopped while starting. Last lines of "
+                    f"{log_path}:\n{self._log_tail(log_path) or '(empty)'}"
+                )
+            if time.monotonic() - began >= next_note:
+                logger.info(f"Still starting ({int(time.monotonic() - began)}s)...")
+                next_note += 15.0
+            time.sleep(0.5)
+        raise CliError(
+            f"Veda server did not answer within {int(wait_secs)}s (it may still be loading the model; run `veda` again to keep "
+            f"waiting for it, or set VEDA_START_TIMEOUT higher). Log: {log_path}"
+        )
+
+    @staticmethod
+    def _died(proc, pid: int | None) -> bool:
+        if proc is not None and hasattr(proc, "poll"):
+            return proc.poll() is not None
+        if pid is None:
+            return False
+        import psutil
+
+        try:
+            return not psutil.Process(pid).is_running()
+        except psutil.NoSuchProcess:
+            return True
+        except psutil.Error:
+            return False
+
+    def _spawn(self, repo_root: Path, log_path: Path):
         src_dir = repo_root / "src"
         env = os.environ.copy()
         env["PYTHONPATH"] = str(src_dir) + os.pathsep + env.get("PYTHONPATH", "")
         host = urlparse(self.server_url).hostname or "127.0.0.1"
         port = str(self._port)
-        log_path = repo_root / "data" / "veda-server.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_file = open(log_path, "wb")
         kwargs: dict[str, Any] = {
@@ -166,29 +247,25 @@ class VedaClient:
             "env": env, "cwd": str(src_dir),
         }
         if sys.platform == "win32":
-            # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP — hide the console
+            # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP - hide the console
             # and isolate the child from our REPL's Ctrl-C.
             kwargs["creationflags"] = 0x08000000 | 0x00000200
         else:
             kwargs["start_new_session"] = True
-        logger.info(f"Veda server not reachable; spawning at {self.server_url}")
         try:
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 [sys.executable, "-m", "uvicorn", "server:app", "--host", host, "--port", port],
                 **kwargs,
             )
         finally:
             log_file.close()
-
-        deadline = time.monotonic() + wait_secs
-        while time.monotonic() < deadline:
-            if self.is_up():
-                return stopped
-            time.sleep(0.5)
-        raise CliError(
-            f"Spawned Veda server but it didn't come up within {wait_secs}s. "
-            f"Check the log at {log_path}."
-        )
+        pid = getattr(proc, "pid", None)
+        if pid:   # lets the next `veda` see that this server is still loading instead of starting a second one
+            try:
+                _pid_file(self._port).write_text(str(pid))
+            except OSError:
+                pass
+        return proc
 
     # ---------- chat / stream ----------
 
@@ -318,6 +395,36 @@ class VedaClient:
 
     def complete_task(self, task_id: int) -> dict[str, Any]:
         r = self._http.post(f"{self.server_url}/api/tasks/{task_id}/complete")
+        r.raise_for_status()
+        return r.json()
+
+    # ---------- google sign-in ----------
+
+    def google_status(self) -> dict[str, Any]:
+        r = self._http.get(f"{self.server_url}/api/google/status", timeout=20.0)
+        r.raise_for_status()
+        return r.json()
+
+    def google_reload(self) -> dict[str, Any]:
+        r = self._http.post(f"{self.server_url}/api/google/reload", timeout=20.0)
+        r.raise_for_status()
+        return r.json()
+
+    # ---------- reminders ----------
+
+    def reminders_recent(self, after: int | None) -> dict[str, Any]:
+        params = {} if after is None else {"after": after}
+        r = self._http.get(f"{self.server_url}/api/reminders/recent", params=params, timeout=4.0)
+        r.raise_for_status()
+        return r.json()
+
+    def reminders_status(self) -> dict[str, Any]:
+        r = self._http.get(f"{self.server_url}/api/reminders/status", timeout=4.0)
+        r.raise_for_status()
+        return r.json()
+
+    def set_reminders(self, **changes: Any) -> dict[str, Any]:
+        r = self._http.put(f"{self.server_url}/api/reminders/config", json=changes, timeout=4.0)
         r.raise_for_status()
         return r.json()
 

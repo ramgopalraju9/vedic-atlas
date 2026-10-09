@@ -42,8 +42,11 @@ class TurnOutcome:
     notes: list[str] = field(default_factory=list)
 
 
-async def execute_call(skill_runner: SkillRunner, ctx: AgentContext, call: dict[str, Any]) -> ExecutedCall:
-    """Run one call through SkillRunner (permission / rate-limit / validators / audit hooks all apply) and log it."""
+async def execute_call(
+    skill_runner: SkillRunner, ctx: AgentContext, call: dict[str, Any], *, private: bool = False,
+) -> ExecutedCall:
+    """Run one call through SkillRunner (permission / rate-limit / validators / audit hooks all apply) and log it.
+    `private` (the tool's manifest says so) keeps the result text out of the log line."""
     tool, args = call["tool"], call["args"]
     started = time.perf_counter()
     try:
@@ -58,7 +61,7 @@ async def execute_call(skill_runner: SkillRunner, ctx: AgentContext, call: dict[
     ms = int((time.perf_counter() - started) * 1000)
     logger.info(
         f"[tool-call] agent={ctx.current_agent} tool={tool} args={json.dumps(args, default=str)} "
-        f"ok={ok} ms={ms} result={(observation or error or '')[:200]!r}"
+        f"ok={ok} ms={ms} result={('<private>' if private and ok else (observation or error or '')[:200])!r}"
     )
     return ExecutedCall(tool, args, ok, observation, spoken, final, error, ms)
 

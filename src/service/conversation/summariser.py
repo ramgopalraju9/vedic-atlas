@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta
 
+from domain.policies.session_boundary_policy import DEFAULT_SESSION_GAP_MIN
 from domain.ports.conversation_repository_port import ConversationRepositoryPort
 from domain.ports.inference_port import InferencePort
 from domain.entities.conversation import ConversationSummary
@@ -44,8 +45,9 @@ class ConversationSummariser:
         repo: ConversationRepositoryPort,
         client: InferencePort,
         *,
-        idle_gap_min: int = 10,
+        idle_gap_min: int = DEFAULT_SESSION_GAP_MIN,
         batch_threshold: int = 50,
+        batch_min_idle_min: int = 2,
         tick_sec: float = 60.0,
         summary_model: str | None = None,
         summary_num_predict: int = 256,
@@ -57,7 +59,8 @@ class ConversationSummariser:
         self.repo = repo
         self.client = client
         self._on_summary = on_summary
-        self.idle_gap_min = idle_gap_min
+        self.idle_gap_min = idle_gap_min   # = the session gap: a conversation is summarised only once it is over
+        self.batch_min_idle_min = batch_min_idle_min
         self.batch_threshold = batch_threshold
         self.tick_sec = tick_sec
         self.summary_model = summary_model
@@ -198,12 +201,15 @@ class ConversationSummariser:
         self, *, now: datetime
     ) -> tuple[str, int, datetime, datetime] | None:
         idle_cutoff = now - timedelta(minutes=self.idle_gap_min)
+        # A long session may be compacted before it ends, but never while the user is mid-conversation: a summary run
+        # takes the one model lock (minutes on a Pi) and used to drop live turns out of the history.
+        batch_cutoff = now - timedelta(minutes=self.batch_min_idle_min)
         for session_id, count, from_ts, to_ts in self.repo.sessions_with_unsummarized():
             if self._failure_counts.get(session_id, 0) >= self._max_retries:
                 continue  # exhausted retries — skip until restart
             if to_ts <= idle_cutoff:
                 return session_id, count, from_ts, to_ts
-            if count >= self.batch_threshold:
+            if count >= self.batch_threshold and to_ts <= batch_cutoff:
                 return session_id, count, from_ts, to_ts
         return None
 

@@ -49,10 +49,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--server-url", help="Override server URL (default http://127.0.0.1:8000)")
     p.add_argument("--no-spawn", action="store_true", help="Don't auto-start the server when not reachable")
     p.add_argument(
-        "--no-restart", action="store_true",
-        help="REPL start: reuse a running server instead of stopping it and starting a fresh one "
-             "(also: VEDA_RESTART_ON_START=0)",
+        "--restart", action="store_true",
+        help="REPL start: stop any running server and start a fresh one (to pick up code or config changes; "
+             "also: VEDA_RESTART_ON_START=1). By default a running server is reused.",
     )
+    p.add_argument("--no-restart", action="store_true", help=argparse.SUPPRESS)   # the old default, kept so scripts still parse
 
     sub = p.add_subparsers(dest="cmd", required=False)
 
@@ -98,6 +99,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_doctor = sub.add_parser("doctor", help="Check that the online tools (weather, search, currency) work.")
     p_doctor.set_defaults(func=_handle_doctor)
+
+    p_login = sub.add_parser("login", help="Sign in to Google (Gmail + Calendar + reminders). Works on a headless Raspberry Pi.")
+    p_login.add_argument("--check", action="store_true", help="only verify the saved sign-in")
+    p_login.add_argument("--manual", action="store_true", help="no browser on this machine: open the address on another device and paste the result back")
+    p_login.add_argument("--browser", action="store_true", help="force the local-browser flow")
+    p_login.add_argument("--port", type=int, default=0, help="loopback port (default: any; 8765 with --manual)")
+    p_login.set_defaults(func=_handle_login)
 
     p_task = sub.add_parser("task", help="Manage tasks: add <title> | list | done <id>.")
     p_task.add_argument("action", nargs="?", default="list", help="add | list | done")
@@ -230,6 +238,26 @@ def _handle_task(args: argparse.Namespace) -> int:
         return cmd_task(client, args.action, args.rest)
 
 
+def _handle_login(args: argparse.Namespace) -> int:
+    from controller.cli import google_login
+    from core.env import load_env
+
+    load_env()
+    if args.check:
+        return google_login.run_check()
+    rc = google_login.run_link(manual=True if args.manual else (False if args.browser else None), port=args.port)
+    if rc != 0:
+        return rc
+    with open_client(server_url=args.server_url) as client:   # a running server picks the new sign-in up without a restart
+        try:
+            if client.is_up():
+                state = client.google_reload().get("state")
+                print("The running Veda server now reports:", state)
+        except Exception:
+            print("Saved. Restart Veda to use it.")
+    return 0
+
+
 def _handle_default_chat(args: argparse.Namespace, prompt: str) -> int:
     """One-shot streaming chat — what you get when you type `veda "..."`."""
     console = Console()
@@ -251,22 +279,33 @@ def _handle_default_chat(args: argparse.Namespace, prompt: str) -> int:
     return 0
 
 
-def _handle_repl(args: argparse.Namespace) -> int:
-    # Starting Veda always serves the current code and config: any server already running on the
-    # port is stopped and a fresh one spawned. Opt out with --no-restart or VEDA_RESTART_ON_START=0.
-    restart = (
+def _wants_restart(args: argparse.Namespace) -> bool:
+    """`veda` continues the running server if there is one, waits for one that is still starting, and starts one
+    otherwise. Only --restart (or VEDA_RESTART_ON_START=1) stops a running server for a fresh one."""
+    return (
         not args.no_spawn
         and not getattr(args, "no_restart", False)
-        and os.environ.get("VEDA_RESTART_ON_START", "1").strip().lower() not in ("0", "false", "no")
+        and (getattr(args, "restart", False)
+             or os.environ.get("VEDA_RESTART_ON_START", "0").strip().lower() in ("1", "true", "yes"))
     )
+
+
+def _handle_repl(args: argparse.Namespace) -> int:
+    restart = _wants_restart(args)
     with open_client(server_url=args.server_url) as client:
         try:
             stopped = client.ensure_up(allow_spawn=not args.no_spawn, restart=restart)
         except CliError as e:
             print(str(e), file=sys.stderr)
             return 1
-        if stopped:
-            Console().print(f"[dim]stopped the previous Veda server (pid {stopped}); started a fresh one[/dim]")
+        note = {
+            "reused": "continuing with the running Veda server (use `veda --restart` for a fresh one)",
+            "waited": "the Veda server was still starting; connected to it",
+            "started": "started a new Veda server",
+            "restarted": f"stopped the previous Veda server (pid {stopped}); started a fresh one",
+        }.get(client.how)
+        if note:
+            Console().print(f"[dim]{note}[/dim]")
         return Repl(client).run()
 
 
@@ -276,7 +315,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
 
     raw = list(argv if argv is not None else sys.argv[1:])
-    known_subs = {"hello", "server", "persona", "approve", "config", "status", "mute", "unmute", "listen", "task", "doctor", "trace", "-h", "--help"}
+    known_subs = {"hello", "server", "persona", "approve", "config", "status", "mute", "unmute", "listen", "task", "doctor", "trace", "login", "-h", "--help"}
 
     first_pos = next((a for a in raw if not a.startswith("-")), None)
     is_subcommand = first_pos in known_subs if first_pos else False

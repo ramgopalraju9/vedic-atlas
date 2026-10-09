@@ -29,7 +29,7 @@ def test_profile_from_the_environment_overrides_the_base(monkeypatch):
     assert "0.6B" in cfg.inference.model_path
     assert cfg.app.chat_summaries == 0 and cfg.app.chat_persona == "compact"
     assert cfg.inference.n_ctx == 3072
-    assert cfg.embedding.top_k == 1
+    assert cfg.embedding.top_k == 4 and cfg.embedding.min_score == 0.62
 
 
 def test_profile_from_the_dotenv_file(monkeypatch, tmp_path):

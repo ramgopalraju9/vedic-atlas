@@ -66,6 +66,15 @@ def get_task_service(request: Request):
     return _require(request, "task_service", "task service")
 
 
+def get_google_auth(request: Request):
+    """503 when Google tools are not registered (online tools disabled)."""
+    return _require(request, "google_auth", "Google sign-in")
+
+
+def get_reminders(request: Request):
+    return _require(request, "reminders", "reminders")
+
+
 def get_speaker_enrollment_service(request: Request) -> "SpeakerEnrollmentService":
     """503 when speaker ID is disabled/unavailable - same "not initialized"
     semantics as every other _require'd service, just conditionally built."""

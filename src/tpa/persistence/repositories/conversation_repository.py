@@ -118,6 +118,52 @@ class ConversationRepository:
             ).all()
         return [(sid, int(cnt), lo, hi) for sid, cnt, lo, hi in rows]
 
+    def summary_created_at(self, summary_id: int) -> datetime | None:
+        with self._session() as s:
+            return s.scalar(select(ConversationSummaryRow.created_at).where(ConversationSummaryRow.id == summary_id))
+
+    def turn_created_at(self, turn_id: int) -> datetime | None:
+        with self._session() as s:
+            return s.scalar(select(ConversationTurnRow.created_at).where(ConversationTurnRow.id == turn_id))
+
+    def exchanges(self) -> list[tuple[int, str, str, str, datetime]]:
+        with self._session() as s:
+            rows = list(s.scalars(select(ConversationTurnRow).order_by(ConversationTurnRow.created_at.asc(), ConversationTurnRow.id.asc())))
+        pending: dict[str, str] = {}
+        pairs = []
+        for r in rows:   # a question is answered by the next assistant turn of its session; ambient messages have no question
+            if r.role == "user":
+                pending[r.session_id] = r.content
+            elif r.role == "assistant" and r.session_id in pending:
+                pairs.append((r.id, r.session_id, pending.pop(r.session_id), r.content, r.created_at))
+        return pairs
+
+    def sessions_without_summary(self) -> list[tuple[str, int, datetime, datetime]]:
+        with self._session() as s:
+            summarised = select(ConversationSummaryRow.session_id)
+            rows = s.execute(
+                select(
+                    ConversationTurnRow.session_id,
+                    func.count(ConversationTurnRow.id),
+                    func.min(ConversationTurnRow.created_at),
+                    func.max(ConversationTurnRow.created_at),
+                )
+                .where(ConversationTurnRow.session_id.not_in(summarised))
+                .group_by(ConversationTurnRow.session_id)
+                .order_by(func.min(ConversationTurnRow.created_at).asc())
+            ).all()
+        return [(sid, int(cnt), lo, hi) for sid, cnt, lo, hi in rows]
+
+    def turns_by_session(self, session_id: str) -> list[Turn]:
+        with self._session() as s:
+            stmt = (
+                select(ConversationTurnRow)
+                .where(ConversationTurnRow.session_id == session_id)
+                .order_by(ConversationTurnRow.created_at.asc(), ConversationTurnRow.id.asc())
+            )
+            rows = list(s.scalars(stmt))
+        return [turn_row_to_entity(r) for r in rows]
+
     def mark_summarized(self, turn_ids: Sequence[int]) -> None:
         if not turn_ids:
             return
@@ -134,6 +180,7 @@ class ConversationRepository:
                 to_ts=summary.to_ts,
                 content=summary.content,
                 turn_count=summary.turn_count,
+                **({"created_at": summary.created_at} if summary.created_at else {}),   # a backfill dates it by the conversation
             )
             s.add(row)
             s.flush()

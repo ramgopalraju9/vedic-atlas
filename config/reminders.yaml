@@ -1,0 +1,13 @@
+# Spoken reminders for calendar events and for tasks that have a due time. No model is involved: this is a timer that
+# waits for a quiet moment (never while you are talking or Veda is speaking), then says one short sentence.
+# Edit here for lasting changes; `GET/PUT /api/reminders/config` and `/reminders` in the CLI change them until restart.
+enabled: true
+lead_minutes: [15]        # a heads-up this many minutes before the start; several are fine, e.g. [30, 10]; [] = none
+at_start: true            # and one when it starts ("... is starting now")
+skip_all_day: true        # all-day events and date-only tasks have no clock time to remind about
+include_tasks: true       # tasks that have a due time (set one by saying "remind me at 6 pm to ...")
+
+poll_sec: 300             # how often the calendar is re-read (one small request); new events are picked up within this
+horizon_hours: 24         # how far ahead it plans
+tick_sec: 5               # how often it checks what is due (a reminder can be this late at most)
+idle_settle_sec: 1.5      # quiet this long before speaking, so it never cuts into a pause between two sentences

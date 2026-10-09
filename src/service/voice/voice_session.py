@@ -45,6 +45,15 @@ from service.voice.utterance_collector import UtteranceCollector
 
 _WORD_RE = re.compile(r"[a-z0-9']+")
 _SENTENCE_END_RE = re.compile(r"[.!?]+(?=\s)")
+_WAKE_ACKNOWLEDGEMENT = "Hey there, what's up?"
+
+
+def _format_request_duration(elapsed_ms: float) -> str:
+    if elapsed_ms < 60_000:
+        return f"{elapsed_ms:.0f} ms"
+    if elapsed_ms < 3_600_000:
+        return f"{elapsed_ms / 60_000:.2f} mins"
+    return f"{elapsed_ms / 3_600_000:.2f} hr"
 
 
 class VoiceSession:
@@ -121,6 +130,7 @@ class VoiceSession:
         self._stop = asyncio.Event()
         self._speaking = False
         self._processing_turn = False
+        self._turn_active = False   # a heard utterance is being transcribed / thought about / answered
         self._turns = 0
         self._turn_sequence = 0
         self._wake_sequence = 0
@@ -261,6 +271,22 @@ class VoiceSession:
                     f"score={score_text} threshold={threshold_text}; "
                     "wake phrase opens the command window and is not sent as a command"
                 )
+                if self._tts is None:
+                    logger.warning(
+                        "[voice][wake] acknowledgement skipped because no TTS engine is available"
+                    )
+                else:
+                    acknowledgement_started = time.perf_counter()
+                    logger.info(
+                        "[voice][flow] stage=wake_acknowledgement_started "
+                        f"wake={self._wake_id} chars={len(_WAKE_ACKNOWLEDGEMENT)}"
+                    )
+                    await self._speak(_WAKE_ACKNOWLEDGEMENT)
+                    logger.info(
+                        "[voice][flow] stage=wake_acknowledgement_complete "
+                        f"wake={self._wake_id} "
+                        f"elapsed_ms={(time.perf_counter() - acknowledgement_started) * 1000:.0f}"
+                    )
                 self._arm(reason="wake_word")
             return
 
@@ -341,8 +367,9 @@ class VoiceSession:
         )
         discarded_frames = self._discard_captured_audio()
         cancel = asyncio.Event()
-        task = asyncio.create_task(self._handle(utterance, cancel), name="VoiceTurn")
+        self._turn_active = True
         completion_reason = "turn_failed"
+        task = asyncio.create_task(self._handle(utterance, cancel), name="VoiceTurn")
         try:
             while True:
                 done, _ = await asyncio.wait({task}, timeout=0.1)
@@ -396,10 +423,17 @@ class VoiceSession:
             )
             raise
         finally:
+            elapsed_ms = (time.perf_counter() - turn_started) * 1000
+            logger.info(
+                "[voice][timing] Time taken to process the request : "
+                f"{_format_request_duration(elapsed_ms)} "
+                f"(elapsed_ms={elapsed_ms:.0f}) turn={turn_id} status={completion_reason}"
+            )
             capture_resumed = self._gate.resume_capture(
                 source=f"voice_turn:{turn_id}"
             )
             self._processing_turn = False
+            self._turn_active = False
             listening = capture_resumed and (
                 self._wake is None or self._is_armed()
             )
@@ -741,6 +775,25 @@ class VoiceSession:
     async def speak(self, text: str) -> None:
         """Speak arbitrary text through the same echo-guarded path as a reply."""
         await self._speak(text)
+
+    # -- Announcements (reminders): speak only when nothing else is going on -------------
+
+    def available(self) -> bool:
+        return self.is_running
+
+    def is_busy(self) -> bool:
+        """True while we are speaking, the user is talking (or the wake window is open for them to), or a turn is in
+        flight. Being muted is NOT busy: a closed mic does not stop the speaker."""
+        return self._speaking or self._turn_active or self._collector.is_speaking or self._is_armed()
+
+    async def announce(self, text: str) -> bool:
+        """Speak `text` only if idle right now; False means busy, try later. The idle check and `_speaking = True`
+        (set at the top of `_speak`) happen with no `await` between them, so a turn cannot start in the gap, and the
+        mic stays closed while we talk exactly as for a reply."""
+        if not self.is_running or self.is_busy():
+            return False
+        await self._speak(text)
+        return True
 
     async def _speak(self, text: str) -> None:
         """Synthesise and play with the mic held closed until playback truly ends."""

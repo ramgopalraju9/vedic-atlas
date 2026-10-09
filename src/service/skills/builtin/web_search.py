@@ -8,6 +8,7 @@ from core.logging_config import logger
 from domain.entities.agent_context import AgentContext
 from domain.entities.skill_result import SkillResult
 from domain.entities.tool_manifest import ToolManifest
+from domain.policies.query_policy import has_unresolved_reference
 from service.lookup.search_lookup import SearchLookup
 from service.skills.manifest_skill import ManifestSkill
 
@@ -31,5 +32,8 @@ class WebSearchSkill(ManifestSkill):
         if topic == "news" and not _NEWS_WORDS.search(ctx.user_message or ""):
             logger.info("[web_search] model chose topic=news but the question isn't news-like; using general")
             topic = "general"
+        if has_unresolved_reference(params.get("query") or ""):
+            logger.info("[web_search] query leans on an earlier turn it does not name; asking instead of searching")
+            return self._fail("query names no subject", "What do you mean? Tell me the name and I'll look it up.")
         obs = await self._lookup.search(params.get("query"), topic)
         return self._from_observation(obs)

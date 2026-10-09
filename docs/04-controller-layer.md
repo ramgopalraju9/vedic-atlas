@@ -89,15 +89,16 @@ same as any other client would.
   text. Bare positional text → one-shot streaming chat.
 - **`client.py` — `VedaClient`**: sync `httpx.Client` wrapper, base URL
   from `VEDA_SERVER_URL` env var (default `http://127.0.0.1:8000`).
-  `ensure_up(allow_spawn=True)` auto-spawns the server as a subprocess
-  (`python -m uvicorn server:app`, with `PYTHONPATH` set to `src/`) if
-  it's unreachable, then polls until ready. `ensure_up(restart=True)` first calls
-  `stop_server()`, which finds the process listening on the port (psutil), refuses to
-  touch anything that isn't recognisably a Veda server, tries `POST /api/admin/shutdown`
-  (clean voice/mic teardown), then terminates and, if needed, kills it. The REPL start
-  (bare `veda`) uses `restart=True` so a stale server is never reused; opt out with
-  `--no-restart` or `VEDA_RESTART_ON_START=0`. One-shot commands (`veda task`,
-  `veda doctor`, `veda "prompt"`) attach to a running server without restarting it. Wraps essentially every route
+  `ensure_up()` makes sure a server answers and says what it did in `client.how`:
+  **reused** (already running: left alone), **waited** (an earlier `veda` spawned one that is still loading the model:
+  wait for it, never start a second; its pid is kept in `data/veda-server-<port>.pid`), **started** (spawned
+  `python -m uvicorn server:app` with `PYTHONPATH` set to `src/`) or **restarted**. The server answers only after the
+  model is loaded and warmed (about a minute on a laptop, more on a Pi), so the wait is 240 s (`VEDA_START_TIMEOUT`),
+  progress is logged every 15 s, and if the server process dies the last lines of `data/veda-server.log` are shown at once.
+  Bare `veda` continues a running server; `veda --restart` (or `VEDA_RESTART_ON_START=1`) first calls `stop_server()` for a
+  fresh one (psutil finds the listener, refuses anything that is not recognisably a Veda server, tries
+  `POST /api/admin/shutdown`, then terminates, then kills). One-shot commands (`veda task`, `veda doctor`,
+  `veda "prompt"`) attach to a running server the same way. Wraps essentially every route
   above (`stream_chat`, `chat_one_shot`, persona/approval/task/status
   helpers).
 - **`commands.py`**: `cmd_approve` (interactive y/n/skip loop, or `--id`/

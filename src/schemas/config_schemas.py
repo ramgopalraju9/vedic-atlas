@@ -114,6 +114,12 @@ class EmbeddingConfig(BaseModel):
     cache_dir: str | None = "data/embeddings"
     top_k: int = 5
     min_score: float = 0.3  # minimum cosine similarity to inject a memory
+    margin: float | None = None  # also keep hits within this of the best one (up to top_k); None = no margin rule
+    max_hit_chars: int = 280     # each recalled memory is cut to this
+    min_score_by_source: dict[str, float] = {}  # a stricter floor for one source, e.g. exchange: short notes score higher
+    conversation_intent_soft_min: float = 0.76  # a looser match counts only instead of a clarifying question or a refusal
+    conversation_intent_min: float | None = None  # "what are we discussing" is answered from the newest conversations (None = off)
+    max_total_chars: int = 800   # and the whole recalled block to this (prompt tokens are Raspberry Pi prefill time)
     sources: list[str] = ["fact", "summary"]  # which memory sources recall searches
 
 
@@ -234,16 +240,46 @@ class SensingConfig(BaseModel):
     rate_limit_window_sec: float = 60.0
 
 
+class RemindersConfig(BaseModel):
+    """reminders: section — spoken reminders for calendar events and due tasks (no model involved)."""
+
+    enabled: bool = True
+    lead_minutes: list[int] = [15]
+    at_start: bool = True
+    skip_all_day: bool = True
+    include_tasks: bool = True
+    poll_sec: float = 300.0
+    horizon_hours: float = 24.0
+    tick_sec: float = 5.0
+    idle_settle_sec: float = 1.5
+
+    @field_validator("lead_minutes")
+    @classmethod
+    def _valid_leads(cls, v: list[int]) -> list[int]:
+        from domain.policies.reminder_policy import validate_leads
+        return list(validate_leads(v))
+
+    @field_validator("poll_sec", "horizon_hours", "tick_sec")
+    @classmethod
+    def _positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("must be > 0")
+        return v
+
+
 class OnlineConfig(BaseModel):
     """privacy.online: sub-section — the network egress allow-list."""
 
     enabled: bool = True  # False = fully offline: no online tools are registered
     allowlist: list[str] = [
         "api.open-meteo.com", "geocoding-api.open-meteo.com", "api.frankfurter.dev", "open.er-api.com",
-        "api.tavily.com",
+        "api.tavily.com", "oauth2.googleapis.com", "gmail.googleapis.com", "www.googleapis.com",
     ]
     default_place: str = "Hyderabad"  # used when the user asks for weather without naming a place
     search_api_key_env: str = "TAVILY_API_KEY"  # env var holding the Tavily key (never stored in config)
+    google_client_id_env: str = "GOOGLE_API_CLIENT_ID"   # env vars holding the Google OAuth secrets (never stored in config)
+    google_client_secret_env: str = "GOOGLE_CLIENT_SECRET"
+    google_refresh_token_env: str = "GOOGLE_REFRESH_TOKEN"
 
 
 class PrivacyConfig(BaseModel):
@@ -399,6 +435,7 @@ class AppConfig(BaseModel):
     embedding: EmbeddingConfig = EmbeddingConfig()
     audio: AudioConfig = AudioConfig()
     sensing: SensingConfig = SensingConfig()
+    reminders: RemindersConfig = RemindersConfig()
     privacy: PrivacyConfig = PrivacyConfig()
     governance: GovernanceConfig = GovernanceConfig()
     guardrails: GuardrailsConfig = GuardrailsConfig()

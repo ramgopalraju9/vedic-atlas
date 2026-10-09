@@ -1,0 +1,29 @@
+name: calendar_agenda
+agent: google
+description: The user's calendar - meetings and appointments today or the next days. Read-only.
+reply_mode: template        # event titles are spoken as the calendar returned them
+permission_level: auto
+returns: value
+private: true
+requires_online: true
+hosts: [www.googleapis.com, oauth2.googleapis.com]
+
+params:
+  date_offset:
+    type: integer
+    description: days from today, 0 to 6 (0 today, 1 tomorrow); leave out for today
+  days:
+    type: integer
+    description: how many days to read, 1 to 7; leave out for one day, use 7 for the week
+
+examples:
+  - user: what's on my calendar tomorrow
+    calls: [{tool: calendar_agenda, args: {date_offset: 1}}]
+    prompt_example: true
+  - user: do I have any meetings today
+    calls: [{tool: calendar_agenda, args: {date_offset: 0}}]
+  - user: what does my week look like
+    calls: [{tool: calendar_agenda, args: {date_offset: 0, days: 7}}]
+
+claims:
+  - '\b(you (have|got) (\d+|no|two|three|four|five) (events?|meetings?|appointments?)|your calendar (shows|is))\b'

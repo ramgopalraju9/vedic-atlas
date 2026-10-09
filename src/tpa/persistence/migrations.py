@@ -14,7 +14,7 @@ def init_tables() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     # Import models for side-effect registration before create_all.
     from tpa.persistence.models import (  # noqa: F401
-        agent_memory, conversation, memory_vector, session_context, task, turn_trace,
+        agent_memory, conversation, memory_vector, reminder_fired, session_context, task, turn_trace,
     )
 
     Base.metadata.create_all(engine)

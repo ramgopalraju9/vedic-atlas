@@ -65,3 +65,6 @@ class ToolManifest:
     # The argument(s) that say WHAT a destructive call acts on (tasks: title). The user must have named it in their
     # own message; otherwise the call is not run and the turn asks. Empty = the tool has no such rule.
     target_params: tuple[str, ...] = ()
+    # The result is the user's private content (mail, calendar): it is spoken to them but never written to the trace,
+    # the audit log, the tool-call log or the API's skill_calls.
+    private: bool = False

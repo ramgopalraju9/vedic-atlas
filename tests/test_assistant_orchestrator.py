@@ -104,7 +104,7 @@ def fail(error="provider down"):
     return SkillResult(skill_name="x", success=False, error=error)
 
 
-def env(decisions, skills, *, responder_text="Chat reply.", narration="Narrated.", claims=lambda t: False):
+def env(decisions, skills, *, responder_text="Chat reply.", narration="Narrated.", claims=lambda t: False, conversation_intent=None):
     engine = create_engine("sqlite:///:memory:", future=True, connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, future=True, expire_on_commit=False)
@@ -115,7 +115,7 @@ def env(decisions, skills, *, responder_text="Chat reply.", narration="Narrated.
     orch = AssistantOrchestrator(
         decoder=decoder, composer=PromptComposer(FilePromptStore(), list(MANIFESTS.values())), skill_runner=runner,
         manifests=MANIFESTS, responder=responder, client=client, conversation=convo, claims_action=claims,
-        session_state=session_state, traces=traces, grounding_check=lambda *a: True,
+        session_state=session_state, traces=traces, grounding_check=lambda *a: True, conversation_intent=conversation_intent,
     )
     return SimpleNamespace(orch=orch, decoder=decoder, runner=runner, convo=convo, responder=responder,
                            client=client, state=session_state, traces=traces)
@@ -211,6 +211,13 @@ def test_failed_call_gets_plain_failure_text_never_an_invented_result():
             {"get_weather": fail("provider down"), "convert_currency": ok(spoken="5 USD is 4.3 EUR.")})
     _, result = turn(e, "x")
     assert result.response == "I couldn't do that: provider down 5 USD is 4.3 EUR."
+
+
+def test_a_failed_call_that_carries_its_own_sentence_is_spoken_with_that_sentence():
+    failed = SkillResult(skill_name="x", success=False, error="no app name", metadata={"spoken": "Which app do you mean?"})
+    e = env([dec([call("get_weather", place="Tokyo")], live=True)], {"get_weather": failed})
+    _, result = turn(e, "x")
+    assert result.response == "Which app do you mean?"
 
 
 def test_a_skill_that_raises_is_a_failed_call_not_a_crash():
@@ -383,3 +390,72 @@ def test_a_document_result_is_capped_before_the_content_decode():
     e.orch._composer.content_stage = lambda task, doc, q, **kw: seen.setdefault("task", task) and orig(task, doc, q, **kw)
     turn(e, "x")
     assert seen["task"] == "narrate"
+
+
+# ---- questions about the conversation itself always reach chat (where the history and memory are) ---------------------------------------
+
+def about(answer=True, score=None):
+    """A fake conversation-intent scorer: strong (0.9) or none (0.1), or an exact score."""
+    async def check(message):
+        return score if score is not None else (0.9 if answer else 0.1)
+    return check
+
+
+def test_a_question_about_the_conversation_goes_to_chat_even_if_the_router_asked_a_question():
+    e = env([dec(clar="What would you like to know about the conversation so far?")], {}, responder_text="We talked about plans.",
+            conversation_intent=about())
+    _, result = turn(e, "what are we discussing")
+    assert result.response == "We talked about plans." and e.responder.ran == 1
+
+
+def test_a_question_about_the_conversation_never_runs_a_tool_the_router_picked():
+    e = env([dec([call("web_search", query="what areas we talked")], live=True)], {"web_search": ok(spoken="web!")},
+            responder_text="We talked about plans.", conversation_intent=about())
+    _, result = turn(e, "what areas have we talked about")
+    assert result.response == "We talked about plans." and e.responder.ran == 1
+
+
+def test_other_questions_keep_the_routers_decision():
+    e = env([dec([call("get_weather", place="Tokyo")], live=True)], {"get_weather": WEATHER}, conversation_intent=about(False))
+    _, result = turn(e, "weather in Tokyo")
+    assert result.response == "In Tokyo it's 18 degrees." and e.responder.ran == 0
+
+
+def test_a_failing_intent_check_does_not_break_the_turn():
+    async def boom(message):
+        raise RuntimeError("embedding down")
+
+    e = env([dec([call("get_weather", place="Tokyo")], live=True)], {"get_weather": WEATHER}, conversation_intent=boom)
+    _, result = turn(e, "weather in Tokyo")
+    assert result.response == "In Tokyo it's 18 degrees."
+
+
+def test_the_streamed_path_also_reaches_chat():
+    e = env([dec(clar="What do you mean?")], {}, responder_text="We talked about plans.", conversation_intent=about())
+    _, text = turn(e, "what are we discussing", stream=True)
+    assert text == "We talked about plans." and e.responder.ran == 1
+
+
+def test_a_softer_match_replaces_a_clarifying_question_with_chat_and_tells_chat_why():
+    e = env([dec(clar="What would you like to know about our conversation?")], {}, responder_text="We talked about plans.",
+            conversation_intent=about(score=0.795))                     # "can you tell me what are we discusing lately"
+    ctx, result = turn(e, "can you tell me what are we discusing lately")
+    assert result.response == "We talked about plans." and e.responder.ran == 1 and ctx.metadata["about_conversation"] is True
+
+
+def test_a_softer_match_replaces_a_refusal_too():
+    e = env([dec(live=True)], {}, responder_text="We talked about plans.", conversation_intent=about(score=0.78))
+    _, result = turn(e, "what have we been on about lately")
+    assert result.response == "We talked about plans."
+
+
+def test_a_softer_match_never_overrides_a_tool_the_router_chose():
+    e = env([dec([call("get_weather", place="Tokyo")], live=True)], {"get_weather": WEATHER}, conversation_intent=about(score=0.78))
+    ctx, result = turn(e, "can you tell me the weather")
+    assert result.response == "In Tokyo it's 18 degrees." and e.responder.ran == 0 and "about_conversation" not in ctx.metadata
+
+
+def test_a_score_below_the_soft_threshold_changes_nothing():
+    e = env([dec(clar="Which one?")], {}, conversation_intent=about(score=0.70))
+    _, result = turn(e, "which one")
+    assert result.response == "Which one?" and e.responder.ran == 0

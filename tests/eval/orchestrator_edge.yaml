@@ -1,0 +1,55 @@
+# Edge cases for the calendar / clock / sent-mail / reminder-related tools. A PROBE, not a gate and not tuned against:
+# run it to see where the 4B model breaks, then decide what to fix in code (the tools validate their own input).
+#
+#   python scripts/spike_decision_protocol.py --variants A1 --golden tests/eval/orchestrator_edge.yaml
+#
+# Same format as orchestrator_golden.yaml. "No tool for it" cases expect an empty call list and needs_live_data true.
+
+# ---- calendar writes: how the time and day are spoken ---------------------------------------------------------------
+- {say: "add standup to my calendar at 9:30 tomorrow morning", category: cal-write, expect: {calls: [{tool: calendar_create, args: {title: standup, date_offset: 1, time: "09:30"}}]}}
+- {say: "schedule a call with Priya on the calendar tomorrow at five thirty pm", category: cal-write, expect: {calls: [{tool: calendar_create, args: {title: call, date_offset: 1, time: "17:30"}}]}}
+- {say: "put dinner on my calendar tonight at 8", category: cal-write, expect: {calls: [{tool: calendar_create, args: {title: dinner, date_offset: 0, time: "20:00"}}]}}
+- {say: "block two hours tomorrow at 2 pm for deep work", category: cal-write, expect: {calls: [{tool: calendar_create, args: {date_offset: 1, time: "14:00", duration_minutes: 120}}]}}
+
+# ---- things there is no tool for: must not fall into another tool ------------------------------------------------------
+- {say: "cancel my 5 pm meeting", category: no-tool, expect: {calls: [], needs_live_data: true}}
+- {say: "move my meeting to 6 pm", category: no-tool, expect: {calls: [], needs_live_data: true}}
+- {say: "delete the 5 pm meeting from my calendar", category: no-tool, expect: {calls: [], needs_live_data: true}}
+- {say: "what's on my calendar next month", category: no-tool, expect: {calls: [], needs_live_data: true}}
+- {say: "what time is it in Tokyo", category: no-tool, expect: {calls: [{tool: web_search, args: {query: tokyo}}]}}
+
+# ---- calendar reads ----------------------------------------------------------------------------------------------------
+- {say: "what's on my calendar day after tomorrow", category: cal-read, expect: {calls: [{tool: calendar_agenda, args: {date_offset: 2}}]}}
+- {say: "do I have anything in the next three days", category: cal-read, expect: {calls: [{tool: calendar_agenda, args: {days: 3}}]}}
+
+# ---- tasks vs calendar -------------------------------------------------------------------------------------------------
+- {say: "remind me to take my medicine", category: tasks, expect: {calls: [{tool: tasks, args: {action: add, title: medicine}}]}}
+- {say: "remind me at 6 pm to call mom", category: tasks, expect: {calls: [{tool: tasks, args: {action: add, title: mom, due_at: "18:00"}}]}}
+- {say: "add pay rent to my tasks and put the rent meeting on my calendar tomorrow at 4 pm", category: tasks, expect: {calls: [{tool: tasks, args: {action: add, title: rent}}, {tool: calendar_create, args: {date_offset: 1, time: "16:00"}}]}}
+
+# ---- mentions and negations around the new words -----------------------------------------------------------------------
+- {say: "I don't care what time it is", category: mention, expect: {calls: [], needs_live_data: false}}
+- {say: "my watch shows the wrong time", category: mention, expect: {calls: [], needs_live_data: false}}
+- {say: "don't add a meeting to my calendar", category: mention, expect: {calls: [], needs_live_data: false}}
+- {say: "my calendar app crashes every morning", category: mention, expect: {calls: [], needs_live_data: false}}
+- {say: "what does the word calendar mean", category: mention, expect: {calls: [], needs_live_data: false}}
+
+# ---- mail: sent folder, and requests with a missing piece ----------------------------------------------------------------
+- {say: "what mail did I send yesterday", category: mail, expect: {calls: [{tool: gmail_search, args: {folder: sent}}]}}
+- {say: "did I sent any mail to manoj", category: mail, expect: {calls: [{tool: gmail_search, args: {folder: sent}}]}}
+- {say: "email Priya", category: mail, expect: {calls: [], clarification: true}}
+- {say: "send an email", category: mail, expect: {calls: [], clarification: true}}
+- {say: "send it", category: mail, expect: {calls: []}}
+
+# ---- follow-ups that name (or do not name) their subject -------------------------------------------------------------------
+- say: "how old is it"
+  category: followup
+  history: [{user: "how tall is the Eiffel Tower", veda: "The Eiffel Tower is about 330 metres tall. Source: britannica."}]
+  state: {tool: web_search, slots: {query: height of the Eiffel Tower, topic: general}}
+  expect: {calls: [{tool: web_search, args: {query: eiffel}}]}
+- {say: "how old is it", category: no-state, expect: {calls: [], clarification: true}}
+- say: "where was he born"
+  category: followup
+  history: [{user: "who runs Tesla", veda: "Elon Musk is the CEO of Tesla. Source: wikipedia."}]
+  state: {tool: web_search, slots: {query: CEO of Tesla, topic: general}}
+  expect: {calls: [{tool: web_search, args: {query: musk}}]}

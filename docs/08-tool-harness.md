@@ -45,8 +45,48 @@ Decodes per turn: tool turn with template reply 1; with narration 2; chat 2; cla
 ## Tools today
 `get_weather`, `get_weather_forecast(place, date_offset 0..6)` (code validates the range and builds the sentence naming the
 place and the day), `convert_currency`, `web_search` (`returns: document`, narrated), `tasks`, `remember`, and the device
-tools `app_control` (open/close/focus), `volume_control` (get/set/mute/unmute), `device_status` (battery/processes).
+tools `app_control` (open/close/focus), `volume_control` (get/set/mute/unmute), `device_status` (battery/processes),
+and `current_time` (time or date, built from the device clock: before it existed "what is the time" was answered with CPU usage).
 `terminal` and `file_ops` are skills but are deliberately **not** model-callable.
+
+### Gmail and Calendar (`gmail_search`, `gmail_read`, `gmail_draft`, `gmail_send`, `calendar_agenda`, `calendar_create`)
+Ports `MailPort` / `CalendarPort`; adapters `tpa/online/google/{google_auth,gmail_client,gmail_parser,calendar_client}.py`; skills
+`service/skills/builtin/{gmail,calendar_agenda,calendar_create}.py`; pure rules `domain/policies/{mail,calendar}_policy.py`.
+- **Linking, `veda login`:** Veda checks the sign-in when it starts (`GET /api/google/status`; the server also logs one line) and the REPL offers to fix it on the spot
+  ("Sign in to Google now? [Y/n]"): not signed in, expired/revoked, or missing a permission (e.g. an old read-only calendar token). `veda login` does the same any time
+  (`--check` verifies, `--manual` for a headless Raspberry Pi, `--browser` to force the local browser); the running server reloads the new token with no restart
+  (`POST /api/google/reload`). Headless/manual flow: open the printed address on any device, allow access, copy the whole address of the page that then fails to load
+  (127.0.0.1) and paste it back; Google's "enter a code" device flow cannot be used because it does not allow Gmail/Calendar scopes. Skip the prompt with `VEDA_SKIP_GOOGLE_PROMPT=1`.
+  Manual details: `GOOGLE_API_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in `.env`, then `python scripts/google_auth.py` once (browser consent, PKCE, loopback) writes
+  `GOOGLE_REFRESH_TOKEN` to `.env`; `--check` verifies it. Scopes: gmail.readonly, gmail.compose, calendar.events — Veda reads and adds events (no attendees, so nobody is invited) and never deletes mail or events. After upgrading from calendar.readonly, run `python scripts/google_auth.py` again to grant the new permission.
+  Until linked the tools answer "I can't check your email yet because it isn't set up". A consent screen left in *Testing* expires the token after 7 days.
+- **Two planes:** `gmail_search` speaks sender + subject only (template); `folder: sent` makes the CODE search `in:sent` and speak the recipient ("To Manoj Routhu: ..."), so a wrong model-written query cannot look in the inbox for mail the user sent. `gmail_read` is `returns: document`: one body (<=2000 chars, quotes stripped), summarised by the
+  content decode, never in a control prompt; its spoken fallback never carries the body.
+- **Sending is two turns by construction:** `gmail_draft` resolves a name to an address from the user's own mail (only when exactly ONE address matches, else it asks),
+  saves a Gmail draft and reads it back; `gmail_send` takes **no arguments** and can send only that draft (`service/mail/draft_outbox.py`: in memory, 10 min, this session,
+  consumed on the attempt so a repeat or a retry cannot send twice). It is `destructive: true` (no state inheritance, never in a multi-call). There is no code path that
+  sends text composed in the same turn. `permission_level` is `notify`, not `approve`: `PermissionManager`'s approval wait has no resolver wired (nothing calls its
+  `approve()`), so an `approve` tool would always time out; the user's separate "send it" after hearing the draft is the confirmation.
+- **Privacy:** manifests set `private: true`: results are kept out of the trace, the `[tool-call]` log, the audit log and the API's `skill_calls`. Mail/calendar text is
+  untrusted input; `clean_text` flattens it before it is spoken (and therefore saved into history).
+- **Calendar:** primary calendar. `calendar_agenda` reads: the model picks `date_offset` 0..6 and `days` 1..7, code does the dates. `calendar_create(title, date_offset 0..6, time "HH:MM", duration_minutes?)` adds one event in one turn: it sets NO attendees (nobody is invited), refuses a time already past, does not add an identical event twice, and reads the confirmation back from the event Google stored. Tasks and the calendar are separate: the `tasks` tool refuses a title that names the calendar or starts with "block"/"event" (`calendar_policy.looks_like_calendar_entry`) and says so, instead of filing "block calendar for Manoj" as a to-do. A sign-in without `calendar.events` answers "I don't have permission to add calendar events yet".
+- **Search follow-ups:** the control model rewrites a follow-up with the subject named from ACTIVE/RECENT (prompt rule + one example); `web_search` refuses a query that is only a pronoun ("where is it", "what is happening there": `query_policy.has_unresolved_reference`) and asks what is meant. Spoken search answers split sentences after initials ("N. R. Murthy") and titles ("Dr.") correctly.
+
+## Write guards (the model's output is checked against the user's own words)
+A live probe of 27 edge utterances (`tests/eval/orchestrator_edge.yaml`, 14/27 at the decision level) showed the 4B model answers requests it has
+no tool for with a write tool, sometimes copying a prompt example. The prompt is at its size cap, so the tools check instead, in code
+(`tests/test_guards.py`):
+* `calendar_create` refuses "cancel / move / delete / reschedule ..." with no adding verb ("I can't move, cancel or delete calendar events yet"),
+  needs a clock time in the user's words (else asks "What time should I set it for?"), and needs a title made of words the user said (else
+  asks what to call it). It also reads "5 PM", "5pm", "17:00:00" and "12 am" in the model's `time`.
+* `gmail_draft` asks "What should the email say?" when the request is only "email Priya" (the model would invent a body).
+* `current_time` says "It's 2:30 PM here. I can't check the time anywhere else." for "what time is it in Tokyo".
+* `tasks` refuses only titles that name the calendar or start with "block"/"event"; "schedule dentist appointment" is a real to-do.
+* `web_search` asks "What do you mean?" for a query that is only a pronoun.
+* A reminder being spoken is never planned a second time by a calendar re-read; finishing or deleting a task makes the reminders re-read at once.
+There is deliberately NO greeting guard: "Hey veda!" goes to the model, which can re-run the previous tool when all its arguments are inherited
+from ACTIVE (seen once with a mail search). Known, accepted: "cancel my 5 pm meeting" may still be answered by reading the calendar;
+"remind me at 6 pm to call mom" becomes a calendar event (which does remind), not a task with a due time.
 
 ## The remember tool
 `config/tools/remember.yaml` keeps lasting facts about the user: preferences, allergies, names, routines. Actions: `save` (topic + value), `forget` (topic), `list`.

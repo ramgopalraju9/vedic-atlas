@@ -63,8 +63,9 @@
 
 # ---- live data with no tool ----------------------------------------------------------------------
 - {say: "what's the latest cricket score", category: explicit, expect: {calls: [{tool: web_search, args: {query: cricket}}]}}
-- {say: "do i have a meeting this afternoon", category: no-tool, expect: {calls: [], needs_live_data: true}}
-- {say: "read my messages", category: no-tool, expect: {calls: [], needs_live_data: true}}
+# was no-tool until the calendar and mail tools existed (2026-10-08); the expectation follows the tool set, the phrasing is unchanged
+- {say: "do i have a meeting this afternoon", category: google, expect: {calls: [{tool: calendar_agenda}]}}
+- {say: "what mail came in this morning", category: google, expect: {calls: [{tool: gmail_search}]}}
 
 # ---- no active state -----------------------------------------------------------------------------
 - {say: "and what about the weekend", category: no-state, expect: {calls: [], clarification: true}}
@@ -102,3 +103,10 @@
   history: [{user: "delete a task", veda: "Which task do you mean?"}]
   state: {tool: tasks, slots: {}, pending: {tool: tasks, partial_args: {action: delete}, awaiting: title, candidates: [water plants, book tickets, pay rent]}}
   expect: {calls: [{tool: tasks, args: {action: delete, title: water}}]}
+# ---- calendar writes, the clock and sent mail (added with calendar_create / current_time / gmail_search folder) ----
+- {say: "add lunch with Priya to my calendar tomorrow at 1 pm", category: calendar-write, expect: {calls: [{tool: calendar_create, args: {title: lunch, date_offset: 1, time: "13:00"}}]}}
+- {say: "create a meeting called budget review on my calendar today at 4:30 pm", category: calendar-write, expect: {calls: [{tool: calendar_create, args: {title: budget, date_offset: 0, time: "16:30"}}]}}
+- {say: "do I have anything on my calendar tomorrow", category: calendar-write, expect: {calls: [{tool: calendar_agenda, args: {date_offset: 1}}]}}
+- {say: "tell me the time", category: clock, expect: {calls: [{tool: current_time, args: {}}]}}
+- {say: "which day is it today", category: clock, expect: {calls: [{tool: current_time, args: {what: date}}]}}
+- {say: "show me the emails I sent to Priya", category: google, expect: {calls: [{tool: gmail_search, args: {folder: sent}}]}}
