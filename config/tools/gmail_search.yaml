@@ -1,0 +1,35 @@
+name: gmail_search
+agent: google
+description: List recent emails (sender and subject), new, unread, from someone, or sent by the user. Never reads a body.
+reply_mode: template        # the sentence is built from the headers; nothing is paraphrased
+permission_level: auto
+returns: digest
+private: true               # the user's mail: kept out of traces and logs
+requires_online: true
+hosts: [gmail.googleapis.com, oauth2.googleapis.com]
+
+params:
+  query:
+    type: string
+    description: Gmail search words such as from:priya or subject:invoice; leave out for the inbox
+  unread_only:
+    type: boolean
+    description: true for new or unread mail
+  folder:
+    type: string
+    enum: [inbox, sent]
+    description: sent for mail the user sent or wrote to someone; leave out otherwise
+
+examples:
+  - user: check my inbox
+    calls: [{tool: gmail_search, args: {unread_only: true}}]
+    prompt_example: true
+  - user: did I get anything from Priya today
+    calls: [{tool: gmail_search, args: {query: from:priya newer_than:1d}}]
+  - user: any mail about my invoice
+    calls: [{tool: gmail_search, args: {query: subject:invoice}}]
+  - user: what mail did I send to Priya
+    calls: [{tool: gmail_search, args: {folder: sent, query: to:priya}}]
+
+claims:
+  - '\b(you (have|got) (\d+|no|two|three|four|five) (new |unread )?emails?|your (inbox|unread emails?))\b'

@@ -1,0 +1,26 @@
+name: gmail_read
+agent: google
+description: Read and summarise the newest email matching a search, e.g. the last email from someone.
+reply_mode: llm             # the body is summarised by the content decode; it never enters a control prompt
+permission_level: auto
+returns: document
+max_result_tokens: 300
+private: true
+requires_online: true
+hosts: [gmail.googleapis.com, oauth2.googleapis.com]
+
+params:
+  query:
+    type: string
+    description: Gmail search words such as from:priya; leave out for the newest email
+
+examples:
+  - user: summarise my last email from Priya
+    calls: [{tool: gmail_read, args: {query: from:priya}}]
+  - user: read my latest email
+    calls: [{tool: gmail_read, args: {}}]
+  - user: what did the bank email say
+    calls: [{tool: gmail_read, args: {query: bank}}]
+
+claims:
+  - '\b(the email (says|said)|(they|he|she) (wrote|emailed|said in (the|that|their) email))\b'

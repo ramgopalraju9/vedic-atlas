@@ -1,0 +1,36 @@
+name: calendar_create
+agent: google
+description: Add an event to the user's calendar at a day and time. Invites nobody.
+reply_mode: template        # the confirmation is read back from the event the calendar stored
+permission_level: notify
+returns: value
+private: true
+requires_online: true
+hosts: [www.googleapis.com, oauth2.googleapis.com]
+
+params:
+  title:
+    type: string
+    required: true
+    description: a few words naming the event, e.g. Software review with Manoj
+  date_offset:
+    type: integer
+    description: days from today, 0 to 6 (0 today, 1 tomorrow); leave out for today
+  time:
+    type: string
+    description: start time as 24-hour HH:MM, e.g. 17:00 for 5 PM; leave out if the user did not say a time
+  duration_minutes:
+    type: integer
+    description: length in minutes; leave out for one hour
+
+examples:
+  - user: block my calendar tomorrow at 5 pm for the software review
+    calls: [{tool: calendar_create, args: {title: Software review, date_offset: 1, time: "17:00"}}]
+    prompt_example: true
+  - user: add a dentist appointment on my calendar today at 4:30 for 30 minutes
+    calls: [{tool: calendar_create, args: {title: Dentist appointment, date_offset: 0, time: "16:30", duration_minutes: 30}}]
+  - user: schedule a team sync tomorrow at 10
+    calls: [{tool: calendar_create, args: {title: Team sync, date_offset: 1, time: "10:00"}}]
+
+claims:
+  - '\b(added|put|scheduled|blocked)\b.{0,60}\b(your |the )?calend[ae]r\b'
