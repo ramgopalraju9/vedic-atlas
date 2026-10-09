@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 data/
 docs/
-src/vedic_atlas.egg-info/SOURCES.txt
+src/vedic_atlas.egg-info/
 src/vedic_atlas.egg-info/top_level.txt
 src/vedic_atlas.egg-info/requires.txt
 src/vedic_atlas.egg-info/PKG-INFO
