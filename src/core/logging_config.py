@@ -14,9 +14,25 @@ declared in VedaConfig.log_level but never read).
 """
 
 import logging
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 
 _request_id: ContextVar[str] = ContextVar("request_id", default="-")
+_voice_turn_id: ContextVar[str] = ContextVar("voice_turn_id", default="-")
+
+
+class _ReminderAccessLogFilter(logging.Filter):
+    """Suppress successful reminder-poll access logs while keeping request errors visible."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        request_line = message.partition('"')[2].partition('"')[0].split()
+        status = message.rpartition('" ')[2]
+        is_reminder_poll = (
+            len(request_line) >= 2
+            and request_line[0] == "GET"
+            and request_line[1].split("?", 1)[0] == "/api/reminders/recent"
+        )
+        return not (is_reminder_poll and status.startswith("200 "))
 
 
 def set_request_id(identifier: str) -> None:
@@ -24,11 +40,27 @@ def set_request_id(identifier: str) -> None:
     _request_id.set(identifier)
 
 
+def set_voice_turn_id(identifier: str) -> Token[str]:
+    """Bind a voice turn identifier to the current async task / thread context."""
+    return _voice_turn_id.set(identifier)
+
+
+def get_voice_turn_id() -> str:
+    """Return the voice turn identifier active in this execution context."""
+    return _voice_turn_id.get()
+
+
+def reset_voice_turn_id(token: Token[str]) -> None:
+    """Restore the voice turn identifier that was active before this scope."""
+    _voice_turn_id.reset(token)
+
+
 class _RequestIdFilter(logging.Filter):
     """Injects the current context's request id into every log record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.identifier = _request_id.get()
+        record.voice_turn_id = _voice_turn_id.get()
         return True
 
 
@@ -36,15 +68,22 @@ def configure_logging(level: str = "INFO") -> logging.Logger:
     """Build and return the app logger. Call once at process startup."""
     logger = logging.getLogger("veda")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    logger.addFilter(_RequestIdFilter())
+    if not any(isinstance(item, _RequestIdFilter) for item in logger.filters):
+        logger.addFilter(_RequestIdFilter())
 
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        "[%(asctime)s][%(levelname)-7s][%(identifier)s][%(funcName)s]"
-        "[%(module)s:%(filename)s].(%(lineno)d)] : %(message)s"
-    )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(isinstance(item, _ReminderAccessLogFilter) for item in access_logger.filters):
+        access_logger.addFilter(_ReminderAccessLogFilter())
+
+    if not any(getattr(handler, "_veda_configured", False) for handler in logger.handlers):
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "[%(asctime)s][%(levelname)-7s][%(identifier)s][voice_turn=%(voice_turn_id)s][%(funcName)s]"
+            "[%(module)s:%(filename)s].(%(lineno)d)] : %(message)s"
+        )
+        handler.setFormatter(formatter)
+        setattr(handler, "_veda_configured", True)
+        logger.addHandler(handler)
     return logger
 
 

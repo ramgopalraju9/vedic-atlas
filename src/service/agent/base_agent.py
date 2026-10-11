@@ -36,7 +36,7 @@ class BaseAgent(ABC):
         self.skills = skills or []
         self.system_prompt = system_prompt
         self.model = model
-        self.triggers = triggers or []  # regexes for deterministic routing (see routing_policy)
+        self.triggers = triggers or []
 
     @abstractmethod
     async def execute(self, ctx: AgentContext) -> AgentResult:

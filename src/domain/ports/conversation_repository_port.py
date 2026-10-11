@@ -39,8 +39,10 @@ class ConversationRepositoryPort(Protocol):
         """Insert a turn. Returns its row id."""
         ...
 
-    def recent_turns(self, limit: int = 30, only_unsummarized: bool = True) -> list[Turn]:
-        """Most recent turns GLOBALLY (no session filter), chronological order."""
+    def recent_turns(
+        self, limit: int = 30, only_unsummarized: bool = True, session_id: str | None = None,
+    ) -> list[Turn]:
+        """Most recent turns, chronological order. Global when `session_id` is None, otherwise that session only."""
         ...
 
     def add_summary(self, summary: ConversationSummary) -> int:
@@ -57,6 +59,26 @@ class ConversationRepositoryPort(Protocol):
 
     def sessions_with_unsummarized(self) -> list[tuple[str, int, datetime, datetime]]:
         """Every session with pending turns: (session_id, count, from_ts, to_ts)."""
+        ...
+
+    def summary_created_at(self, summary_id: int) -> datetime | None:
+        """When a summary is dated (the conversation's own day), or None if it does not exist."""
+        ...
+
+    def turn_created_at(self, turn_id: int) -> datetime | None:
+        """When a turn was said, or None if it no longer exists."""
+        ...
+
+    def exchanges(self) -> list[tuple[int, str, str, str, datetime]]:
+        """Every question-answer pair, oldest first: (answer turn id, session id, question, answer, answered at)."""
+        ...
+
+    def sessions_without_summary(self) -> list[tuple[str, int, datetime, datetime]]:
+        """Sessions that have turns but no summary row at all: (session_id, count, from_ts, to_ts)."""
+        ...
+
+    def turns_by_session(self, session_id: str) -> list[Turn]:
+        """Every turn of one session, summarised or not, oldest first."""
         ...
 
     def mark_summarized(self, turn_ids: list[int]) -> None:

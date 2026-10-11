@@ -47,10 +47,4 @@ async def health(request: Request) -> dict:
         "checks": checks,
         "governance_enabled": governance is not None,
     }
-    status = getattr(supervisor, "routing_status", None)
-    if callable(status):
-        routing = status()
-        body["routing"] = routing
-        if routing["router_paused_for_sec"] > 0:
-            body["status"] = "degraded"  # the router model is paused: messages are being routed by the keyword fallback
     return body

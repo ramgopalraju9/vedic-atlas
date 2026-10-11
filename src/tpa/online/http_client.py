@@ -46,6 +46,10 @@ class AllowListedHttpClient:
     async def post_json(self, url: str, *, category: str, json: dict, headers: dict | None = None) -> dict:
         return await self._request("POST", url, category=category, json=json, headers=headers)
 
+    async def post_form(self, url: str, *, category: str, data: dict, headers: dict | None = None) -> dict:
+        """application/x-www-form-urlencoded, as OAuth token endpoints require."""
+        return await self._request("POST", url, category=category, data=data, headers=headers)
+
     async def _request(self, method: str, url: str, *, category: str, **kwargs) -> dict:
         self._check(url, category)
         import httpx

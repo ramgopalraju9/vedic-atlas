@@ -1,4 +1,4 @@
-"""Phase 4: grounding policy, trace persistence, trace recording by ToolAgent, and the API route."""
+"""Phase 4: grounding policy, trace persistence, and the API route."""
 
 import asyncio
 import json
@@ -85,38 +85,6 @@ def test_purge_removes_only_old_traces():
     assert [t.user_message for t in repo.recent(10)] == ["new"]
 
 
-# ---- ToolAgent writes a trace per turn -----------------------------------------
-
-def test_tool_agent_records_a_trace_for_tool_and_no_tool_turns():
-    from tests.test_tool_turn import _calls, _env  # reuse the scripted-model harness
-
-    agent, client, service, convo, runner = _env([_calls(("tasks", {"action": "list"})), _calls()], chat_reply="Doing well!")
-    repo = _repo()
-    agent._traces = repo
-    service.add("bring vegies")
-
-    asyncio.run(agent.execute(AgentContext(user_message="what are my tasks?")))
-    asyncio.run(agent.execute(AgentContext(user_message="how are you?")))
-
-    newest, older = repo.recent(2)
-    assert (older.decided, older.calls[0]["tool"], older.calls[0]["ok"]) == ("tool", "tasks", True)
-    assert "bring vegies" in older.reply and older.total_ms >= 0 and "call" in older.prompt_tokens
-    assert (newest.decided, newest.calls, newest.reply) == ("no-tool", [], "Doing well!")
-
-
-def test_a_failing_trace_store_never_breaks_the_turn():
-    from tests.test_tool_turn import _calls, _env
-
-    class _Broken:
-        def record(self, trace):
-            raise RuntimeError("db locked")
-
-    agent, *_ = _env([_calls(("tasks", {"action": "list"}))])
-    agent._traces = _Broken()
-    res = asyncio.run(agent.execute(AgentContext(user_message="what are my tasks?")))
-    assert "empty" in res.response.lower()
-
-
 # ---- API route ------------------------------------------------------------------
 
 def test_trace_route_returns_recent_traces(tmp_path):
@@ -130,3 +98,18 @@ def test_trace_route_returns_recent_traces(tmp_path):
     body = TestClient(app).get("/api/trace?limit=5").json()
     assert body["traces"][0]["agent"] == "tasks" and body["traces"][0]["calls"][0]["tool"] == "tasks"
     json.dumps(body)  # fully serialisable
+
+
+def test_trace_orchestrator_fields_default_and_round_trip():
+    repo = _repo()
+    repo.record(_trace(msg="legacy"))
+    legacy = repo.recent(1)[0]
+    assert (legacy.state_used, legacy.slots_inherited, legacy.needs_live_data, legacy.clarified, legacy.prefix_cache_hit) == (
+        False, [], None, False, None)
+
+    t = _trace(msg="umbrella")
+    t.state_used, t.slots_inherited, t.needs_live_data, t.clarified, t.prefix_cache_hit = True, ["place"], True, False, True
+    repo.record(t)
+    got = repo.recent(1)[0]
+    assert got.state_used is True and got.slots_inherited == ["place"]
+    assert got.needs_live_data is True and got.prefix_cache_hit is True

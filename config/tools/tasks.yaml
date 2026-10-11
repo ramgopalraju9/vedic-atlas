@@ -1,9 +1,12 @@
 # The user's to-do list. Everything the harness needs to know about this tool lives here.
 name: tasks
 agent: tasks
-description: The user's to-do list - add, list, complete or delete tasks.
+description: The user's to-do list - add, list, complete or delete tasks. Not a calendar or email.
 reply_mode: template        # reply is built from the tool's own result; no second model call
 permission_level: notify
+returns: value
+destructive_when: {action: [delete]}   # never inherited from session state
+target_params: [title]                 # a delete must name its target in the user's own words, or the turn asks instead
 
 params:
   action:
@@ -13,8 +16,6 @@ params:
   title:
     type: string
     description: task text for add; a few words naming the task for complete/delete
-  task_id:
-    type: integer
   due_at:
     type: string
     description: ISO datetime
@@ -26,6 +27,7 @@ examples:
     calls: [{tool: tasks, args: {action: add, title: bring vegies}}]
   - user: yeah I bought the milk packets
     calls: [{tool: tasks, args: {action: complete, title: milk packets}}]
+    prompt_example: true
   - user: what are my tasks?
     calls: [{tool: tasks, args: {action: list}}]
   - user: what did I finish?

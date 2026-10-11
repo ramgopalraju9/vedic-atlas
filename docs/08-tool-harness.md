@@ -1,93 +1,123 @@
-# 08 — Tool harness (tasks, weather, currency, web search, remember)
+# 08 — Tool harness (tasks, weather, forecast, currency, web search, remember, device control)
 
 How Veda calls tools reliably on a small quantized local model (Qwen3-4B Q4, CPU, n_ctx 4096).
 
 ## Principles
-1. **The model does the minimum**: pick a tool, fill 1-3 flat arguments. Code does the rest.
-2. **Each prompt carries only what its stage needs** (measured: persona 563 tok vs persona_lite 65 tok; call stage ~340-560 tok).
+1. **One decision per turn, made by the model with the whole conversation in view.** No regex reads the user's message to pick, force or skip a tool; a regex may only constrain or veto the model's *output*.
+2. **The model does the minimum**: pick tools, fill 1-3 flat arguments. Code does the rest (dates, ranges, place defaults, spoken sentences).
 3. **Output is constrained**: llama.cpp grammar from a JSON schema — no malformed JSON, no unknown tool/argument.
-4. **Facts come only from tool results**; replies for weather/currency/tasks (and search) are built from the tool's own data.
-5. **One source of truth per tool**: `config/tools/<name>.yaml`.
+4. **Facts come only from tool results**; replies for template tools are the tool's own sentence and never pass through the model.
+5. **Fail closed**: unparseable decision -> "didn't catch that"; live data wanted but no tool -> fixed refusal; an unnamed destructive target -> ask.
+6. **One source of truth per tool**: `config/tools/<name>.yaml`.
 
 ## Turn flow
 ```
-user text -> Supervisor: manifest `triggers` / keyword rules (instant) -> agent;
-              nothing matched -> LLM router (one constrained call, ~2 s warm) -> agent; failure -> chat
-  -> ToolAgent (tasks | lookup)
-     A. DECIDE   constrained JSON {"calls":[...]}  (persona_lite + this agent's tools + last 2 turns)
-        FORCE    `required_when` matched but no call -> retry once with minItems=1
-     B. EXECUTE  SkillRunner (permissions / rate limit / validators / audit hooks) — every call logged
-     C. REPLY    spoken text from the tool itself (`final`/template) — or a short narrate call, then a
-                 grounding check (numbers must appear in the tool result), else the deterministic text
-  -> no tool needed -> plain chat (responder); a chat reply that claims an action is refused
-  -> TurnTrace written (calls, results, timings, prompt tokens)
+user text -> Supervisor (bookkeeping) -> AssistantOrchestrator
+  1. session id resolved once; session state -> `ACTIVE: get_weather | place=Tokyo | 3 min ago`
+  2. ONE control decode: persona_lite + every tool + rules (static, cached) / ACTIVE + RECENT + TODAY + USER
+        -> {"needs_live_data": bool, "calls": [<=3]} + optional "clarification": "..." (only when asking)
+  3. dispatch_policy:  TOOLS | CLARIFY | CHAT | REFUSE | FAIL_CLOSED
+  4. TOOLS   each call through SkillRunner (permissions / rate limit / validators / audit hooks), logged `[tool-call]`
+             reply: template tools -> their own `spoken` sentence, joined in call order (0 more decodes);
+                    results needing phrasing -> ONE content decode (`narrate`) + grounding check, else the plain text
+     CHAT    ResponderAgent (persona, saved facts, summaries, history of this session); a reply that claims an action is refused
+     others  a fixed sentence
+  5. turn persisted, session state written (successful, non-destructive calls only), TurnTrace recorded
 ```
+Decodes per turn: tool turn with template reply 1; with narration 2; chat 2; clarification/refusal 1.
 
 ## Where things live
 | Piece | Location |
 |---|---|
-| Tool manifests (name, params, examples, triggers, required_when, claims, reply_mode, cache TTL, hosts) | `config/tools/*.yaml` -> `schemas/tool_manifest_schema.py` -> `domain/entities/tool_manifest.py` |
-| Prompts | `config/prompts/{persona_lite,call_stage,narrate}.md` via `tpa/filestore/file_prompt_store.py` |
-| Prompt assembly + token budgets | `service/prompting/prompt_composer.py`, `domain/policies/token_budget_policy.py` |
-| JSON schema for constrained decoding | `domain/policies/tool_call_schema.py` (+ `json_schema` on `InferencePort.complete`) |
-| Routing | `domain/policies/routing_policy.py` (`AgentProfile.triggers`) |
-| Staged turn | `service/agent/tool_turn_runner.py`, `service/agent/tool_agent.py`, `service/agent/tool_use_guard.py` |
+| Tool manifests (name, params, examples, `prompt_example`, reply_mode, `returns`, `max_result_tokens`, `destructive`/`destructive_when`/`target_params`, claims, cache TTL, hosts) | `config/tools/*.yaml` -> `schemas/tool_manifest_schema.py` -> `domain/entities/tool_manifest.py` |
+| Prompts | `config/prompts/{persona_lite,control_stage,narrate,content_*}.md` via `tpa/filestore/file_prompt_store.py` |
+| Prompt assembly + token budgets | `service/prompting/prompt_composer.py`, `domain/policies/token_budget_policy.py`, `config/prompting.yaml` |
+| Control-decision schema | `domain/policies/tool_call_schema.py` (`build_control_schema`) |
+| Decision, dispatch, replies | `service/agent/{control_decoder,assistant_orchestrator,tool_execution,tool_use_guard}.py`, `domain/policies/{dispatch,reply,destructive,session_state,claim_guard}_policy.py` |
+| Session state | `service/session/session_state.py`, `session_contexts` table (`tpa/persistence/repositories/session_context_repository.py`), TTL `agents.session_ttl_sec` |
 | Grounding | `domain/policies/grounding_policy.py` |
-| Skills | `service/skills/manifest_skill.py` + `builtin/{tasks,weather,currency,web_search,remember}.py` |
+| Skills | `service/skills/manifest_skill.py` + `builtin/{tasks,weather,currency,web_search,remember,system_control}.py` |
 | Online lookups | `service/lookup/{lookup_service,place_resolver,weather_lookup,currency_lookup,search_lookup,ttl_cache}.py` |
-| Providers | `tpa/online/providers/{weather,geocode,fx,tavily}.py` via `tpa/online/http_client.py` (allow-list, no redirects, `[http]` log) |
+| Providers | `tpa/online/providers/{weather,forecast,geocode,fx,tavily}.py` via `tpa/online/http_client.py` (allow-list, no redirects, `[http]` log) |
 | Traces | `domain/entities/turn_trace.py`, `tpa/persistence/repositories/trace_repository.py`, `GET /api/trace`, `veda trace` |
 | Health | `service/lookup/health_service.py`, `GET /api/lookup/health`, `veda doctor` |
 
-## The remember tool
-`config/tools/remember.yaml` (owner agent `memory`) keeps lasting facts about the user: preferences, allergies, names,
-routines. Actions: `save` (topic + value), `forget` (topic), `list`.
+## Tools today
+`get_weather`, `get_weather_forecast(place, date_offset 0..6)` (code validates the range and builds the sentence naming the
+place and the day), `convert_currency`, `web_search` (`returns: document`, narrated), `tasks`, `remember`, and the device
+tools `app_control` (open/close/focus), `volume_control` (get/set/mute/unmute), `device_status` (battery/processes),
+and `current_time` (time or date, built from the device clock: before it existed "what is the time" was answered with CPU usage).
+`terminal` and `file_ops` are skills but are deliberately **not** model-callable.
 
-- **Stored as** one line per fact, `favourite sweet: gulab jamun`, in `data/knowledge.json` (the existing
-  `KnowledgeBase`; `domain/policies/fact_policy.py` defines the shape). The topic is the key: "my fav sweet",
-  "my favorite sweet" and "favourite sweet" are the same topic, so a new value *replaces* the old one and the reply says
-  what it replaced.
-- **Always in the chat prompt.** `ResponderAgent.build_prompt` includes every saved fact on every turn, then adds
-  semantically recalled conversation summaries when relevant (recall now searches summaries only, `config/embedding.yaml`).
-  So a question ("what's my favourite sweet?") is answered from the prompt and needs no tool call.
-- **Routing.** Statements ("my favourite sweet is X", "remember that I'm allergic to Z", "forget my favourite sweet",
-  "what do you remember about me?") match the manifest triggers; looser phrasings ("I only eat vegetarian food") go
-  through the LLM router. `required_when` forces a real call for the explicit forms, and `claims` stops a reply such as
-  "I'll remember that" when nothing was saved. Replies are templates built from what was written.
-- **Limits.** Max 40 facts (`MAX_FACTS`), topic <= 60 and value <= 200 characters. Passwords, PINs, card and account
-  numbers are refused. Nothing is saved unless the user said it: no automatic extraction from conversation.
-- **Known limit.** The LLM router sometimes sends a *question* about a saved fact ("what is my favourite food?") to
-  `memory`; the tool then lists all saved facts, which is grounded but not a direct answer. Measured on the golden set:
-  31/32 LLM-routed cases correct, 0 chat messages sent to a tool.
+### Gmail and Calendar (`gmail_search`, `gmail_read`, `gmail_draft`, `gmail_send`, `calendar_agenda`, `calendar_create`)
+Ports `MailPort` / `CalendarPort`; adapters `tpa/online/google/{google_auth,gmail_client,gmail_parser,calendar_client}.py`; skills
+`service/skills/builtin/{gmail,calendar_agenda,calendar_create}.py`; pure rules `domain/policies/{mail,calendar}_policy.py`.
+- **Linking, `veda login`:** Veda checks the sign-in when it starts (`GET /api/google/status`; the server also logs one line) and the REPL offers to fix it on the spot
+  ("Sign in to Google now? [Y/n]"): not signed in, expired/revoked, or missing a permission (e.g. an old read-only calendar token). `veda login` does the same any time
+  (`--check` verifies, `--manual` for a headless Raspberry Pi, `--browser` to force the local browser); the running server reloads the new token with no restart
+  (`POST /api/google/reload`). Headless/manual flow: open the printed address on any device, allow access, copy the whole address of the page that then fails to load
+  (127.0.0.1) and paste it back; Google's "enter a code" device flow cannot be used because it does not allow Gmail/Calendar scopes. Skip the prompt with `VEDA_SKIP_GOOGLE_PROMPT=1`.
+  Manual details: `GOOGLE_API_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` in `.env`, then `python scripts/google_auth.py` once (browser consent, PKCE, loopback) writes
+  `GOOGLE_REFRESH_TOKEN` to `.env`; `--check` verifies it. Scopes: gmail.readonly, gmail.compose, calendar.events — Veda reads and adds events (no attendees, so nobody is invited) and never deletes mail or events. After upgrading from calendar.readonly, run `python scripts/google_auth.py` again to grant the new permission.
+  Until linked the tools answer "I can't check your email yet because it isn't set up". A consent screen left in *Testing* expires the token after 7 days.
+- **Two planes:** `gmail_search` speaks sender + subject only (template); `folder: sent` makes the CODE search `in:sent` and speak the recipient ("To Manoj Routhu: ..."), so a wrong model-written query cannot look in the inbox for mail the user sent. `gmail_read` is `returns: document`: one body (<=2000 chars, quotes stripped), summarised by the
+  content decode, never in a control prompt; its spoken fallback never carries the body.
+- **Sending is two turns by construction:** `gmail_draft` resolves a name to an address from the user's own mail (only when exactly ONE address matches, else it asks),
+  saves a Gmail draft and reads it back; `gmail_send` takes **no arguments** and can send only that draft (`service/mail/draft_outbox.py`: in memory, 10 min, this session,
+  consumed on the attempt so a repeat or a retry cannot send twice). It is `destructive: true` (no state inheritance, never in a multi-call). There is no code path that
+  sends text composed in the same turn. `permission_level` is `notify`, not `approve`: `PermissionManager`'s approval wait has no resolver wired (nothing calls its
+  `approve()`), so an `approve` tool would always time out; the user's separate "send it" after hearing the draft is the confirmation.
+- **Privacy:** manifests set `private: true`: results are kept out of the trace, the `[tool-call]` log, the audit log and the API's `skill_calls`. Mail/calendar text is
+  untrusted input; `clean_text` flattens it before it is spoken (and therefore saved into history).
+- **Calendar:** primary calendar. `calendar_agenda` reads: the model picks `date_offset` 0..6 and `days` 1..7, code does the dates. `calendar_create(title, date_offset 0..6, time "HH:MM", duration_minutes?)` adds one event in one turn: it sets NO attendees (nobody is invited), refuses a time already past, does not add an identical event twice, and reads the confirmation back from the event Google stored. Tasks and the calendar are separate: the `tasks` tool refuses a title that names the calendar or starts with "block"/"event" (`calendar_policy.looks_like_calendar_entry`) and says so, instead of filing "block calendar for Manoj" as a to-do. A sign-in without `calendar.events` answers "I don't have permission to add calendar events yet".
+- **Search follow-ups:** the control model rewrites a follow-up with the subject named from ACTIVE/RECENT (prompt rule + one example); `web_search` refuses a query that is only a pronoun ("where is it", "what is happening there": `query_policy.has_unresolved_reference`) and asks what is meant. Spoken search answers split sentences after initials ("N. R. Murthy") and titles ("Dr.") correctly.
+
+## Write guards (the model's output is checked against the user's own words)
+A live probe of 27 edge utterances (`tests/eval/orchestrator_edge.yaml`, 14/27 at the decision level) showed the 4B model answers requests it has
+no tool for with a write tool, sometimes copying a prompt example. The prompt is at its size cap, so the tools check instead, in code
+(`tests/test_guards.py`):
+* `calendar_create` refuses "cancel / move / delete / reschedule ..." with no adding verb ("I can't move, cancel or delete calendar events yet"),
+  needs a clock time in the user's words (else asks "What time should I set it for?"), and needs a title made of words the user said (else
+  asks what to call it). It also reads "5 PM", "5pm", "17:00:00" and "12 am" in the model's `time`.
+* `gmail_draft` asks "What should the email say?" when the request is only "email Priya" (the model would invent a body).
+* `current_time` says "It's 2:30 PM here. I can't check the time anywhere else." for "what time is it in Tokyo".
+* `tasks` refuses only titles that name the calendar or start with "block"/"event"; "schedule dentist appointment" is a real to-do.
+* `web_search` asks "What do you mean?" for a query that is only a pronoun.
+* A reminder being spoken is never planned a second time by a calendar re-read; finishing or deleting a task makes the reminders re-read at once.
+There is deliberately NO greeting guard: "Hey veda!" goes to the model, which can re-run the previous tool when all its arguments are inherited
+from ACTIVE (seen once with a mail search). Known, accepted: "cancel my 5 pm meeting" may still be answered by reading the calendar;
+"remind me at 6 pm to call mom" becomes a calendar event (which does remind), not a task with a due time.
+
+## The remember tool
+`config/tools/remember.yaml` keeps lasting facts about the user: preferences, allergies, names, routines. Actions: `save` (topic + value), `forget` (topic), `list`.
+
+- **Stored as** one line per fact, `favourite sweet: gulab jamun`, in `data/knowledge.json` (the `KnowledgeBase`; `domain/policies/fact_policy.py` defines the shape). The topic is the key, so a new value *replaces* the old one and the reply says what it replaced.
+- **Always in the chat prompt.** `ResponderAgent.build_prompt` includes every saved fact on every turn, so "what's my favourite sweet?" is answered from the prompt and needs no tool (a `list` call is harmless but unnecessary).
+- `forget` is destructive: the topic must be named in the user's own words, or the turn asks which one. `claims` stops a reply such as "I'll remember that" when nothing was saved.
+- **Limits.** Max 40 facts (`MAX_FACTS`), topic <= 60 and value <= 200 characters. Passwords, PINs, card and account numbers are refused. Nothing is saved unless the user said it.
 
 ## Adding a tool
-1. Write `config/tools/<name>.yaml` (description <= 25 words, <= 6 examples, triggers, required_when).
+1. Write `config/tools/<name>.yaml` (description <= 25 words, <= 6 examples, at most one `prompt_example: true`; set `destructive_when` + `target_params` for anything irreversible).
 2. Write a `ManifestSkill` subclass (`run()` only), register it in `server.py`.
-3. Add golden-set rows in `tests/eval/golden_set.yaml`; run `python scripts/eval_tools.py --model`.
+3. Add cases to `tests/eval/orchestrator_golden.yaml`; never tune against `orchestrator_heldout.yaml`. Measure with `python scripts/spike_decision_protocol.py --variants A5`.
+4. The static control prompt grows with every tool (~100 tokens each with its example): check `PromptBudgets.control` still leaves >= 400 tokens (a test enforces it).
 
 ## Online tools
-- Weather: Open-Meteo (place -> coordinates via its geocoder; unknown place -> web-search coordinates, validated; provider down -> labelled-approximate web-search answer).
+- Weather / forecast: Open-Meteo (place -> coordinates via its geocoder; unknown place -> web-search coordinates, validated; current-weather provider down -> labelled-approximate web-search answer).
 - Currency: Frankfurter (ECB, ~30 currencies) with open.er-api.com fallback (166 currencies; attribution: https://www.exchangerate-api.com).
 - Search: Tavily. Key in `.env` as `TAVILY_API_KEY` (git-ignored). News questions speak the top dated headlines; general questions speak the provider's answer.
 - `privacy.online.enabled: false` removes all online tools.
 
 ## Operating it
 - `veda doctor` — live probe of every provider (geocoding, weather, currency, web_search incl. key presence).
-- `veda trace [n]` / `/trace` — what each tool turn really did.
-- `python scripts/eval_tools.py [--model]` — golden-set accuracy (routing is also a CI test).
+- `veda trace [n]` / `/trace` — what each turn really did (decided, calls, `needs_live_data`, `clarified`, `state_used`, timings, prompt tokens).
+- `python scripts/spike_decision_protocol.py --variants A5 [--golden tests/eval/orchestrator_heldout.yaml]` — decision accuracy through the real pipeline; `--rejudge <saved.json> [--phase4]` re-scores saved model output offline.
 - `python scripts/measure_prompt_budget.py [--speed]` — exact token counts per prompt file.
-- Log tags: `[tool-turn] [tool-call] [tool-guard] [lookup] [http] [place] [fx] [health]`.
+- Log tags: `[control] [tool-call] [tool-guard] [lookup] [http] [place] [fx] [health] [session-state]`.
 
-## Known limits
-- Weather is current conditions only (no forecast/rain probability yet).
-- Follow-up fragments ("and in Mumbai?") route via the LLM router, which sees the recent turns for messages of <= 6 words; this is not covered by the eval.
-- "I need to ..." creates a task by design, so "I need to open chrome" is routed to tasks.
-- CPU latency: ~3-15 s per tool turn (decide stage dominates); first request after boot is slower (cold prefix cache).
-- **Slow devices (Raspberry Pi).** The LLM router costs ~1-3 s on a laptop but can exceed its 30 s timeout on a Pi
-  (about 380 prompt tokens to read, cold). Two safeguards: a timeout makes the router pause itself for 10 minutes
-  (rules only, logged as `[route] llm routing took longer than 30s - too slow on this device`), and
-  `LlamaCppClient` holds a thread lock around every decode, because a timed-out call's thread keeps running and a
-  second decode on the same llama.cpp context crashes the server (the CLI then shows "peer closed connection ...
-  incomplete chunked read"). The reply that follows a timed-out call therefore waits for it to finish. On a Pi where
-  the router is never fast enough, set `agents.llm_routing: false` in `config/agents.yaml` (**this is the default in
-  `config/agents.yaml` for v1**; set it to `true` on a fast machine to route unusual phrasings with the model).
+## Known limits (measured; see docs/10-orchestrator-review-and-plan.md §6c-§6g)
+- **Decision accuracy on a 4B Q4 model**: 84% on the tuned golden set, ~62% on the held-out set. Typical misses: general knowledge sent to `web_search`, a private-data question ("my meetings") mapped onto `tasks`, a follow-up with no context guessing a topic, and a two-intent message dropping the second call.
+- **Latency is decode-bound** (~0.35 s per output token on the dev laptop): ~8 s for a chat turn's decision, ~13 s for a tool call. A Raspberry Pi is slower; the small profile (`n_ctx: 2048`) cannot hold the ~2,300-token control prompt.
+- "I need to ..." creates a task by design, so "I need to open chrome" may be read as a task.
+- `LlamaCppClient` holds a thread lock around every decode: a timed-out call's thread keeps running, and a second decode on the same llama.cpp context would crash the server. The reply after a timed-out call waits for it to finish.
+- `SkillRunner` permissions are per skill, not per argument, so `app_control close` cannot require a higher level than `open`.

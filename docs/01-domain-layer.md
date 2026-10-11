@@ -81,7 +81,11 @@ No classes, no I/O, no implicit clock access (every function that needs
 | `proactivity_policy.py` | `rate_limit_multiplier(level) -> int` | `2` for `CHATTY`, `1` otherwise |
 | `redaction_policy.py` | `find_pii(content) -> str\|None`; `find_credential(content) -> str\|None` | Regex match for SSN/credit-card/PAN/Aadhaar, and API-key/password/secret/AWS/OpenAI/GitHub-PAT patterns |
 | `retention_policy.py` | `is_expired_agent_memory(created_at, now) -> bool`; `is_expired_user_fact(...) -> bool` (always `False`) | `AGENT_MEMORY_RETENTION_DAYS = 10` rolling expiry; user facts never auto-expire; `COMPLETED_TASK_RETENTION_DAYS = 7` and `TURN_TRACE_RETENTION_DAYS = 14` (windows enforced by the hourly housekeeping job) |
-| `routing_policy.py` | `pick_agent(message, candidates, default) -> str` (never `None`) | Keyword-overlap between message and each `AgentProfile.description`, highest score wins, falls back to `default`. **First** checks each agent's `triggers` (regexes from tool manifests) — the agent with most matches wins — before the keyword overlap |
+| `dispatch_policy.py` | `resolve(decision, manifests, user_message=) -> Resolution(route, calls, text)` | The ONE control decision -> `TOOLS` / `CLARIFY` / `CHAT` / `REFUSE` / `FAIL_CLOSED`; fails closed; a destructive call never joins a multi-call and must have its target named by the user |
+| `destructive_policy.py` | `is_destructive(manifest, args)`, `target_is_explicit(manifest, args, user_message)` | Whole-tool `destructive` or per-argument `destructive_when`; a pronoun/ordinal/filler word never counts as naming a target (fail-closed veto on the model's output, never a router) |
+| `reply_policy.py` | `classify_call`, `spoken_text`, `failure_text` | Template sentences verbatim and never sent to a model; only results that need phrasing share one content decode |
+| `session_state_policy.py` | `state_after_call`, `active_line` | What the next turn may inherit (`ACTIVE: tool \| slot=value \| age`); never from a destructive call |
+| `claim_guard_policy.py` | `SentenceClaimGuard` | Streaming-safe veto of a reply that claims an action no tool performed |
 | `session_boundary_policy.py` | `is_same_session(last_activity_at, now, session_gap_min=30) -> bool` | `DEFAULT_SESSION_GAP_MIN = 30` — true if gap ≤ threshold |
 | `currency_policy.py` | `normalize_currency(token) -> str\|None`; `parse_amount(value) -> float\|None` | Spoken names/symbols ("rupees", "$") → ISO codes; positive finite amounts only |
 | `coordinate_policy.py` | `parse_lat_lon(text) -> tuple\|None` | Extracts lat/lon from (untrusted) web text; accepts only clean, in-range pairs |
@@ -105,7 +109,7 @@ registration time and again at every `LookupService.fetch()` call.
 | `capture_event.py` | `CaptureEvent`: `muted`, `previous_muted`, `source`, `changed_at` |
 
 `AmbientEvent` is the payload type for the whole ambient/narration system —
-see `EventBus` and `SupervisorAgent.dispatch_ambient` in
+see `EventBus` and `AmbientDispatcher.dispatch_ambient` in
 [03-service-layer.md](03-service-layer.md).
 
 ## `domain/ports/` — the contract layer

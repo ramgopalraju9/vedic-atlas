@@ -11,6 +11,7 @@ per REQ-M-06 (audio stays behind one well-defined boundary).
 from __future__ import annotations
 
 import queue
+import threading
 from datetime import datetime
 
 from domain.value_objects.audio_window import AudioWindow
@@ -30,6 +31,9 @@ class SoundDeviceCapture:
         self._queue: "queue.Queue[bytes]" = queue.Queue(maxsize=256)
         self._stream = None
         self._resampler = None   # set only when the mic cannot be opened at 16 kHz
+        self._queue_dropped_frames = 0
+        self._stats_lock = threading.Lock()
+        self._input_overflow_count = 0
 
     @property
     def sample_rate(self) -> int:
@@ -43,7 +47,12 @@ class SoundDeviceCapture:
         if status:
             from core.logging_config import logger
 
-            logger.warning(f"[mic] {status}")
+            if getattr(status, "input_overflow", False):
+                self._input_overflow_count += 1
+            logger.warning(
+                f"[mic] input callback status={status} "
+                f"input_overflow_count={self._input_overflow_count}"
+            )
         data = bytes(indata)
         if self._resampler is not None:
             data = self._resampler.process(data)
@@ -52,23 +61,37 @@ class SoundDeviceCapture:
         except queue.Full:
             try:
                 self._queue.get_nowait()
+                with self._stats_lock:
+                    self._queue_dropped_frames += 1
             except queue.Empty:
                 pass
             self._queue.put_nowait(data)
 
     def start(self) -> None:
         import sounddevice as sd
+        from core.logging_config import logger
 
         self._resampler = None
         try:
             self._stream = sd.RawInputStream(
                 samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE,
                 blocksize=self.frame_length, device=self.device_index, callback=self._callback,
+                latency="high",
             )
         except Exception as refused:
             # Many USB microphones only accept 44.1 / 48 kHz when opened directly ("Invalid sample rate").
             self._stream = self._open_at_native_rate(sd, refused)
         self._stream.start()
+        try:
+            device = sd.query_devices(self.device_index, "input")
+            device_name = device["name"]
+        except Exception:
+            device_name = self.device_index if self.device_index is not None else "system-default"
+        logger.info(
+            "[mic] capture stream opened "
+            f"device={device_name!r} sample_rate={SAMPLE_RATE}Hz "
+            f"frame_samples={self.frame_length}"
+        )
 
     def _open_at_native_rate(self, sd, refused: Exception):
         """Open the mic at a rate it accepts and convert every block to 16 kHz; re-raise `refused` if none works."""
@@ -102,6 +125,9 @@ class SoundDeviceCapture:
             try:
                 self._stream.stop()
                 self._stream.close()
+                from core.logging_config import logger
+
+                logger.info("[mic] capture stream closed")
             except Exception:
                 pass
             self._stream = None
@@ -114,9 +140,14 @@ class SoundDeviceCapture:
         duration_sec = self.frame_length / SAMPLE_RATE
         return AudioWindow(pcm=pcm, sample_rate=SAMPLE_RATE, channels=CHANNELS, started_at=datetime.now(), duration_sec=duration_sec)
 
-    def drain(self) -> None:
+    def drain(self) -> int:
+        """Discard queued frames and return how many were dropped."""
+        with self._stats_lock:
+            drained = self._queue_dropped_frames
+            self._queue_dropped_frames = 0
         while True:
             try:
                 self._queue.get_nowait()
+                drained += 1
             except queue.Empty:
-                return
+                return drained

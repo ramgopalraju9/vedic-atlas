@@ -3,6 +3,8 @@ agent: lookup
 description: Search the web for current facts, news, scores and prices.
 reply_mode: llm             # results are snippets, so a short narrate step phrases them
 permission_level: auto
+returns: document          # snippets go to the narrate step only, never into a control prompt
+max_result_tokens: 320
 requires_online: true
 cache_ttl_sec: 900
 hosts: [api.tavily.com]
@@ -28,6 +30,7 @@ examples:
     calls: [{tool: web_search, args: {query: silver rate today in India per kg, topic: general}}]
   - user: who is the prime minister of Japan
     calls: [{tool: web_search, args: {query: current prime minister of Japan, topic: general}}]
+    prompt_example: true
   - user: upcoming Telugu movies releasing in November 2026
     calls: [{tool: web_search, args: {query: upcoming Telugu movies releasing November 2026, topic: general}}]
 

@@ -1,62 +1,40 @@
 wake_word_enabled: true
-# Wake trigger: openwakeword (spoken "Hey Veda", local ONNX model, no key) | none (transcribe
-# everything while unmuted) | hotkey | porcupine. With a wake engine configured, Veda is PASSIVE
-# until it hears the wake word, then listens for wake_window_sec (each handled turn extends it).
-# If the wake model cannot be loaded the voice loop does NOT start (it never falls back to
-# listening continuously).
-wake_engine: openwakeword           # require "Hey Veda" (trained model: data/models/openwakeword/hey_veda.onnx + .onnx.data). Set to none to transcribe everything while unmuted.
+wake_engine: openwakeword
 wake_oww_model: hey_veda
 wake_oww_model_path: data/models/openwakeword/hey_veda.onnx
-# Detection score needed to trigger (0-1). Higher = fewer false triggers, more misses.
-# Measure with your own voice: python scripts/wake_test.py
-wake_threshold: 0.5
-wake_window_sec: 8.0
+wake_threshold: 0.4
+wake_window_sec: 10.0        # time to start one command; say "Hey Veda" again for the next
 daemon_trigger: auto
 hotkey: <f8>
 
-# Local faster-whisper model directory. Staged manually - this build never
-# auto-downloads models (REQ-M-02).
 stt_model: base.en
 stt_model_path: data/models/whisper-base.en
+noise_suppression_enabled: true
+noise_suppression_strength: 0.75  # 0 = off, 1 = strongest; targets steady fan/hum noise
 
-# auto = Windows speech (pyttsx3) on Windows, Piper on Linux/Pi. Piper needs a voice: put a Piper
-# .onnx (and its .onnx.json) on the device and set tts_model_path. A missing voice or package stops
-# voice at startup with a clear error instead of leaving replies silent.
-tts_engine: auto          # auto | pyttsx3 (Windows SAPI) | piper (cross-platform)
+tts_engine: auto
 tts_voice: zira
 tts_model_path: null
 
-mic_device_index: null     # null = system default
+mic_device_index: 1         # set explicitly after running sounddevice.query_devices()
 speaker_device_index: null
 
-# Always-on listening. The capture gate still decides if the mic opens,
-# so this being true does not mean the device is listening.
 voice_enabled: true
 speak_replies: true
 min_transcript_chars: 2
 
-# Echo/feedback protection. Without these Veda hears its own reply and
-# answers itself in a loop.
-speak_timeout_sec: 60.0
-post_speak_settle_sec: 0.4
+speak_timeout_sec: 45.0     # slightly shorter timeout
+post_speak_settle_sec: 0.3  # reduce pause before re‑arming
 echo_guard: true
 
 vad:
-  # energy = numpy only, works everywhere (default).
-  # webrtc = more precise, but needs a C toolchain on Python 3.13+.
   engine: energy
-
-  frame_duration_ms: 30     # webrtc accepts 10 | 20 | 30 only
-
-  # energy engine tuning
-  min_rms: 300.0            # absolute floor; raise in a noisy room
-  speech_ratio: 3.0         # how far above ambient counts as speech
-  noise_adapt: 0.05         # how fast the noise floor tracks the room
-
-  # webrtc engine tuning
-  aggressiveness: 2         # 0-3, higher = stricter
-
+  frame_duration_ms: 20     # smaller blocks → less overflow
+  min_rms: 300.0
+  speech_ratio: 3.0
+  noise_adapt: 0.05
+  aggressiveness: 2
   start_frames: 3
-  silence_ms: 700
-  max_utterance_sec: 15.0
+  silence_ms: 400           # quicker end‑of‑speech detection
+  max_utterance_sec: 10.0   # shorter utterance cap
   pre_roll_frames: 5

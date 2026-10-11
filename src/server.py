@@ -11,12 +11,8 @@ Batch 11 entry for the full reasoning on each):
   - The always-on ambient voice loop (`service/voice/voice_session.py` was
     never built in any batch — `AmbientLoop`/wake-word/STT/TTS adapters
     exist in `tpa/` but have no orchestrator wired to them yet).
-  - `ResponderAgent` has no skill-calling loop — the donor's tool-calling
-    relied on the Claude/Copilot CLI's native tool-use protocol, which a
-    raw Ollama/llama.cpp `complete()` call doesn't provide equivalently.
-    `SkillRunner` is still constructed and available on `app.state` for a
-    future tool-calling redesign; `SystemAgent`'s bespoke single-action
-    JSON protocol is the only skill-invocation path wired today.
+  - `ResponderAgent` has no skill-calling loop: every turn first goes through the AssistantOrchestrator's ONE
+    control decode, and tools run only through `SkillRunner`.
 """
 
 from __future__ import annotations
@@ -32,8 +28,8 @@ from fastapi import FastAPI
 
 from controller.middleware.request_context import request_context
 from controller.routes import (
-    admin, ambient, approval, chat, config as config_route, governance as governance_route,
-    health, knowledge, lookup, memory as memory_route, persona, privacy, speakers, stream, system,
+    admin, approval, config as config_route, governance as governance_route,
+    google as google_route, health, knowledge, lookup, persona, privacy, reminders as reminders_route, speakers, stream,
     tasks as tasks_route, trace as trace_route, voice,
 )
 from core.config import active_profile, ensure_dirs, load_full_config
@@ -47,14 +43,13 @@ from domain.value_objects.urgency import Urgency
 from exceptions.handlers import register_exception_handlers
 from schemas.config_schemas import AppConfig
 from service.agent.registry import AgentRegistry
-from service.agent.llm_router import LlmRouter
-from service.agent.tool_agent import ToolAgent
-from service.agent.tool_turn_runner import ToolTurnRunner
+from service.agent.assistant_orchestrator import AssistantOrchestrator
+from service.agent.control_decoder import ControlDecoder
 from service.agent.tool_use_guard import ToolUseGuard
+from service.session.session_state import SessionStateService
 from service.prompting.prompt_composer import PromptComposer
 from service.agent.responder import ResponderAgent
 from service.agent.supervisor import SupervisorAgent
-from service.agent.system import SystemAgent
 from service.approval.approval_broker import ApprovalBroker
 from service.conversation.conversation_manager import ConversationManager
 from service.conversation.summariser import ConversationSummariser
@@ -74,6 +69,7 @@ from service.lookup.ttl_cache import TtlCache
 from service.lookup.registry import FactProviderRegistry
 from service.memory.knowledge_base import KnowledgeBase
 from service.privacy.capture_gate import CaptureGate
+from service.sensing.ambient_dispatcher import AmbientDispatcher
 from service.sensing.event_bus import EventBus
 from service.skills.builtin.file_ops import FileOpsSkill
 from service.skills.builtin.terminal import TerminalSkill
@@ -85,13 +81,19 @@ from tpa.inference.factory import build_inference_client
 from service.inference.graceful_degradation import GracefulDegradation
 from service.inference.single_flight import SingleFlight
 from tpa.filestore.file_prompt_store import FilePromptStore
+from tpa.persistence.repositories.session_context_repository import SqliteSessionContextRepository
 from tpa.persistence.repositories.trace_repository import SqliteTraceRepository
 from tpa.filestore.yaml_tool_manifest_store import YamlToolManifestStore
 from tpa.online.http_client import AllowListedHttpClient
 from tpa.online.providers.fx import FxProvider
 from tpa.online.providers.geocode import GeocodingProvider
 from tpa.online.providers.tavily import TavilyProvider
+from tpa.online.providers.forecast import ForecastProvider
 from tpa.online.providers.weather import WeatherProvider
+from tpa.online.google.calendar_client import GoogleCalendarClient
+from tpa.online.google.consent import SCOPES as GOOGLE_SCOPES
+from tpa.online.google.gmail_client import GmailClient
+from tpa.online.google.google_auth import GoogleAuth
 from tpa.persistence.migrations import init_tables
 from tpa.persistence.repositories.agent_memory_repository import AgentMemoryRepository
 from tpa.persistence.repositories.conversation_repository import ConversationRepository
@@ -143,7 +145,7 @@ def _build_mute_switch(cfg: AppConfig):
             switch = KeyboardMuteFallback(hotkey=cfg.audio.hotkey, start_muted=start_muted)
         elif choice == "gpio":
             from tpa.hardware.gpio_mute_switch import GpioMuteSwitch
-            switch = GpioMuteSwitch(pin=cfg.privacy.mute_gpio_pin)
+            switch = GpioMuteSwitch(pin=cfg.privacy.mute_gpio_pin, muted_level=cfg.privacy.mute_gpio_muted_level)
         elif choice == "hid":
             raise RuntimeError("hid mute switch needs vendor_id/product_id (not configured)")
         else:
@@ -230,6 +232,10 @@ def _build_stt(cfg: AppConfig):
         from core.constants import PROJECT_ROOT
         from tpa.stt.faster_whisper import FasterWhisperProvider
 
+        provider_options = {
+            "noise_suppression_enabled": cfg.audio.noise_suppression_enabled,
+            "noise_suppression_strength": cfg.audio.noise_suppression_strength,
+        }
         path = cfg.audio.stt_model_path
         if path:
             resolved = (PROJECT_ROOT / path) if not Path(path).is_absolute() else Path(path)
@@ -237,8 +243,8 @@ def _build_stt(cfg: AppConfig):
                 logger.warning(f"[voice] STT model not found at {resolved}; STT disabled")
                 return None
             # faster-whisper accepts a directory in place of a size name.
-            return FasterWhisperProvider(model_size=str(resolved))
-        return FasterWhisperProvider(model_size=cfg.audio.stt_model)
+            return FasterWhisperProvider(model_size=str(resolved), **provider_options)
+        return FasterWhisperProvider(model_size=cfg.audio.stt_model, **provider_options)
     except Exception as e:
         logger.info(f"[voice] STT unavailable ({e})")
         return None
@@ -346,7 +352,10 @@ def _build_wake_word(cfg: AppConfig):
                 model_path=str(resolved),
                 threshold=cfg.audio.wake_threshold,
             )
-            logger.info(f"[voice] wake engine 'openwakeword' active ({cfg.audio.wake_oww_model})")
+            logger.info(
+                "[voice] wake engine 'openwakeword' active "
+                f"(model={cfg.audio.wake_oww_model!r}, threshold={cfg.audio.wake_threshold:.3f})"
+            )
             return wake
         if engine == "porcupine":
             access_key = _picovoice_access_key()
@@ -448,6 +457,39 @@ def _build_speaker_enrollment_service(cfg: AppConfig, audio_capture):
     except Exception as e:
         logger.warning(f"[voice] speaker enrollment unavailable ({e}); disabled")
         return None
+
+
+def _build_reminders(cfg: AppConfig, *, calendar, tasks, voice_session, calendar_changed):
+    """Spoken reminders for calendar events and due tasks. A timer, not an agent: no model, no tools, no prompt. It speaks
+    through the voice session only when that is idle, and always leaves the text for the terminal. None when disabled."""
+    rc = cfg.reminders
+    if not rc.enabled:
+        logger.info("[reminders] disabled (reminders.enabled=false)")
+        return None
+    from domain.policies.reminder_policy import ReminderRules
+    from service.reminders.announcer import ReminderAnnouncer
+    from service.reminders.feed import ReminderFeed
+    from service.reminders.reminder_service import ReminderService
+    from service.reminders.scheduler import ReminderScheduler
+    from service.reminders.sources import CalendarReminderSource, TaskReminderSource
+    from tpa.persistence.repositories.reminder_ledger_repository import SqliteReminderLedger
+
+    rules = ReminderRules(
+        enabled=True, lead_minutes=tuple(rc.lead_minutes), at_start=rc.at_start, skip_all_day=rc.skip_all_day,
+    )
+    sources = []
+    if calendar is not None:
+        sources.append(CalendarReminderSource(calendar))
+    if rc.include_tasks:
+        sources.append(TaskReminderSource(tasks))
+    ledger, feed = SqliteReminderLedger(), ReminderFeed()
+    announcer = ReminderAnnouncer(ledger, feed, voice_session, rules, idle_settle_sec=rc.idle_settle_sec)
+    scheduler = ReminderScheduler(
+        sources, ledger, announcer, rules, poll_sec=rc.poll_sec, horizon_hours=rc.horizon_hours, tick_sec=rc.tick_sec,
+    )
+    service = ReminderService(scheduler, announcer, feed)
+    calendar_changed.subscribe(service.nudge)
+    return service
 
 
 def _build_voice_session(cfg: AppConfig, *, audio, capture_gate, supervisor, event_bus, speaker_id=None):
@@ -568,43 +610,6 @@ def _build_inference(cfg: AppConfig, governance, lock: asyncio.Lock | None = Non
     return wrapped, primary
 
 
-def _build_router(cfg: AppConfig, main_client, composer, conversation, lock: asyncio.Lock, thread_lock=None):
-    """The model that routes messages, or None (keyword mode, or the router model could not be set up).
-
-    A dedicated small model (routing.model.model_path) gets its own llama.cpp instance that shares the main
-    model's lock; `model_path: null` makes the main LLM route too. Any problem here degrades to keyword rules.
-    """
-    rcfg = cfg.routing
-    if rcfg.mode == "keyword":
-        return None
-    m = rcfg.model
-    client, model_name = main_client, cfg.agents.supervisor.model
-    if m.model_path:
-        from core.constants import PROJECT_ROOT
-        path = Path(m.model_path)
-        path = path if path.is_absolute() else PROJECT_ROOT / path
-        if not path.exists():
-            logger.error(f"[route] router model not found at {path}; routing by keyword rules only")
-            return None
-        try:
-            client = SingleFlight(
-                build_inference_client(
-                    backend="llama_cpp", llama_cpp_model_path=str(path), n_ctx=m.n_ctx, n_threads=m.n_threads,
-                    timeout=m.timeout_sec, num_predict=m.num_predict, think=False, prompt_cache_mb=m.prompt_cache_mb,
-                    model_lock=thread_lock,
-                ),
-                lock=lock,
-            )
-        except Exception as e:
-            logger.error(f"[route] could not load the router model ({type(e).__name__}: {e}); routing by keyword rules only")
-            return None
-        model_name = None
-    return LlmRouter(
-        client=client, composer=composer, model=model_name, num_predict=m.num_predict,
-        timeout_sec=m.timeout_sec, queue_wait_sec=m.queue_wait_sec, history=lambda: conversation.turns,
-    )
-
-
 def _build_embedding(cfg: AppConfig):
     ecfg = cfg.embedding
     if not ecfg.enabled:
@@ -624,7 +629,7 @@ def _build_embedding(cfg: AppConfig):
 
 
 # Tool -> provider category, for per-category cache TTLs taken from the tool manifests.
-_TOOL_CATEGORY = {"get_weather": "weather", "convert_currency": "fx", "web_search": "search"}
+_TOOL_CATEGORY = {"get_weather": "weather", "get_weather_forecast": "forecast", "convert_currency": "fx", "web_search": "search"}
 _GEOCODE_TTL_SEC = 24 * 3600
 
 
@@ -634,7 +639,7 @@ def _build_lookup(cfg: AppConfig, tool_manifests: dict) -> tuple[LookupService, 
     registry = FactProviderRegistry(allow_list=allow_list)
     key_env = cfg.privacy.online.search_api_key_env
     search = TavilyProvider(http_client, api_key_provider=lambda: os.environ.get(key_env))
-    for provider in (WeatherProvider(http_client), GeocodingProvider(http_client), FxProvider(http_client), search):
+    for provider in (WeatherProvider(http_client), ForecastProvider(http_client), GeocodingProvider(http_client), FxProvider(http_client), search):
         try:
             registry.register(provider)
         except ValueError as e:
@@ -707,6 +712,52 @@ def _build_skills(cfg: AppConfig, hooks: HookRegistry) -> tuple[SkillRegistry, S
     return registry, SkillRunner(skill_registry=registry, hook_registry=hooks)
 
 
+_GOOGLE_TOOLS = ("gmail_search", "gmail_read", "gmail_draft", "gmail_send", "calendar_agenda", "calendar_create")
+
+
+def _register_google_tools(
+    online, tool_manifests: dict, skill_registry: SkillRegistry, on_calendar_change=None,
+) -> tuple[GoogleAuth | None, GoogleCalendarClient | None]:
+    """Gmail + Calendar skills over one shared Google sign-in. They are registered even when the account is not yet
+    linked, so asking about mail gets "it isn't set up" (and scripts/google_auth.py tells the user how) instead of a
+    wrong answer from another tool."""
+    from service.mail.draft_outbox import DraftOutbox
+    from service.mail.contact_book import load_mail_contacts
+    from service.skills.builtin.calendar_agenda import CalendarAgendaSkill
+    from service.skills.builtin.calendar_create import CalendarCreateSkill
+    from service.skills.builtin.gmail import GmailDraftSkill, GmailReadSkill, GmailSearchSkill, GmailSendSkill
+
+    if not any(name in tool_manifests for name in _GOOGLE_TOOLS):
+        return None, None
+    http = AllowListedHttpClient(allow_list=frozenset(online.allowlist))
+    auth = GoogleAuth(
+        http,
+        client_id=lambda: os.environ.get(online.google_client_id_env),
+        client_secret=lambda: os.environ.get(online.google_client_secret_env),
+        refresh_token=lambda: os.environ.get(online.google_refresh_token_env),
+        required_scopes=GOOGLE_SCOPES,
+    )
+    mail, calendar, outbox = GmailClient(http, auth), GoogleCalendarClient(http, auth), DraftOutbox()
+    mail_contacts = load_mail_contacts()      # config/mail_contacts.yaml: name -> address; a missing file is an empty map
+    builders = {
+        "gmail_search": lambda m: GmailSearchSkill(mail, m),
+        "gmail_read": lambda m: GmailReadSkill(mail, m),
+        "gmail_draft": lambda m: GmailDraftSkill(mail, m, outbox, contacts=mail_contacts),
+        "gmail_send": lambda m: GmailSendSkill(mail, m, outbox),
+        "calendar_agenda": lambda m: CalendarAgendaSkill(calendar, m),
+        "calendar_create": lambda m: CalendarCreateSkill(calendar, m, on_created=on_calendar_change),
+    }
+    for name, build in builders.items():
+        if name in tool_manifests:
+            skill_registry.register(build(tool_manifests[name]))
+    missing = auth.missing()
+    if missing:
+        logger.info(f"[google] not linked (missing {', '.join(missing)}): mail and calendar tools will say so. Run `veda login`")
+    else:
+        logger.info("[google] Gmail and Calendar tools ready")
+    return auth, calendar
+
+
 def bootstrap(app: FastAPI) -> None:
     """Build every subsystem and attach it to `app.state`."""
     cfg = load_full_config()
@@ -734,20 +785,40 @@ def bootstrap(app: FastAPI) -> None:
     from service.memory.semantic_recall import SemanticRecall
     vector_store = SqliteVectorStore()
     memory_indexer = MemoryIndexer(vector_store, app.state.embedding_provider)
+    conversation_repo = ConversationRepository()
+    app.state.conversation_repo = conversation_repo
+
+    def _memory_date(hit):
+        """The day a recalled summary or exchange is from (None for anything else, e.g. a saved fact)."""
+        if hit.source == "summary":
+            return conversation_repo.summary_created_at(int(hit.ref_id))
+        if hit.source == "exchange":
+            return conversation_repo.turn_created_at(int(hit.ref_id))
+        return None
+
     semantic_recall = SemanticRecall(
         vector_store, app.state.embedding_provider,
         top_k=cfg.embedding.top_k, min_score=cfg.embedding.min_score,
-        sources=tuple(cfg.embedding.sources),
+        sources=tuple(cfg.embedding.sources), margin=cfg.embedding.margin, when=_memory_date,
+        max_hit_chars=cfg.embedding.max_hit_chars, max_total_chars=cfg.embedding.max_total_chars,
+        conversation_intent_min=cfg.embedding.conversation_intent_min, min_score_by_source=cfg.embedding.min_score_by_source,
     )
     app.state.vector_store = vector_store
     app.state.memory_indexer = memory_indexer
     app.state.semantic_recall = semantic_recall
-
-    conversation_repo = ConversationRepository()
-    app.state.conversation_repo = conversation_repo
     memory_repo = AgentMemoryRepository(conversation_repo=conversation_repo)
+    def _index_exchange(turn_id: int, note: str) -> None:
+        """Embed a finished question-and-answer in the background, off the reply path (it is a no-op without embeddings)."""
+        if not memory_indexer.enabled:
+            return
+        try:
+            asyncio.get_running_loop().create_task(memory_indexer.index("exchange", str(turn_id), note))
+        except RuntimeError:
+            pass   # no running loop (e.g. a test): the startup backfill will pick it up
+
     conversation = ConversationManager(
         repo=conversation_repo, max_history=cfg.app.max_history, summaries_limit=cfg.app.chat_summaries,
+        on_exchange=_index_exchange,
     )
     # Exposed so controller/routes/health.py can actually probe the DB;
     # without this its check silently reported False forever.
@@ -788,7 +859,10 @@ def bootstrap(app: FastAPI) -> None:
 
     from tpa.persistence.repositories.task_repository import SqliteTaskRepository
     from service.tasks.task_service import TaskService
-    task_service = TaskService(SqliteTaskRepository())
+    from service.reminders.reminder_service import ChangeSignal
+    calendar_changed = ChangeSignal()   # fired when the calendar or the task list changes, so reminders re-read at once
+    app.state.calendar_changed = calendar_changed
+    task_service = TaskService(SqliteTaskRepository(), on_change=calendar_changed.fire)
     app.state.task_service = task_service
 
     hooks, permissions = _build_guardrails(cfg)
@@ -818,16 +892,22 @@ def bootstrap(app: FastAPI) -> None:
         from service.lookup.search_lookup import SearchLookup
         from service.lookup.weather_lookup import WeatherLookup
         from service.skills.builtin.currency import ConvertCurrencySkill
-        from service.skills.builtin.weather import GetWeatherSkill
+        from service.skills.builtin.weather import GetWeatherForecastSkill, GetWeatherSkill
         from service.skills.builtin.web_search import WebSearchSkill
 
         places = PlaceResolver(lookup_service, default_place=online.default_place)
+        weather_lookup = WeatherLookup(lookup_service, places)
         for skill in (
-            GetWeatherSkill(WeatherLookup(lookup_service, places), tool_manifests["get_weather"]),
+            GetWeatherSkill(weather_lookup, tool_manifests["get_weather"]),
+            *([GetWeatherForecastSkill(weather_lookup, tool_manifests["get_weather_forecast"])]
+              if "get_weather_forecast" in tool_manifests else []),
             ConvertCurrencySkill(CurrencyLookup(lookup_service), tool_manifests["convert_currency"]),
             WebSearchSkill(SearchLookup(lookup_service), tool_manifests["web_search"]),
         ):
             skill_registry.register(skill)
+    app.state.google_auth, calendar_port = (
+        _register_google_tools(online, tool_manifests, skill_registry, calendar_changed.fire) if online.enabled else (None, None)
+    )
     app.state.lookup_service = lookup_service
     app.state.lookup_health = (
         _build_lookup_health(lookup_service, lookup_search, online.search_api_key_env) if lookup_service else None
@@ -838,77 +918,61 @@ def bootstrap(app: FastAPI) -> None:
     app.state.skill_runner = skill_runner
 
     system_control = _build_system_control()
+    from service.skills.builtin.system_control import AppControlSkill, DeviceStatusSkill, VolumeControlSkill
+    for tool_name, skill_cls in (
+        ('app_control', AppControlSkill), ('volume_control', VolumeControlSkill), ('device_status', DeviceStatusSkill),
+    ):
+        manifest = tool_manifests.get(tool_name)
+        if manifest is not None:
+            skill_registry.register(skill_cls(system_control, manifest, governance=governance))
+    if 'current_time' in tool_manifests:
+        from service.skills.builtin.clock import CurrentTimeSkill
+        skill_registry.register(CurrentTimeSkill(tool_manifests['current_time']))
     agent_registry = AgentRegistry()
     trace_repo = SqliteTraceRepository()
     app.state.trace_repo = trace_repo
+    session_state = SessionStateService(
+        SqliteSessionContextRepository(), tool_manifests, ttl_sec=cfg.agents.session_ttl_sec,
+    )
+    app.state.session_state = session_state
     guard = ToolUseGuard(tool_manifests.values())
     count_tokens = getattr(inference_backend, "count_tokens", None) or estimate_tokens
     composer = PromptComposer(
-        FilePromptStore(), list(tool_manifests.values()), budgets=PromptBudgets(), count_tokens=count_tokens,
-    )
-    tool_runner = ToolTurnRunner(
-        client=inference_client, composer=composer, skill_runner=skill_runner,
-        manifests=tool_manifests, guard=guard, conversation=conversation,
-        model=cfg.agents.responder.model,
+        FilePromptStore(), list(tool_manifests.values()), budgets=PromptBudgets(**cfg.prompting.budgets), count_tokens=count_tokens,
+        turn_chars=cfg.prompting.turn_chars, user_message_chars=cfg.prompting.user_message_chars,
     )
     responder = ResponderAgent(
         client=inference_client, conversation=conversation, knowledge=knowledge,
         model=cfg.agents.responder.model, memory=memory_repo,
-        recall=semantic_recall, claim_filter=guard.claims_action,
+        recall=semantic_recall,
+        # Chat is only reached when no tool ran, so any action claim is unbacked: it is vetted as it is generated.
+        reply_veto=guard.claims_action,
         persona=FilePromptStore().get("persona_chat") if cfg.app.chat_persona == "compact" else None,
-    )
-    system_agent = SystemAgent(
-        client=inference_client, system_control=system_control,
-        model=cfg.agents.system.model, governance=governance, memory=memory_repo,
+        chat_budget_tokens=PromptBudgets(**cfg.prompting.budgets).chat, history_turn_chars=cfg.prompting.turn_chars,
     )
     agent_registry.register(responder)
-    agent_registry.register(system_agent)
-    if cfg.agents.tools_enabled:
-        # One specialist per owning agent named in the tool manifests. Routing
-        # triggers, tools and guard rules all come from the manifests.
-        for owner in sorted({m.agent for m in tool_manifests.values()}):
-            owned = composer.tools_of_agent(owner)
-            agent_registry.register(ToolAgent(
-                name=owner,
-                description=(
-                    getattr(cfg.agents, owner, None).description
-                    if getattr(cfg.agents, owner, None) is not None and getattr(cfg.agents, owner).description
-                    else "; ".join(tool_manifests[n].description for n in owned)
-                ),
-                tool_names=owned,
-                triggers=[t for n in owned for t in tool_manifests[n].triggers],
-                runner=tool_runner, fallback=responder, guard=guard,
-                conversation=conversation, memory=memory_repo,
-                model=cfg.agents.responder.model, traces=trace_repo,
-            ))
-
-    # Routing: config/routing.yaml decides keyword | hybrid | model. The old `agents.llm_routing: true` flag still
-    # works when routing.mode is left at "keyword": it means "keyword rules, then the main LLM for unmatched messages".
-    routing_mode = cfg.routing.mode
-    llm_router = _build_router(cfg, inference_client, composer, conversation, inference_lock, inference_thread_lock)
-    if cfg.agents.llm_routing and routing_mode == "keyword":
-        logger.warning("[route] agents.llm_routing is deprecated; set routing.mode in config/routing.yaml instead")
-        llm_router = LlmRouter(
-            client=inference_client, composer=composer, model=cfg.agents.supervisor.model,
-            num_predict=min(cfg.inference.routing_num_predict, 24), history=lambda: conversation.turns,
-        )
-        routing_mode = None  # legacy behaviour
-    elif routing_mode != "keyword" and llm_router is None:
-        logger.error(f"[route] routing.mode={routing_mode} but no router model is available; using keyword rules")
-        routing_mode = "keyword"
-    app.state.llm_router = llm_router
-    supervisor = SupervisorAgent(
-        agent_registry=agent_registry, client=inference_client, default_agent="responder",
-        model=cfg.agents.supervisor.model, debounce_window_sec=cfg.sensing.debounce_window_sec,
-        rate_limit_max=cfg.sensing.rate_limit_max, rate_limit_window_sec=cfg.sensing.rate_limit_window_sec,
-        proactivity=cfg.sensing.proactivity, memory=memory_repo, governance=governance,
-        conversation=conversation,
-        routing_num_predict=cfg.inference.routing_num_predict, llm_router=llm_router,
-        routing_mode=routing_mode, router_on_failure=cfg.routing.on_failure,
+    orchestrator = AssistantOrchestrator(
+        decoder=ControlDecoder(
+            client=inference_client, composer=composer, manifests=tool_manifests,
+            model=cfg.agents.responder.model, exchanges=cfg.prompting.control_history_exchanges,
+        ),
+        composer=composer, skill_runner=skill_runner, manifests=tool_manifests, responder=responder,
+        client=inference_client, conversation=conversation, claims_action=guard.claims_action,
+        session_state=session_state, traces=trace_repo, memory=memory_repo, model=cfg.agents.responder.model,
+        conversation_intent=semantic_recall.conversation_intent_score if cfg.embedding.conversation_intent_min is not None else None,
+        conversation_intent_min=cfg.embedding.conversation_intent_min or 0.82,
+        conversation_intent_soft_min=cfg.embedding.conversation_intent_soft_min,
     )
+    app.state.orchestrator = orchestrator
+    supervisor = SupervisorAgent(model=cfg.agents.supervisor.model, orchestrator=orchestrator)
     agent_registry.register(supervisor)
     app.state.agent_registry = agent_registry
     app.state.supervisor = supervisor
+    app.state.ambient_dispatcher = AmbientDispatcher(
+        debounce_window_sec=cfg.sensing.debounce_window_sec, rate_limit_max=cfg.sensing.rate_limit_max,
+        rate_limit_window_sec=cfg.sensing.rate_limit_window_sec, proactivity=cfg.sensing.proactivity,
+        conversation=conversation,
+    )
 
     app.state.notifier = _build_notifier()
     app.state.egress_allow_list = frozenset(cfg.privacy.online.allowlist)
@@ -943,7 +1007,32 @@ def bootstrap(app: FastAPI) -> None:
         supervisor=supervisor, event_bus=event_bus, speaker_id=speaker_recognizer,
     )
 
+    app.state.reminders = _build_reminders(
+        cfg, calendar=calendar_port, tasks=task_service, voice_session=app.state.voice_session,
+        calendar_changed=calendar_changed,
+    )
+
     logger.info(f"Bootstrap: {agent_registry.count} agents, {len(skill_registry.list_all())} skills registered")
+
+
+async def _index_exchanges(app: FastAPI) -> None:
+    """Index every saved question-and-answer that has no vector yet, and drop vectors whose turn is gone (the 30-day cleanup
+    deletes old turns, and what was deleted must not stay recallable). Cheap after the first run: only the new ones embed."""
+    from domain.policies.exchange_note_policy import exchange_note
+
+    store, repo = app.state.vector_store, app.state.conversation_repo
+    model_id = app.state.embedding_provider.model_id
+    pairs = repo.exchanges()
+    existing = store.ref_ids(source="exchange", model_id=model_id)
+    stale = existing - {str(turn_id) for turn_id, *_ in pairs}
+    if stale:
+        store.delete_refs(source="exchange", ref_ids=stale)
+    added = 0
+    for turn_id, _sid, question, answer, _when in pairs:
+        note = exchange_note(question, answer)
+        if note and str(turn_id) not in existing and await app.state.memory_indexer.index("exchange", str(turn_id), note):
+            added += 1
+    logger.info(f"[memory-index] exchanges: {added} indexed, {len(stale)} stale removed")
 
 
 async def _backfill_memory_index(app: FastAPI) -> None:
@@ -958,12 +1047,13 @@ async def _backfill_memory_index(app: FastAPI) -> None:
             await indexer.index("fact", str(i), fact)
         for summ in app.state.conversation_repo.recent_summaries(limit=1000):
             await indexer.index("summary", str(summ.id), summ.content, skip_existing=True)
+        await _index_exchanges(app)
         logger.info("[memory-index] backfill complete")
     except Exception as e:
         logger.warning(f"[memory-index] backfill failed: {e}")
 
 
-async def _housekeeping_loop(task_service, trace_repo, interval_sec: float = 3600.0) -> None:
+async def _housekeeping_loop(task_service, trace_repo, session_state=None, interval_sec: float = 3600.0) -> None:
     """Hourly: drop completed tasks and old tool-turn traces past their retention windows."""
     from datetime import datetime, timedelta
 
@@ -977,9 +1067,35 @@ async def _housekeeping_loop(task_service, trace_repo, interval_sec: float = 360
             old = trace_repo.purge_before(datetime.now() - timedelta(days=TURN_TRACE_RETENTION_DAYS))
             if old:
                 logger.info(f"[trace] purged {old} old tool-turn trace(s)")
+            if session_state is not None:
+                expired = session_state.purge_expired()
+                if expired:
+                    logger.info(f"[session-state] purged {expired} expired row(s)")
         except Exception as e:
             logger.warning(f"[housekeeping] failed: {e}")
         await asyncio.sleep(interval_sec)
+
+
+_GOOGLE_HINTS = {
+    "not_linked": "not signed in: run `veda login` (mail and calendar answer \"isn't set up\" until then)",
+    "rejected": "Google refused the saved sign-in (expired or revoked): run `veda login`",
+    "needs_permission": "the saved sign-in lacks permission for: {scopes}: run `veda login` to grant it",
+    "unreachable": "could not reach Google to check the sign-in (offline?); it will be tried again when used",
+}
+
+
+async def _log_google_status(auth) -> None:
+    """One line at boot saying whether mail/calendar will work, and exactly how to fix it if not. Never blocks or raises."""
+    try:
+        status = await asyncio.wait_for(auth.status(), timeout=15)
+    except Exception as e:
+        logger.info(f"[google] sign-in not checked ({type(e).__name__})")
+        return
+    state = status.get("state", "ok")
+    if state == "ok":
+        logger.info("[google] sign-in OK (mail, calendar, reminders)")
+    else:
+        logger.warning("[google] " + _GOOGLE_HINTS.get(state, state).format(scopes=", ".join(status.get("missing_scopes", []))))
 
 
 @asynccontextmanager
@@ -990,8 +1106,7 @@ async def lifespan(app: FastAPI):
     logger.info(
         f"[config] profile={active_profile() or 'base (none set)'} model={cfg.inference.model_path} "
         f"n_ctx={cfg.inference.n_ctx} max_history={cfg.app.max_history} chat_summaries={cfg.app.chat_summaries} "
-        f"chat_persona={cfg.app.chat_persona} routing={cfg.routing.mode}"
-        + (f" router_model={cfg.routing.model.model_path or 'main LLM'}" if cfg.routing.mode != "keyword" else "")
+        f"chat_persona={cfg.app.chat_persona}"
     )
     ensure_dirs()
     init_tables()
@@ -1016,7 +1131,7 @@ async def lifespan(app: FastAPI):
             logger.warning(f"[inference] warmup skipped: {e}")
 
     if cfg.inference.warmup_on_boot:
-        await app.state.supervisor.warm_router()
+        await app.state.orchestrator.warmup()  # pre-evaluate the control prefix so the first real turn is not cold
 
     # Must start inside the running loop — the gate captures it so a
     # mute transition raised on a hardware thread can still reach the bus.
@@ -1030,7 +1145,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"ConversationSummariser failed to start: {e}")
 
-    app.state.task_purge_job = asyncio.create_task(_housekeeping_loop(app.state.task_service, app.state.trace_repo))
+    app.state.task_purge_job = asyncio.create_task(_housekeeping_loop(app.state.task_service, app.state.trace_repo, app.state.session_state))
 
     if getattr(app.state, "memory_indexer", None) is not None and app.state.memory_indexer.enabled:
         asyncio.create_task(_backfill_memory_index(app))
@@ -1041,7 +1156,20 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"VoiceSession failed to start: {e}")
 
+    if getattr(app.state, "google_auth", None) is not None:
+        asyncio.create_task(_log_google_status(app.state.google_auth))
+
+    if getattr(app.state, "reminders", None) is not None:
+        app.state.reminders.start()   # after the voice loop, so its first announcement can already be spoken
+        logger.info("[reminders] started")
+
     yield
+
+    if getattr(app.state, "reminders", None) is not None:
+        try:
+            await app.state.reminders.stop()
+        except Exception as e:
+            logger.warning(f"Reminders failed to stop cleanly: {e}")
 
     if getattr(app.state, "voice_session", None) is not None:
         try:
@@ -1078,8 +1206,8 @@ app.middleware("http")(request_context)
 logger.info(f"{PROJECT_NAME} v{VERSION} application initialized")
 
 for _mod in (
-    admin, ambient, approval, chat, config_route, governance_route,
-    health, knowledge, lookup, memory_route, persona, privacy, speakers, stream, system, tasks_route, trace_route, voice,
+    admin, approval, config_route, governance_route,
+    google_route, health, knowledge, lookup, persona, privacy, reminders_route, speakers, stream, tasks_route, trace_route, voice,
 ):
     app.include_router(_mod.router, prefix="/api")
 

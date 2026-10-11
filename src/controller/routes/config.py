@@ -9,8 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from controller.dependencies.providers import get_supervisor
-from service.agent.supervisor import SupervisorAgent
+from controller.dependencies.providers import get_ambient_dispatcher
+from service.sensing.ambient_dispatcher import AmbientDispatcher
 
 router = APIRouter()
 
@@ -22,14 +22,14 @@ class ProactivityBody(BaseModel):
 
 
 @router.get("/config/proactivity")
-async def get_proactivity(supervisor: SupervisorAgent = Depends(get_supervisor)):
-    return {"level": supervisor.proactivity, "valid": list(_VALID_PROACTIVITY)}
+async def get_proactivity(ambient: AmbientDispatcher = Depends(get_ambient_dispatcher)):
+    return {"level": ambient.proactivity, "valid": list(_VALID_PROACTIVITY)}
 
 
 @router.post("/config/proactivity")
-async def set_proactivity(body: ProactivityBody, supervisor: SupervisorAgent = Depends(get_supervisor)):
+async def set_proactivity(body: ProactivityBody, ambient: AmbientDispatcher = Depends(get_ambient_dispatcher)):
     try:
-        level = supervisor.set_proactivity(body.level)
+        level = ambient.set_proactivity(body.level)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"level": level, "valid": list(_VALID_PROACTIVITY)}

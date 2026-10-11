@@ -1,0 +1,400 @@
+{"id": "g05-0063", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g07-0520", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0219", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0342", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 4}}]}}
+{"id": "g12-0061", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "list"}}]}}
+{"id": "g07-0289", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0078", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 3}}]}}
+{"id": "g09-0350", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know?"}}
+{"id": "g01-0455", "label": {"needs_live_data": true, "calls": [{"tool": "current_time", "args": {"what": "time"}}]}}
+{"id": "g07-0347", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0109", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 40, "from": "USD", "to": "INR"}}]}}
+{"id": "g09-0334", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know?"}}
+{"id": "g05-0104", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Team lunch", "date_offset": 2, "time": "13:00"}}]}}
+{"id": "g10-0197", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g01-0047", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Chennai"}}]}}
+{"id": "g05-0147", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "One on one with Divya", "date_offset": 1, "time": "16:00"}}]}}
+{"id": "g03-0113", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "complete", "title": "milk"}}]}}
+{"id": "g03-0013", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "lock the back door"}}]}}
+{"id": "g09-0127", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "list", "include_done": true}}]}}
+{"id": "g04-0173", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "to:divya", "folder": "sent"}}]}}
+{"id": "g02-0203", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "current RBI repo rate", "topic": "general"}}]}}
+{"id": "g06-0257", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "open", "name": "slack"}}, {"tool": "volume_control", "args": {"action": "set", "level": 20}}, {"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g09-0085", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 2}}]}}
+{"id": "g10-0263", "label": {"needs_live_data": false, "calls": [], "clarification": "What volume level would you like?"}}
+{"id": "g03-0146", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "delete", "title": "iron the uniforms"}}]}}
+{"id": "g07-0119", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g10-0216", "label": {"needs_live_data": false, "calls": [], "clarification": "What should the email say?"}}
+{"id": "g10-0195", "label": {"needs_live_data": true, "calls": [{"tool": "volume_control", "args": {"action": "set", "level": 20}}]}}
+{"id": "g12-0224", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0144", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0041", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 1000, "from": "CNY", "to": "INR"}}]}}
+{"id": "g02-0037", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 120, "from": "AUD", "to": "INR"}}]}}
+{"id": "g08-0311", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Delhi"}}]}}
+{"id": "g04-0311", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0308", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g10-0147", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g05-0100", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Doctor call", "date_offset": 1, "time": "09:00", "duration_minutes": 30}}]}}
+{"id": "g05-0210", "label": {"needs_live_data": false, "calls": [], "clarification": "Which day should I put it on?"}}
+{"id": "g10-0040", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g01-0490", "label": {"needs_live_data": true, "calls": [{"tool": "device_status", "args": {"what": "battery"}}]}}
+{"id": "g07-0431", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0303", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g10-0106", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g07-0098", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0314", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0209", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "latest Oscars best actor winner", "topic": "general"}}]}}
+{"id": "g07-0371", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0421", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0297", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0041", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Lisbon"}}]}}
+{"id": "g12-0196", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_send", "args": {}}]}}
+{"id": "g01-0528", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g10-0209", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g10-0081", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Kochi", "date_offset": 3}}]}}
+{"id": "g07-0029", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0345", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "open", "name": "maps"}}]}}
+{"id": "g10-0022", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g07-0359", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0357", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "how old is the Taj Mahal", "topic": "general"}}]}}
+{"id": "g10-0101", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "New York"}}]}}
+{"id": "g01-0483", "label": {"needs_live_data": true, "calls": [{"tool": "device_status", "args": {"what": "battery"}}]}}
+{"id": "g10-0104", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0300", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0304", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0347", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know?"}}
+{"id": "g05-0174", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "send the invoice", "due_at": "2026-11-07T12:00"}}]}}
+{"id": "g08-0109", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "pay electricity bill"}}]}}
+{"id": "g09-0279", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know about Sunday?"}}
+{"id": "g02-0207", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "best actor winner at the last Oscars", "topic": "general"}}]}}
+{"id": "g04-0119", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "bank"}}]}}
+{"id": "g07-0185", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g12-0051", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "brother's city", "value": "Pune"}}]}}
+{"id": "g05-0092", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Deep work", "date_offset": 1, "time": "14:00", "duration_minutes": 60}}]}}
+{"id": "g07-0335", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g12-0028", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "favourite cricketer", "value": "Dhoni"}}]}}
+{"id": "g01-0525", "label": {"needs_live_data": true, "calls": [{"tool": "current_time", "args": {"what": "date"}}, {"tool": "get_weather_forecast", "args": {"date_offset": 1}}]}}
+{"id": "g05-0057", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g06-0286", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "complete", "title": "budget report"}}, {"tool": "device_status", "args": {"what": "battery"}}]}}
+{"id": "g06-0245", "label": {"needs_live_data": true, "calls": [{"tool": "device_status", "args": {"what": "battery"}}, {"tool": "volume_control", "args": {"action": "get"}}, {"tool": "current_time", "args": {"what": "time"}}]}}
+{"id": "g06-0082", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "focus", "name": "zoom"}}]}}
+{"id": "g06-0321", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Kochi"}}, {"tool": "volume_control", "args": {"action": "set", "level": 50}}]}}
+{"id": "g06-0002", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "open", "name": "spotify"}}]}}
+{"id": "g08-0058", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0177", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Hyderabad", "date_offset": 0}}]}}
+{"id": "g10-0246", "label": {"needs_live_data": false, "calls": [], "clarification": "What's the event, and what day and time?"}}
+{"id": "g12-0048", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "son's school bus time", "value": "7:15"}}]}}
+{"id": "g07-0380", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0123", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0204", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0149", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Lisbon", "date_offset": 3}}]}}
+{"id": "g09-0044", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Lima", "date_offset": 1}}]}}
+{"id": "g04-0198", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_draft", "args": {"to": "meera@example.com", "subject": "Meeting time", "body": "Hi Meera, the meeting is at four."}}]}}
+{"id": "g01-0011", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Lagos"}}]}}
+{"id": "g04-0202", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_draft", "args": {"to": "Divya", "subject": "Thanks for the gift", "body": "Hi Divya, thanks for the gift."}}]}}
+{"id": "g08-0141", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0074", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 200, "from": "USD", "to": "INR"}}]}}
+{"id": "g03-0080", "label": {"needs_live_data": false, "calls": [], "clarification": "What should I remind you about?"}}
+{"id": "g04-0239", "label": {"needs_live_data": false, "calls": [], "clarification": "What should the email say?"}}
+{"id": "g05-0265", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g08-0340", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "list"}}]}}
+{"id": "g09-0195", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0134", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "India match live score", "topic": "news"}}]}}
+{"id": "g04-0137", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "from:asha"}}]}}
+{"id": "g08-0267", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0397", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Dublin", "date_offset": 2}}]}}
+{"id": "g02-0099", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 1000, "from": "USD", "to": "INR"}}]}}
+{"id": "g04-0214", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_draft", "args": {"to": "Sameer", "subject": "Dinner on Saturday", "body": "Hi Sameer, are you free Saturday evening for dinner?"}}]}}
+{"id": "g04-0074", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "newer_than:3d"}}]}}
+{"id": "g07-0524", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0107", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g03-0165", "label": {"needs_live_data": false, "calls": [], "clarification": "Which task did you finish?"}}
+{"id": "g12-0181", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_send", "args": {}}]}}
+{"id": "g05-0197", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Call with Ravi", "date_offset": 0, "time": "17:00"}}]}}
+{"id": "g02-0077", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 1000, "from": "INR", "to": "USD"}}]}}
+{"id": "g08-0020", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0123", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Lunch with Karan", "date_offset": 1, "time": "12:00"}}]}}
+{"id": "g12-0200", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_send", "args": {}}]}}
+{"id": "g01-0581", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0305", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 1}}]}}
+{"id": "g02-0368", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 900, "from": "EUR", "to": "GBP"}}]}}
+{"id": "g04-0089", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"folder": "sent"}}]}}
+{"id": "g10-0036", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g02-0208", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "latest Oscar best actor winner", "topic": "news"}}]}}
+{"id": "g06-0063", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "close", "name": "terminal"}}]}}
+{"id": "g05-0101", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Doctor call", "date_offset": 1, "time": "09:00", "duration_minutes": 30}}]}}
+{"id": "g01-0125", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Delhi", "date_offset": 1}}]}}
+{"id": "g01-0078", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {}}]}}
+{"id": "g09-0383", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "from:meera"}}]}}
+{"id": "g04-0189", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_draft", "args": {"to": "Asha", "subject": "Late", "body": "Hi Asha, I'm going to be late."}}]}}
+{"id": "g08-0182", "label": {"needs_live_data": true, "calls": [{"tool": "device_status", "args": {"what": "battery"}}]}}
+{"id": "g06-0180", "label": {"needs_live_data": true, "calls": [{"tool": "volume_control", "args": {"action": "set", "level": 80}}]}}
+{"id": "g07-0422", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0290", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g12-0050", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "brother's city", "value": "Pune"}}]}}
+{"id": "g02-0196", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "best laptops under fifty thousand rupees", "topic": "general"}}]}}
+{"id": "g02-0034", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 200, "from": "SGD", "to": "INR"}}]}}
+{"id": "g09-0372", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0181", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0114", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Kochi", "date_offset": 1}}]}}
+{"id": "g09-0260", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Project kickoff", "date_offset": 1, "time": "10:00"}}]}}
+{"id": "g08-0292", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Delhi"}}]}}
+{"id": "g01-0127", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Delhi", "date_offset": 1}}]}}
+{"id": "g09-0342", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know?"}}
+{"id": "g10-0254", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "call asha"}}]}}
+{"id": "g07-0218", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g12-0032", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "coffee", "value": "without sugar"}}]}}
+{"id": "g07-0078", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g03-0044", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "submit the timesheet", "due_at": "2026-10-20T09:00"}}]}}
+{"id": "g04-0241", "label": {"needs_live_data": false, "calls": [], "clarification": "Who should it go to and what should it say?"}}
+{"id": "g01-0442", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g06-0161", "label": {"needs_live_data": false, "calls": [], "clarification": "What volume level would you like?"}}
+{"id": "g01-0294", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 0}}]}}
+{"id": "g04-0194", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_draft", "args": {"to": "Ravi", "subject": "Report finished", "body": "Hi Ravi, the report is finished."}}]}}
+{"id": "g01-0562", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0382", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0356", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_draft", "args": {"to": "Sameer", "subject": "Tickets booked", "body": "Hi Sameer, the tickets are booked for Sunday."}}]}}
+{"id": "g09-0275", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 0, "days": 7}}]}}
+{"id": "g02-0123", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "petrol price in Chennai today", "topic": "general"}}]}}
+{"id": "g01-0046", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Chennai"}}]}}
+{"id": "g04-0183", "label": {"needs_live_data": false, "calls": [], "clarification": "Which one do you mean?"}}
+{"id": "g12-0144", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "forget", "topic": "cat name"}}]}}
+{"id": "g12-0139", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "forget", "topic": "gym days"}}]}}
+{"id": "g08-0145", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g10-0166", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g09-0070", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 250, "from": "USD", "to": "EUR"}}]}}
+{"id": "g01-0256", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 4}}]}}
+{"id": "g09-0269", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Mumbai"}}]}}
+{"id": "g03-0125", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "complete", "title": "clean the garage"}}]}}
+{"id": "g10-0060", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g02-0291", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0205", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "2026 Nobel Prize in Physics winner", "topic": "general"}}]}}
+{"id": "g12-0160", "label": {"needs_live_data": false, "calls": [], "clarification": "Which one do you mean?"}}
+{"id": "g04-0267", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_send", "args": {}}]}}
+{"id": "g06-0202", "label": {"needs_live_data": true, "calls": [{"tool": "current_time", "args": {"what": "time"}}, {"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g02-0098", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 50, "from": "EUR", "to": "INR"}}]}}
+{"id": "g09-0302", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know about the day after tomorrow?"}}
+{"id": "g05-0004", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g06-0172", "label": {"needs_live_data": false, "calls": [], "clarification": "What volume level would you like?"}}
+{"id": "g02-0259", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "IPL match result last night", "topic": "news"}}]}}
+{"id": "g02-0231", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "24 carat gold rate today in India", "topic": "general"}}]}}
+{"id": "g01-0561", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0526", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g01-0342", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Pune"}}]}}
+{"id": "g04-0143", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "subject:invoice"}}]}}
+{"id": "g09-0399", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Oslo", "date_offset": 1}}]}}
+{"id": "g03-0176", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "call the plumber"}}]}}
+{"id": "g03-0202", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "list"}}]}}
+{"id": "g07-0390", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0335", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know?"}}
+{"id": "g12-0104", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "delete", "title": "bank"}}]}}
+{"id": "g04-0063", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "receipt newer_than:1d"}}]}}
+{"id": "g03-0147", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "delete", "title": "calling ravi"}}]}}
+{"id": "g01-0146", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Mumbai", "date_offset": 3}}]}}
+{"id": "g09-0124", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "petrol price in Chennai", "topic": "general"}}]}}
+{"id": "g01-0404", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Kochi", "date_offset": 1}}]}}
+{"id": "g08-0288", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0079", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 1, "from": "USD", "to": "INR"}}]}}
+{"id": "g04-0035", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "from:meera", "unread_only": true}}]}}
+{"id": "g02-0325", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g03-0162", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "delete", "title": "haircut"}}]}}
+{"id": "g02-0101", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 1000, "from": "USD", "to": "INR"}}]}}
+{"id": "g10-0282", "label": {"needs_live_data": false, "calls": [], "clarification": "What should I add?"}}
+{"id": "g09-0133", "label": {"needs_live_data": true, "calls": [{"tool": "volume_control", "args": {"action": "set", "level": 60}}]}}
+{"id": "g07-0206", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0193", "label": {"needs_live_data": true, "calls": [{"tool": "device_status", "args": {"what": "battery"}}]}}
+{"id": "g09-0283", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know about tomorrow?"}}
+{"id": "g12-0059", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "list"}}]}}
+{"id": "g04-0127", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "is:unread"}}]}}
+{"id": "g02-0126", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "bitcoin price right now", "topic": "general"}}]}}
+{"id": "g10-0190", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g06-0224", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Kochi"}}, {"tool": "calendar_agenda", "args": {"date_offset": 0}}, {"tool": "current_time", "args": {"what": "time"}}]}}
+{"id": "g06-0293", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0332", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0279", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0320", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0128", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "is:unread"}}]}}
+{"id": "g09-0172", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0346", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g03-0039", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "call mom", "due_at": "2026-10-14T18:00"}}]}}
+{"id": "g08-0330", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Lima", "date_offset": 1}}]}}
+{"id": "g05-0178", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "call the plumber", "due_at": "2026-11-28T10:00"}}]}}
+{"id": "g05-0133", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Board meeting", "date_offset": 3, "time": "09:00"}}]}}
+{"id": "g05-0096", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Study session", "date_offset": 3, "time": "19:00", "duration_minutes": 120}}]}}
+{"id": "g10-0072", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g12-0011", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "wifi password", "value": "on the fridge"}}]}}
+{"id": "g08-0249", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0176", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "call the plumber", "due_at": "2026-11-28T10:00"}}]}}
+{"id": "g03-0151", "label": {"needs_live_data": false, "calls": [], "clarification": "Which one do you mean?"}}
+{"id": "g09-0053", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Kochi", "date_offset": 3}}]}}
+{"id": "g05-0094", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Deep work", "date_offset": 1, "time": "14:00", "duration_minutes": 60}}]}}
+{"id": "g05-0204", "label": {"needs_live_data": false, "calls": [], "clarification": "What time should I set it for?"}}
+{"id": "g01-0085", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {}}]}}
+{"id": "g02-0150", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "current British prime minister", "topic": "general"}}]}}
+{"id": "g02-0265", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0160", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0227", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Lagos", "date_offset": 5}}]}}
+{"id": "g07-0131", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g03-0121", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "complete", "title": "call the plumber"}}]}}
+{"id": "g04-0147", "label": {"needs_live_data": false, "calls": [], "clarification": "Which email do you mean?"}}
+{"id": "g01-0277", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 0}}]}}
+{"id": "g02-0346", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0276", "label": {"needs_live_data": true, "calls": [{"tool": "current_time", "args": {"what": "date"}}]}}
+{"id": "g05-0035", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 2}}]}}
+{"id": "g02-0329", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0084", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0199", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 3}}]}}
+{"id": "g04-0334", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0168", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0163", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "renew the passport", "due_at": "2026-10-14T09:00"}}]}}
+{"id": "g06-0258", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "open", "name": "slack"}}, {"tool": "volume_control", "args": {"action": "set", "level": 20}}, {"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g09-0404", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "highlights of yesterday's Mumbai Indians match", "topic": "news"}}]}}
+{"id": "g04-0093", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "to:meera newer_than:7d", "folder": "sent"}}]}}
+{"id": "g06-0019", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "open", "name": "calculator"}}]}}
+{"id": "g05-0001", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g02-0068", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 200, "from": "GBP", "to": "INR"}}]}}
+{"id": "g02-0276", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0194", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0261", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0112", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "population of Pune", "topic": "general"}}]}}
+{"id": "g07-0352", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0335", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 1}}]}}
+{"id": "g06-0004", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "open", "name": "spotify"}}]}}
+{"id": "g05-0058", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g03-0197", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "cat's name", "value": "Mishti"}}]}}
+{"id": "g03-0079", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "lock the shop", "due_at": "2026-11-08T23:00"}}]}}
+{"id": "g01-0183", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Surat", "date_offset": 0}}]}}
+{"id": "g03-0136", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "delete", "title": "buy stamps"}}]}}
+{"id": "g08-0111", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0247", "label": {"needs_live_data": false, "calls": [], "clarification": "Who should it go to?"}}
+{"id": "g07-0074", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g10-0045", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g04-0339", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "from:leela newer_than:7d"}}]}}
+{"id": "g07-0451", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0216", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "how old is Narendra Modi", "topic": "general"}}]}}
+{"id": "g09-0352", "label": {"needs_live_data": false, "calls": [], "clarification": "What would you like to know?"}}
+{"id": "g08-0195", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0192", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "Diwali date 2026", "topic": "general"}}]}}
+{"id": "g09-0278", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Lagos", "date_offset": 2}}]}}
+{"id": "g07-0179", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0478", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0031", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "from:karan newer_than:7d"}}]}}
+{"id": "g07-0465", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0294", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0284", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0553", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g06-0264", "label": {"needs_live_data": true, "calls": [{"tool": "device_status", "args": {"what": "processes"}}, {"tool": "volume_control", "args": {"action": "get"}}]}}
+{"id": "g12-0015", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "cat's name", "value": "Mishti"}}]}}
+{"id": "g02-0195", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "best budget laptops 2026", "topic": "general"}}]}}
+{"id": "g06-0056", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "close", "name": "notepad"}}]}}
+{"id": "g06-0105", "label": {"needs_live_data": true, "calls": [{"tool": "volume_control", "args": {"action": "set", "level": 70}}]}}
+{"id": "g01-0448", "label": {"needs_live_data": true, "calls": [{"tool": "current_time", "args": {"what": "time"}}]}}
+{"id": "g07-0413", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0314", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0052", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "flight booking"}}]}}
+{"id": "g10-0229", "label": {"needs_live_data": false, "calls": [], "clarification": "Who should I send it to?"}}
+{"id": "g02-0141", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "Arsenal latest match result", "topic": "news"}}]}}
+{"id": "g06-0310", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0104", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Pune", "date_offset": 1}}]}}
+{"id": "g05-0250", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g12-0132", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "complete", "title": "send report"}}]}}
+{"id": "g05-0231", "label": {"needs_live_data": false, "calls": [], "clarification": "What day and time should I set it for?"}}
+{"id": "g10-0033", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g01-0263", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 1}}]}}
+{"id": "g09-0166", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0150", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "from:karan"}}]}}
+{"id": "g08-0169", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0001", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 250, "from": "USD", "to": "INR"}}]}}
+{"id": "g01-0303", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 1}}]}}
+{"id": "g08-0047", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g10-0189", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g10-0219", "label": {"needs_live_data": false, "calls": [], "clarification": "What should the email say?"}}
+{"id": "g06-0190", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Oslo"}}, {"tool": "convert_currency", "args": {"amount": 100, "from": "USD", "to": "EUR"}}]}}
+{"id": "g02-0278", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g03-0188", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "buy filter coffee", "due_at": "2026-10-16T18:00"}}]}}
+{"id": "g08-0228", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "bank"}}]}}
+{"id": "g01-0275", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"date_offset": 0}}]}}
+{"id": "g02-0206", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "Nobel Prize in Physics 2026 winner", "topic": "general"}}]}}
+{"id": "g09-0276", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Lagos", "date_offset": 2}}]}}
+{"id": "g07-0073", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0020", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 50000, "from": "INR", "to": "USD"}}]}}
+{"id": "g03-0167", "label": {"needs_live_data": false, "calls": [], "clarification": "Which task should I remove?"}}
+{"id": "g03-0042", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "send the report", "due_at": "2026-10-20T09:00"}}]}}
+{"id": "g07-0045", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0341", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0404", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g12-0004", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "allergy", "value": "shellfish"}}]}}
+{"id": "g09-0182", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g06-0260", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {}}, {"tool": "tasks", "args": {"action": "list"}}]}}
+{"id": "g09-0358", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "how old is the Taj Mahal", "topic": "general"}}]}}
+{"id": "g01-0484", "label": {"needs_live_data": true, "calls": [{"tool": "device_status", "args": {"what": "battery"}}]}}
+{"id": "g07-0102", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0117", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "bank"}}]}}
+{"id": "g04-0095", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"query": "to:meera newer_than:7d", "folder": "sent"}}]}}
+{"id": "g06-0185", "label": {"needs_live_data": true, "calls": [{"tool": "volume_control", "args": {"action": "mute"}}]}}
+{"id": "g04-0140", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "from:karan"}}]}}
+{"id": "g02-0178", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "Air India crash case latest", "topic": "news"}}]}}
+{"id": "g07-0459", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g03-0097", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "list"}}]}}
+{"id": "g12-0179", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_send", "args": {}}]}}
+{"id": "g02-0032", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 1, "from": "EUR", "to": "INR"}}]}}
+{"id": "g01-0124", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Delhi", "date_offset": 1}}]}}
+{"id": "g01-0291", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Toronto", "date_offset": 2}}]}}
+{"id": "g04-0144", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "subject:invoice"}}]}}
+{"id": "g12-0201", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_send", "args": {}}]}}
+{"id": "g10-0151", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g07-0511", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g12-0101", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "delete", "title": "pay rent"}}]}}
+{"id": "g09-0411", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0357", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Oslo", "date_offset": 1}}]}}
+{"id": "g03-0081", "label": {"needs_live_data": false, "calls": [], "clarification": "What should I remind you about?"}}
+{"id": "g06-0312", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0137", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "close", "name": "chrome"}}]}}
+{"id": "g10-0047", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Mumbai"}}]}}
+{"id": "g08-0063", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g02-0321", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0108", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0316", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0128", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Toronto", "date_offset": 1}}]}}
+{"id": "g05-0214", "label": {"needs_live_data": false, "calls": [], "clarification": "What should I call the event?"}}
+{"id": "g07-0360", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0150", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "from:ravi subject:invoice"}}]}}
+{"id": "g10-0307", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "close", "name": "spotify"}}]}}
+{"id": "g04-0302", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0096", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 1, "days": 4}}]}}
+{"id": "g01-0013", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather", "args": {"place": "Lagos"}}]}}
+{"id": "g12-0180", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_send", "args": {}}]}}
+{"id": "g02-0364", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0266", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_create", "args": {"title": "Deep work", "date_offset": 1, "time": "15:00", "duration_minutes": 120}}]}}
+{"id": "g05-0326", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0248", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g07-0418", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0470", "label": {"needs_live_data": true, "calls": [{"tool": "current_time", "args": {"what": "date"}}]}}
+{"id": "g05-0169", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "water the plants", "due_at": "2026-10-15T21:00"}}]}}
+{"id": "g06-0234", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "list"}}, {"tool": "get_weather", "args": {"place": "Lagos"}}]}}
+{"id": "g02-0044", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 1000, "from": "CNY", "to": "INR"}}]}}
+{"id": "g05-0277", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g06-0079", "label": {"needs_live_data": true, "calls": [{"tool": "app_control", "args": {"action": "focus", "name": "spotify"}}]}}
+{"id": "g12-0041", "label": {"needs_live_data": true, "calls": [{"tool": "remember", "args": {"action": "save", "topic": "gym days", "value": "Monday and Thursday"}}]}}
+{"id": "g02-0074", "label": {"needs_live_data": true, "calls": [{"tool": "convert_currency", "args": {"amount": 3000, "from": "JPY", "to": "USD"}}]}}
+{"id": "g08-0196", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g08-0056", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g03-0157", "label": {"needs_live_data": false, "calls": [], "clarification": "Which one do you mean?"}}
+{"id": "g04-0176", "label": {"needs_live_data": false, "calls": [], "clarification": "Which one do you mean?"}}
+{"id": "g08-0140", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0161", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "take my medicine", "due_at": "2026-10-14T19:30"}}]}}
+{"id": "g02-0152", "label": {"needs_live_data": true, "calls": [{"tool": "web_search", "args": {"query": "current prime minister of Britain", "topic": "general"}}]}}
+{"id": "g06-0290", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0325", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0253", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_send", "args": {}}]}}
+{"id": "g05-0177", "label": {"needs_live_data": true, "calls": [{"tool": "tasks", "args": {"action": "add", "title": "call the plumber", "due_at": "2026-11-28T10:00"}}]}}
+{"id": "g04-0012", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_search", "args": {"unread_only": true}}]}}
+{"id": "g07-0525", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g04-0347", "label": {"needs_live_data": true, "calls": [{"tool": "gmail_read", "args": {"query": "from:leela"}}]}}
+{"id": "g04-0291", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g09-0086", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 2}}]}}
+{"id": "g03-0204", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g05-0240", "label": {"needs_live_data": true, "calls": [{"tool": "calendar_agenda", "args": {"date_offset": 0}}]}}
+{"id": "g10-0169", "label": {"needs_live_data": true, "calls": []}}
+{"id": "g08-0357", "label": {"needs_live_data": false, "calls": []}}
+{"id": "g01-0313", "label": {"needs_live_data": true, "calls": [{"tool": "get_weather_forecast", "args": {"place": "Lagos", "date_offset": 6}}]}}

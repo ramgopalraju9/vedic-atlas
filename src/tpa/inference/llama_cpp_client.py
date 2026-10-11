@@ -82,7 +82,8 @@ class LlamaCppClient:
             # Qwen3's documented soft-switch for engines (like raw
             # llama-cpp-python) that don't expose chat-template-level
             # thinking control.
-            prompt = f"{prompt} /no_think"
+            # Own line: appended to the user's words the model copied it into arguments (a task titled "/no_think").
+            prompt = f"{prompt}\n/no_think"
         messages = []
         if system:
             messages.append({"role": "system", "content": system})

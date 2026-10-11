@@ -1,0 +1,33 @@
+name: gmail_draft
+agent: google
+description: Write an email and save it as a draft. It is read back, NOT sent.
+reply_mode: template        # the draft is read back verbatim, with the resolved address
+permission_level: notify
+returns: value
+private: true
+requires_online: true
+hosts: [gmail.googleapis.com, oauth2.googleapis.com]
+
+params:
+  to:
+    type: string
+    required: true
+    description: the recipient's email address, or their name as the user said it
+  subject:
+    type: string
+    required: true
+    description: a short subject line
+  body:
+    type: string
+    required: true
+    description: the email text, as the user dictated it
+
+examples:
+  - user: email Priya that I'll be ten minutes late
+    calls: [{tool: gmail_draft, args: {to: Priya, subject: Running late, body: "Hi Priya, I'll be ten minutes late."}}]
+    prompt_example: true
+  - user: write to sam@example.com asking for the invoice
+    calls: [{tool: gmail_draft, args: {to: sam@example.com, subject: Invoice, body: "Hi Sam, could you send me the invoice? Thanks."}}]
+
+claims:
+  - '\b(i(''| ha)?ve (drafted|saved a draft|written the email)|(a )?draft (is|has been) (ready|saved|created))\b'

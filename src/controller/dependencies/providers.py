@@ -17,14 +17,12 @@ from fastapi import HTTPException, Request
 
 if TYPE_CHECKING:
     from domain.ports.governance_port import GovernanceProvider
-    from domain.ports.memory_repository_port import MemoryRepositoryPort
     from service.agent.supervisor import SupervisorAgent
+    from service.sensing.ambient_dispatcher import AmbientDispatcher
     from service.approval.approval_broker import ApprovalBroker
     from domain.ports.trace_repository_port import TraceRepositoryPort
     from service.lookup.health_service import LookupHealthService
-    from service.lookup.lookup_service import LookupService
     from service.memory.knowledge_base import KnowledgeBase
-    from service.sensing.event_bus import EventBus
     from service.speakers.speaker_enrollment_service import SpeakerEnrollmentService
 
 
@@ -39,8 +37,8 @@ def get_supervisor(request: Request) -> "SupervisorAgent":
     return _require(request, "supervisor", "supervisor")
 
 
-def get_event_bus(request: Request) -> "EventBus":
-    return _require(request, "event_bus", "event bus")
+def get_ambient_dispatcher(request: Request) -> "AmbientDispatcher":
+    return _require(request, "ambient_dispatcher", "ambient dispatcher")
 
 
 def get_approval_broker(request: Request) -> "ApprovalBroker":
@@ -49,14 +47,6 @@ def get_approval_broker(request: Request) -> "ApprovalBroker":
 
 def get_knowledge_base(request: Request) -> "KnowledgeBase":
     return _require(request, "knowledge", "knowledge base")
-
-
-def get_memory(request: Request) -> "MemoryRepositoryPort":
-    return _require(request, "memory", "memory repository")
-
-
-def get_lookup_service(request: Request) -> "LookupService":
-    return _require(request, "lookup_service", "lookup service")
 
 
 def get_trace_repo(request: Request) -> "TraceRepositoryPort":
@@ -72,13 +62,17 @@ def get_governance(request: Request) -> "GovernanceProvider | None":
     return getattr(request.app.state, "governance", None)
 
 
-def get_semantic_recall(request: Request):
-    """Optional — None when embeddings are unavailable; routes handle that."""
-    return getattr(request.app.state, "semantic_recall", None)
-
-
 def get_task_service(request: Request):
     return _require(request, "task_service", "task service")
+
+
+def get_google_auth(request: Request):
+    """503 when Google tools are not registered (online tools disabled)."""
+    return _require(request, "google_auth", "Google sign-in")
+
+
+def get_reminders(request: Request):
+    return _require(request, "reminders", "reminders")
 
 
 def get_speaker_enrollment_service(request: Request) -> "SpeakerEnrollmentService":

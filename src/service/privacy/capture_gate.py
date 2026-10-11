@@ -58,6 +58,8 @@ class CaptureGate:
         self._audio = audio
         self._bus = bus
         self._status_display = status_display
+        self._capture_paused = False
+        self._capture_lifecycle_lock = threading.RLock()
         # Guards _state against the mute-switch callback arriving on a
         # foreign thread (pynput's listener thread) while a reader is in
         # is_muted() on the event loop thread.
@@ -88,7 +90,9 @@ class CaptureGate:
 
     def stop(self) -> None:
         """Mute and release the mic. Always safe to call twice."""
-        self._apply(muted=True, source="shutdown", previous=self._state.muted)
+        with self._capture_lifecycle_lock:
+            self._capture_paused = False
+            self._apply(muted=True, source="shutdown", previous=self._state.muted)
         stopper = getattr(self._mute_switch, "stop", None)
         if callable(stopper):
             try:
@@ -104,6 +108,31 @@ class CaptureGate:
         with self._lock:
             return self._state.muted
 
+    def pause_capture(self, source: str = "voice_turn") -> None:
+        """Stop audio capture temporarily without changing the user's mute state."""
+        with self._capture_lifecycle_lock:
+            if self._capture_paused:
+                return
+            self._capture_paused = True
+            if not self.is_muted():
+                self._stop_audio()
+            logger.info(f"[capture-gate] capture paused (source={source!r})")
+
+    def resume_capture(self, source: str = "voice_turn") -> bool:
+        """Resume capture unless the user has muted the microphone meanwhile."""
+        with self._capture_lifecycle_lock:
+            if not self._capture_paused:
+                return not self.is_muted()
+            self._capture_paused = False
+            muted = self.is_muted()
+            if not muted:
+                self._start_audio()
+            logger.info(
+                f"[capture-gate] capture {'remains stopped' if muted else 'resumed'} "
+                f"(source={source!r})"
+            )
+            return not muted
+
     @property
     def state(self) -> CaptureState:
         with self._lock:
@@ -114,6 +143,11 @@ class CaptureGate:
     def set_muted(self, muted: bool, source: str = "api") -> CaptureState:
         """Software mute path (UI / API / CLI). Same code path as hardware."""
         previous = self.is_muted()
+        # A physical switch in the muted position wins: software may not unmute over it.
+        forced = getattr(self._mute_switch, "is_forced_muted", None)
+        if not muted and callable(forced) and forced():
+            logger.warning(f"[capture-gate] unmute from {source!r} refused: hardware switch is in the MUTED position")
+            return self.state
         self._apply(muted=muted, source=source, previous=previous)
         # Keep an input device's toggle baseline aligned so a later hotkey
         # press toggles from the gate's real state — the gate stays the one
@@ -136,18 +170,20 @@ class CaptureGate:
         # can never be live with a dark light. Muting: close the mic FIRST,
         # then update the light — on the way down, stopping capture is the
         # guarantee that matters most.
-        if not muted:
-            if not self._drive_indicator(False):
-                logger.error("[capture-gate] indicator failed on unmute — staying MUTED (fail-closed)")
+        with self._capture_lifecycle_lock:
+            if not muted:
+                if not self._drive_indicator(False):
+                    logger.error("[capture-gate] indicator failed on unmute — staying MUTED (fail-closed)")
+                    self._drive_indicator(True)
+                    self._commit(muted=True, source=f"{source}:indicator-failed", previous=previous)
+                    return
+                if not self._capture_paused:
+                    self._start_audio()
+            else:
+                self._stop_audio()
                 self._drive_indicator(True)
-                self._commit(muted=True, source=f"{source}:indicator-failed", previous=previous)
-                return
-            self._start_audio()
-        else:
-            self._stop_audio()
-            self._drive_indicator(True)
 
-        self._commit(muted=muted, source=source, previous=previous)
+            self._commit(muted=muted, source=source, previous=previous)
 
     def _commit(self, *, muted: bool, source: str, previous: bool) -> None:
         with self._lock:

@@ -8,7 +8,7 @@ from pathlib import Path
 
 # Project metadata
 PROJECT_NAME = "Veda"
-VERSION = "0.1.0"
+VERSION = "1.1.0"
 API_PREFIX = "/api"
 
 # Project paths (this file lives at src/core/constants.py — one level up to root)

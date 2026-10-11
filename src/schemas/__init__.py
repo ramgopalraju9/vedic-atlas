@@ -6,16 +6,13 @@ here — an omission, not corrected on purpose).
 """
 
 from schemas.schemas import AppError, AppResponse
-from schemas.chat import ChatRequest, ChatResponse, StreamRequest
+from schemas.chat import StreamRequest
 from schemas.knowledge import FactList, FactRequest
 from schemas.persona import PersonaInfo, PersonaState, PersonaUpdateRequest, PERSONA_CATALOG, lookup
-from schemas.system import SystemInfo
 
 __all__ = [
     "AppError",
     "AppResponse",
-    "ChatRequest",
-    "ChatResponse",
     "StreamRequest",
     "FactList",
     "FactRequest",
@@ -24,5 +21,4 @@ __all__ = [
     "PersonaUpdateRequest",
     "PERSONA_CATALOG",
     "lookup",
-    "SystemInfo",
 ]

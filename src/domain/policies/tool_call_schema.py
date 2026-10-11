@@ -37,18 +37,23 @@ def tool_args_schema(manifest: ToolManifest) -> dict[str, Any]:
     return schema
 
 
-def build_route_schema(agent_names: list[str]) -> dict[str, Any]:
-    """JSON-schema for the router's `{"agent": "<name>"}` answer: `agent` can only be a real agent."""
-    return {
-        "type": "object",
-        "properties": {"agent": {"enum": list(agent_names)}},
-        "required": ["agent"],
-        "additionalProperties": False,
-    }
+CONTROL_KEYS = ("needs_live_data", "calls", "clarification")   # emission order; the flag is decoded BEFORE the calls
+CLARIFICATION_MAX_CHARS = 200
 
 
-def build_call_schema(manifests: list[ToolManifest], *, min_calls: int = 0, max_calls: int = MAX_CALLS) -> dict[str, Any]:
-    """JSON-schema for `{"calls": [...]}` over the given tools."""
+def build_control_schema(
+    manifests: list[ToolManifest], *, max_calls: int = MAX_CALLS, key_order: tuple[str, ...] = CONTROL_KEYS
+) -> dict[str, Any]:
+    """JSON-schema for the unified control decode:
+    `{"needs_live_data": bool, "calls": [...]}` plus an OPTIONAL `"clarification": str` that the model writes only
+    when it is asking a question. Decode time is ~0.35 s per output token on the target CPU, so an always-present
+    `"clarification":null` cost about 2 s on nearly every turn.
+
+    `calls` may be empty (minItems 0) and is NEVER forced to hold one: forcing a call is what turned a mention
+    of "weather" into a weather answer. llama.cpp emits the properties in the order given, so `key_order` decides
+    whether the model commits to `needs_live_data` before or after it picks the calls."""
+    if sorted(key_order) != sorted(CONTROL_KEYS):
+        raise ValueError(f"key_order must be a permutation of {CONTROL_KEYS}")
     one_of = [
         {
             "type": "object",
@@ -58,10 +63,21 @@ def build_call_schema(manifests: list[ToolManifest], *, min_calls: int = 0, max_
         }
         for m in manifests
     ]
-    item: dict[str, Any] = one_of[0] if len(one_of) == 1 else {"oneOf": one_of}
+    if not one_of:
+        calls: dict[str, Any] = {"type": "array", "maxItems": 0}
+    else:
+        item: dict[str, Any] = one_of[0] if len(one_of) == 1 else {"oneOf": one_of}
+        calls = {"type": "array", "items": item, "minItems": 0, "maxItems": max_calls}
+    props = {
+        "needs_live_data": {"type": "boolean"},
+        "calls": calls,
+        "clarification": {"type": "string", "maxLength": CLARIFICATION_MAX_CHARS},
+    }
     return {
         "type": "object",
-        "properties": {"calls": {"type": "array", "items": item, "minItems": min_calls, "maxItems": max_calls}},
-        "required": ["calls"],
+        "properties": {k: props[k] for k in key_order},
+        "required": [k for k in key_order if k != "clarification"],   # optional: absent = not asking (saves ~5 tokens a turn)
         "additionalProperties": False,
     }
+
+

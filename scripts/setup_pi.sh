@@ -460,7 +460,13 @@ summary() {
     Next:
       1. copy data/models/openwakeword/hey_veda.onnx and hey_veda.onnx.data from your PC (if not done)
       2. put TAVILY_API_KEY in $ROOT/.env for web search
-      3. start Veda with the profile that matches the model you downloaded ($MODEL):
+      3. mail and calendar: put GOOGLE_API_CLIENT_ID and GOOGLE_CLIENT_SECRET in $ROOT/.env, then sign in once:
+             veda login --manual        (no browser on the Pi: open the address on another device, paste the result back)
+             veda login --check         (verify the saved sign-in; later runs reuse it, no new sign-in after a restart)
+         Without them, mail and calendar requests answer that they are not set up.
+      4. optional, the fine-tuned router: copy router-Q4_K_M.gguf (or Q5_K_M) by hand into $ROOT/data/router/ and set
+         VEDA_PROFILE=router-q4 (or router-q5) instead of the profile below. Not downloaded by this script.
+      5. start Veda with the profile that matches the model you downloaded ($MODEL):
              source $VENV/bin/activate
              veda
          (the microphone starts muted; unmute from the prompt with /unmute)

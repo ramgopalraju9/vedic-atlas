@@ -24,6 +24,7 @@ from core.logging_config import logger
 from domain.entities.agent_context import AgentContext
 from domain.entities.skill_result import SkillResult
 from domain.entities.tool_manifest import ToolManifest
+from domain.policies.calendar_policy import looks_like_calendar_entry
 from service.skills.manifest_skill import ManifestSkill
 from service.tasks.task_service import TaskService
 
@@ -63,6 +64,12 @@ class TasksSkill(ManifestSkill):
         title = str(params.get("title") or "").strip()
         if not title:
             return self._fail("title required for add", "What should I add?")
+        if looks_like_calendar_entry(title):
+            # "block calendar for Manoj" is an event, not a to-do; saying so beats filing it where it will never alert anyone.
+            return self._fail(
+                "title describes a calendar event, not a task",
+                "That sounds like a calendar event rather than a task. Tell me the day and time and I'll add it to your calendar.",
+            )
         if len(title) > _MAX_TITLE:
             return self._fail(f"title too long (max {_MAX_TITLE} characters)", "That task title is too long.")
         task, created = self._service.add_unique(

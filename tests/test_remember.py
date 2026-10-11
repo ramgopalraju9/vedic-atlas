@@ -176,14 +176,7 @@ def test_facts_stay_in_the_prompt_when_recalled_summaries_are_added(tmp_path):
     assert "favourite sweet: gulab jamun" in prompt and "asked about Paris" in prompt
 
 
-# ---- routing and the guard ---------------------------------------------------------------------
-
-def test_the_guard_requires_a_call_for_explicit_remember_requests():
-    guard = ToolUseGuard(MANIFESTS)
-    assert "remember" in guard.required_tools("remember that I'm allergic to peanuts")
-    assert "remember" in guard.required_tools("what do you remember about me?")
-    assert "remember" not in guard.required_tools("what is my favourite sweet?")      # answered from the prompt
-
+# ---- the claims guard ---------------------------------------------------------------------------
 
 def test_a_claim_to_have_saved_something_is_flagged_but_ordinary_talk_is_not():
     guard = ToolUseGuard(MANIFESTS)

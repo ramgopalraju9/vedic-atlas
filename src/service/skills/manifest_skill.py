@@ -38,6 +38,7 @@ class ManifestSkill(BaseSkill):
             enabled=enabled,
         )
         self._manifest = manifest
+        self.sensitive_output = manifest.private   # SkillRunner keeps this skill's output out of hooks and skill_results
         self._allowed = frozenset(p.name for p in manifest.params)
 
     def get_parameters_description(self) -> str:

@@ -76,17 +76,40 @@ class SqliteVectorStore:
         top_k: int = 5,
         sources: tuple[str, ...] | None = None,
     ) -> list[MemoryHit]:
+        import numpy as np
+
         with self._session() as s:
-            stmt = select(MemoryVectorRow).where(MemoryVectorRow.model_id == model_id)
+            stmt = select(
+                MemoryVectorRow.source, MemoryVectorRow.ref_id, MemoryVectorRow.text, MemoryVectorRow.vector,
+            ).where(MemoryVectorRow.model_id == model_id)
             if sources:
                 stmt = stmt.where(MemoryVectorRow.source.in_(list(sources)))
-            rows = list(s.scalars(stmt))
-        hits = [
-            MemoryHit(source=r.source, ref_id=r.ref_id, text=r.text, score=_cosine(vector, _unpack(r.vector)))
-            for r in rows
-        ]
-        hits.sort(key=lambda h: h.score, reverse=True)
-        return hits[:top_k]
+            rows = [r for r in s.execute(stmt).all() if r[3] and len(r[3]) == 4 * len(vector)]
+        query = np.asarray(vector, dtype=np.float32)
+        qnorm = float(np.linalg.norm(query))
+        if not rows or qnorm == 0.0:
+            return []
+        matrix = np.vstack([np.frombuffer(r[3], dtype="<f4") for r in rows])   # one matrix product, not a Python loop per row
+        norms = np.linalg.norm(matrix, axis=1) * qnorm
+        scores = np.divide(matrix @ query, norms, out=np.zeros(len(rows), dtype=np.float32), where=norms > 0)
+        best = np.argsort(-scores)[:top_k]
+        return [MemoryHit(source=rows[i][0], ref_id=rows[i][1], text=rows[i][2], score=float(scores[i])) for i in best]
+
+    def ref_ids(self, *, source: str, model_id: str) -> set[str]:
+        with self._session() as s:
+            return set(s.scalars(select(MemoryVectorRow.ref_id).where(
+                MemoryVectorRow.source == source, MemoryVectorRow.model_id == model_id,
+            )))
+
+    def delete_refs(self, *, source: str, ref_ids: set[str]) -> int:
+        ids = list(ref_ids)
+        removed = 0
+        with self._session() as s, s.begin():
+            for k in range(0, len(ids), 500):
+                removed += s.execute(sa_delete(MemoryVectorRow).where(
+                    MemoryVectorRow.source == source, MemoryVectorRow.ref_id.in_(ids[k:k + 500]),
+                )).rowcount or 0
+        return removed
 
     def has(self, *, source: str, ref_id: str, model_id: str) -> bool:
         with self._session() as s:

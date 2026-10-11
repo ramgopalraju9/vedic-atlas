@@ -23,6 +23,9 @@ def _to_entity(row: TurnTraceRow) -> TurnTrace:
         narrated=row.narrated, total_ms=row.total_ms, calls=json.loads(row.calls_json or "[]"),
         prompt_tokens=meta.get("prompt_tokens", {}), timings_ms=meta.get("timings_ms", {}),
         notes=meta.get("notes", []),
+        state_used=meta.get("state_used", False), slots_inherited=meta.get("slots_inherited", []),
+        needs_live_data=meta.get("needs_live_data"), clarified=meta.get("clarified", False),
+        prefix_cache_hit=meta.get("prefix_cache_hit"),
     )
 
 
@@ -38,7 +41,12 @@ class SqliteTraceRepository:
                 forced=trace.forced, narrated=trace.narrated, total_ms=trace.total_ms,
                 calls_json=json.dumps(trace.calls, default=str, ensure_ascii=False),
                 meta_json=json.dumps(
-                    {"prompt_tokens": trace.prompt_tokens, "timings_ms": trace.timings_ms, "notes": trace.notes},
+                    {
+                        "prompt_tokens": trace.prompt_tokens, "timings_ms": trace.timings_ms, "notes": trace.notes,
+                        "state_used": trace.state_used, "slots_inherited": trace.slots_inherited,
+                        "needs_live_data": trace.needs_live_data, "clarified": trace.clarified,
+                        "prefix_cache_hit": trace.prefix_cache_hit,
+                    },
                     ensure_ascii=False,
                 ),
             )

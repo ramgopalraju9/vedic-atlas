@@ -23,12 +23,24 @@ from service.lookup.lookup_service import LookupService
 _MAX_QUERY = 200
 _SPOKEN_CHARS = 320
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
+# A full stop after an initial ("N. R. Murthy") or a title ("Dr.", "St.") does not end a sentence.
+_ABBREVIATION_END = re.compile(r"(?:^|\s)(?:[A-Z]|Mr|Mrs|Ms|Dr|Prof|St|Jr|Sr|vs|No|Inc|Ltd|Co|Rs)\.$")
+
+
+def _sentences(text: str) -> list[str]:
+    merged: list[str] = []
+    for part in _SENTENCE_RE.split(" ".join((text or "").split())):
+        if merged and _ABBREVIATION_END.search(merged[-1]):
+            merged[-1] = f"{merged[-1]} {part}"
+        else:
+            merged.append(part)
+    return merged
 
 
 def _first_sentences(text: str, limit: int = _SPOKEN_CHARS) -> str:
     """Whole sentences up to `limit` characters (at least the first, clipped if it alone is too long)."""
     out = ""
-    for sentence in _SENTENCE_RE.split(" ".join((text or "").split())):
+    for sentence in _sentences(text):
         if out and len(out) + 1 + len(sentence) > limit:
             break
         out = f"{out} {sentence}".strip()

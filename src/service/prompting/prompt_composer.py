@@ -27,11 +27,21 @@ from typing import Callable, Sequence
 
 from domain.entities.conversation import Turn
 from domain.entities.tool_manifest import ToolManifest, ToolParam
+from domain.policies.tool_call_schema import CONTROL_KEYS
 from domain.policies.token_budget_policy import PromptBudgets, estimate_tokens
 from domain.ports.tool_manifest_store_port import PromptStorePort
 
 _TURN_CHARS = 200        # a history turn is cut to this many characters
 _USER_MSG_CHARS = 500
+
+# Content-stage tasks: task -> (prompt file holding its instruction, label the document carries in the prompt).
+# "narrate" keeps the label "TOOL RESULT" it has always had.
+CONTENT_TASKS = {
+    "narrate": ("narrate", "TOOL RESULT"),
+    "summarise": ("content_summarise", "DOCUMENT"),
+    "draft_reply": ("content_draft_reply", "DOCUMENT"),
+    "extract": ("content_extract", "DOCUMENT"),
+}
 
 
 @dataclass
@@ -51,21 +61,19 @@ class PromptComposer:
         budgets: PromptBudgets | None = None,
         count_tokens: Callable[[str], int] = estimate_tokens,
         now: Callable[[], datetime] = datetime.now,
+        turn_chars: int = _TURN_CHARS,
+        user_message_chars: int = _USER_MSG_CHARS,
     ):
         self._prompts = prompts
         self._manifests = {m.name: m for m in manifests}
         self.budgets = budgets or PromptBudgets()
         self._count = count_tokens
         self._now = now
-        self._static_cache: dict[tuple[str, ...], str] = {}
+        self._turn_chars = turn_chars
+        self._user_msg_chars = user_message_chars
+        self._control_static: dict[tuple[str, ...], str] = {}  # keyed by the JSON key order only, never by a tool subset
 
     # ---- lookups ----------------------------------------------------------
-
-    def manifests_for(self, tool_names: Sequence[str]) -> list[ToolManifest]:
-        return [self._manifests[n] for n in tool_names if n in self._manifests]
-
-    def tools_of_agent(self, agent: str) -> list[str]:
-        return [m.name for m in self._manifests.values() if m.agent == agent]
 
     # ---- rendering helpers -----------------------------------------------
 
@@ -78,136 +86,154 @@ class PromptComposer:
         return f"- {m.name}({', '.join(one(p) for p in m.params)}) - {m.description}"
 
     @staticmethod
-    def _example(m: ToolManifest) -> list[str]:
-        lines = []
-        for ex in m.examples:
-            payload = json.dumps({"calls": list(ex.calls)}, separators=(",", ":"), ensure_ascii=False)
-            lines.append(f"User: {ex.user}\n{payload}")
-        return lines
-
-    def _static_call_text(self, tool_names: Sequence[str]) -> str:
-        key = tuple(tool_names)
-        if key not in self._static_cache:
-            manifests = self.manifests_for(tool_names)
-            tools = "\n".join(self._signature(m) for m in manifests)
-            examples = "\n".join(line for m in manifests for line in self._example(m))
-            body = self._prompts.get("call_stage").replace("<<tools>>", tools).replace("<<examples>>", examples)
-            self._static_cache[key] = f"{self._prompts.get('persona_lite')}\n\n{body}"
-        return self._static_cache[key]
-
-    @staticmethod
     def _clip(text: str, limit: int) -> str:
         text = " ".join((text or "").split())
         return text if len(text) <= limit else text[: limit - 1] + "…"
 
-    def _history_lines(self, history: Sequence[Turn], keep: int) -> list[str]:
-        lines = []
-        for t in list(history)[-keep:] if keep > 0 else []:
-            content = self._clip(t.content, _TURN_CHARS)
-            if content:
-                lines.append(f"{'User' if t.role == 'user' else 'Veda'}: {content}")
-        return lines
+    def _static_control_text(self, key_order: tuple[str, ...]) -> str:
+        """persona_lite + control_stage.md with EVERY tool signature. Byte-identical every turn: it holds no date,
+        history, state or user text, and exactly one tool set exists, so there is exactly one cached prefix."""
+        if key_order not in self._control_static:
+            tools = "\n".join(self._signature(m) for m in self._manifests.values())
+            body = self._prompts.get("control_stage").replace("<<tools>>", tools).replace(
+                "<<tool_examples>>", self._flagged_examples()
+            )
+            body = "\n".join(self._in_key_order(line, key_order) for line in body.splitlines())
+            self._control_static[key_order] = f"{self._prompts.get('persona_lite')}\n\n{body}"
+        return self._control_static[key_order]
 
-    # ---- stages -----------------------------------------------------------
+    def _flagged_examples(self) -> str:
+        """The ONE example per tool that opts in with `prompt_example: true`, as control decisions. Every other
+        example stays in the manifest for tests and docs only, so prompt size grows by one line pair per tool at
+        most, never by every example. (A call always sets needs_live_data true, as the rules state.)"""
+        lines: list[str] = []
+        for m in self._manifests.values():
+            for ex in m.examples:
+                if ex.prompt_example:
+                    decision = {"needs_live_data": True, "calls": list(ex.calls)}
+                    lines.append(f"User: {ex.user}\n" + json.dumps(decision, separators=(",", ":"), ensure_ascii=False))
+        return "\n".join(lines)
 
-    def call_stage(self, tool_names: Sequence[str], user_message: str, history: Sequence[Turn] = ()) -> ComposedPrompt:
-        system = self._static_call_text(tool_names)
+    @staticmethod
+    def _in_key_order(line: str, key_order: tuple[str, ...]) -> str:
+        """Re-serialise an example decision line so its keys follow the schema's emission order; the grammar and the
+        examples must agree or the model is shown one order and forced into another."""
+        if not line.startswith('{"needs_live_data"'):
+            return line
+        try:
+            data = json.loads(line)
+        except ValueError:
+            return line
+        if not set(data) <= set(CONTROL_KEYS):
+            return line
+        return json.dumps({k: data[k] for k in key_order if k in data}, separators=(",", ":"), ensure_ascii=False)
+
+    @staticmethod
+    def _exchange_turns(history: Sequence[Turn], exchanges: int) -> list[Turn]:
+        """The last `exchanges` complete user->assistant pairs, oldest first. Whole pairs only: a lone user turn
+        or a leading assistant turn is dropped, so RECENT never starts mid-conversation."""
+        pairs: list[tuple[Turn, Turn]] = []
+        turns = list(history)
+        i = len(turns) - 1
+        while i > 0 and len(pairs) < max(exchanges, 0):
+            if turns[i].role != "user" and turns[i - 1].role == "user":
+                pairs.append((turns[i - 1], turns[i]))
+                i -= 2
+            else:
+                i -= 1
+        return [t for pair in reversed(pairs) for t in pair]
+
+    def control_stage(
+        self,
+        user_message: str,
+        history: Sequence[Turn] = (),
+        active: str = "",
+        *,
+        exchanges: int = 2,
+        key_order: tuple[str, ...] = CONTROL_KEYS,
+        show_empty: bool = False,
+    ) -> ComposedPrompt:
+        """The one decision prompt. SYSTEM is static; the volatile tail is `ACTIVE + RECENT + TODAY + USER`.
+        Over budget, the oldest exchange goes first, then ACTIVE is kept (it is ~25 tokens and the most informative)."""
+        system = self._static_control_text(key_order)
         today = f"TODAY: {self._now().strftime('%A %d %b %Y, %H:%M')}."
-        user_line = f"USER: {self._clip(user_message, _USER_MSG_CHARS)}"
-        keep = self.budgets.call_history_turns
+        user_line = f"USER: {self._clip(user_message, self._user_msg_chars)}"
         trimmed: list[str] = []
-
+        keep = exchanges
         while True:
-            hist = self._history_lines(history, keep)
-            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [today, user_line])
+            lines = [
+                f"{'User' if t.role == 'user' else 'Veda'}: {self._clip(t.content, self._turn_chars)}"
+                for t in self._exchange_turns(history, keep)
+                if self._clip(t.content, self._turn_chars)
+            ]
+            # show_empty: say "none" explicitly so the model SEES that there is nothing to continue, instead of
+            # having to infer it from an absent line (omitting is the default and the design doc's layout).
+            head = [active] if active else (["ACTIVE: none"] if show_empty else [])
+            recent = [("RECENT:\n" + "\n".join(lines))] if lines else (["RECENT: none"] if show_empty else [])
+            volatile = "\n".join(head + recent + [today, user_line])
             total = self._count(system) + self._count(volatile)
-            if total <= self.budgets.call or keep == 0:
+            if total <= self.budgets.control or keep == 0:
                 break
             keep -= 1
-            trimmed.append("history_turn")
-
+            trimmed.append("history_exchange")
         sections = {
             "static": self._count(system),
-            "history": self._count("\n".join(hist)) if hist else 0,
+            "active": self._count(active) if active else 0,
+            "history": self._count("\n".join(lines)) if lines else 0,
             "user": self._count(user_line),
         }
         return ComposedPrompt(system=system, prompt=volatile, tokens=total, sections=sections, trimmed=trimmed)
 
-    def _tools_clause(self, agent: str) -> str:
-        """" Tools: name (what it does); ..." for the tools this agent owns, so the router knows what each can do."""
-        owned = [m for m in self._manifests.values() if m.agent == agent]
-        if not owned:
-            return ""
-
-        def short(text: str) -> str:  # first sentence, cut at a word: the router needs "what", not the usage caveats
-            first = re.split(r"\.\s|;\s", " ".join(text.split()), maxsplit=1)[0].rstrip(".")
-            if len(first) > 60:
-                first = first[:60].rsplit(" ", 1)[0]
-            first = re.sub(r"\s*\([^)]*$", "", first)  # drop a parenthesis the cut left open
-            return first.rstrip(" ,;:-")
-
-        return ". Tools: " + "; ".join(f"{m.name} - {short(m.description)}" for m in owned) + "."
-
-    def route_stage(
-        self, agents: Sequence[tuple[str, str]], user_message: str, history: Sequence[Turn] = ()
-    ) -> ComposedPrompt:
-        """Routing prompt: each agent with its one-line description, plus example phrases taken from
-        the tool manifests (so adding a tool teaches the router about it with no code change)."""
-        agent_lines = "\n".join(f"- {name}: {desc}{self._tools_clause(name)}" for name, desc in agents)
-        example_lines = []
-        for name, _ in agents:
-            seen = 0
-            for m in self._manifests.values():
-                if m.agent != name:
-                    continue
-                for ex in m.examples[:1]:  # one per tool: the fixed examples in router.md cover the hard cases
-                    if seen >= 3:
-                        break
-                    example_lines.append(f'"{ex.user}" -> {name}')
-                    seen += 1
-        system = (
-            self._prompts.get("router")
-            .replace("<<agents>>", agent_lines)
-            .replace("<<examples>>", "\n".join(example_lines))
-        )
-        keep = 2
-        trimmed: list[str] = []
-        while True:
-            hist = self._history_lines(history, keep)
-            volatile = "\n".join(([("RECENT:\n" + "\n".join(hist))] if hist else []) + [f"Message: {self._clip(user_message, _USER_MSG_CHARS)}\nAnswer:"])
-            total = self._count(system) + self._count(volatile)
-            if total <= self.budgets.route or keep == 0:
-                break
-            keep -= 1
-            trimmed.append("history_turn")
-        return ComposedPrompt(system=system, prompt=volatile, tokens=total,
-                              sections={"static": self._count(system), "history": self._count("\n".join(hist)) if hist else 0},
-                              trimmed=trimmed)
-
     def narrate_stage(self, user_message: str, tool_results: Sequence[str]) -> ComposedPrompt:
-        system = f"{self._prompts.get('persona_lite')}\n\n{self._prompts.get('narrate')}"
+        """Phrase tool results for the user: the `narrate` task of the content stage."""
         result = "\n".join(r.strip() for r in tool_results if r and r.strip())
+        return self.content_stage("narrate", result, user_message)
+
+    def content_stage(self, task: str, document: str, user_message: str, *, max_tokens: int = 0) -> ComposedPrompt:
+        """The data plane: reason over ONE capped document. No tool list, no history, ever.
+
+        SYSTEM is the same for every task (persona + preamble), so all tasks share one cached prefix; the task
+        instruction rides in the volatile tail. `max_tokens` is the producing tool's `max_result_tokens`, applied
+        before anything else; the stage's own `observation_max` / `narrate` budgets still apply after it."""
+        if task not in CONTENT_TASKS:
+            raise ValueError(f"unknown content task {task!r}; expected one of {sorted(CONTENT_TASKS)}")
+        system = f"{self._prompts.get('persona_lite')}\n\n{self._prompts.get('content_stage')}"
+        instruction = self._prompts.get(CONTENT_TASKS[task][0]).strip()
+        label = CONTENT_TASKS[task][1]
+        result = self.cap_tokens(document, max_tokens)
         trimmed: list[str] = []
+        if result != document:
+            trimmed.append("tool_result")
         cap = self.budgets.observation_max
         if self._count(result) > cap:
             result = self._truncate_tokens(result, cap)
-            trimmed.append("tool_result")
-        question = self._clip(user_message, _USER_MSG_CHARS)
+            if "tool_result" not in trimmed:
+                trimmed.append("tool_result")
+        question = self._clip(user_message, self._user_msg_chars)
         today = f"TODAY: {self._now().strftime('%d %b %Y')}"
-        prompt = f"{today}\nQUESTION: {question}\nTOOL RESULT:\n{result}\n\nAnswer:"
+
+        def build(doc: str) -> str:
+            return f"TASK: {instruction}\n{today}\nQUESTION: {question}\n{label}:\n{doc}\n\nAnswer:"
+
+        prompt = build(result)
         total = self._count(system) + self._count(prompt)
         if total > self.budgets.narrate:
-            trimmed.append("tool_result")
+            if "tool_result" not in trimmed:
+                trimmed.append("tool_result")
             target = max(50, self._count(result) - (total - self.budgets.narrate))
             while True:  # the ellipsis suffix can cost a token, so re-check until it fits
                 result = self._truncate_tokens(result, target)
-                prompt = f"{today}\nQUESTION: {question}\nTOOL RESULT:\n{result}\n\nAnswer:"
+                prompt = build(result)
                 total = self._count(system) + self._count(prompt)
                 if total <= self.budgets.narrate or target <= 50:
                     break
                 target -= 8
         sections = {"static": self._count(system), "tool_result": self._count(result)}
         return ComposedPrompt(system=system, prompt=prompt, tokens=total, sections=sections, trimmed=trimmed)
+
+    def cap_tokens(self, text: str, max_tokens: int) -> str:
+        """Cut a tool result to `max_tokens` before it can reach any prompt (a tool's own `max_result_tokens`)."""
+        return self._truncate_tokens(text, max_tokens) if max_tokens > 0 else text
 
     def _truncate_tokens(self, text: str, max_tokens: int) -> str:
         """Cut `text` so it fits `max_tokens` (binary search on characters)."""

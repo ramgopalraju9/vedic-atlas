@@ -30,6 +30,11 @@ class TraceOut(BaseModel):
     prompt_tokens: dict[str, int] = {}
     timings_ms: dict[str, int] = {}
     notes: list[str] = []
+    state_used: bool = False
+    slots_inherited: list[str] = []
+    needs_live_data: bool | None = None
+    clarified: bool = False
+    prefix_cache_hit: bool | None = None
 
 
 class TraceList(BaseModel):

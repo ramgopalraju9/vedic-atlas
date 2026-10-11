@@ -1,0 +1,2797 @@
+# CLEAN TEST SET: written by an author who never saw the training data; near-copies of training sentences removed.
+# Never train on it, never tune prompts against it. Only structured arguments are scored (see training/make_testset.py).
+#   python scripts/spike_decision_protocol.py --variants A1 --golden tests/eval/orchestrator_clean.yaml
+- say: hey veda uh what's it like outside in kochi right now
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Kochi
+- say: whether in pune
+  category: stt
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Pune
+- say: is it still pouring in mumbai or has it stopped
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Mumbai
+- say: will it rain on saturday in bangalore
+  category: stt
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 3
+        place: Bangalore
+- say: do i need a sweater in shimla on sunday
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 1
+        place: Shimla
+- say: weather for tomorrow no wait friday in hyderabad
+  category: stt
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 4
+        place: Hyderabad
+- say: what's the temperature at home
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather
+      args: {}
+- say: is it foggy in delhi this morning
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Delhi
+- say: what's the weather going to be like in goa two weeks from now
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: what's the weather going to be like in goa in two days
+  category: refuse-twin
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 2
+        place: Goa
+- say: will it snow in manali on christmas
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: do you think it'll snow in manali on christmas day
+  category: refuse-twin
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 2
+        place: Manali
+- say: my mom checks the weather app like every five minutes it's honestly so funny
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: whether or not i go to the gym tomorrow depends on my mood
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: people keep saying bangalore has the best weather in india why is that
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: no no i don't want the weather just tell me how clouds form
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: and what about trivandrum
+  category: followup
+  state:
+    tool: get_weather
+    slots:
+      place: Kochi
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Trivandrum
+- say: same day in quito
+  category: followup
+  history:
+  - user: forecast for lima on saturday
+    veda: In Lima on Saturday expect 19 degrees and overcast skies.
+  state:
+    tool: get_weather_forecast
+    slots:
+      place: Lima
+      date_offset: '3'
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 3
+        place: Quito
+- say: and in lucknow
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: what's the weather in hyderabad and also in vizag
+  category: multi
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Hyderabad
+    - tool: get_weather
+      args:
+        place: Vizag
+- say: umbrella check for tomorrow and what's on my calendar tomorrow
+  category: multi
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 1
+    - tool: calendar_agenda
+      args:
+        date_offset: 1
+- say: hey veda tell me the whether for cochin on thursday
+  category: stt
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 3
+        place: Cochin
+- say: how humid is it in kolkata
+  category: explicit
+  state:
+    tool: gmail_search
+    slots:
+      unread_only: 'true'
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Kolkata
+- say: will i need sunscreen in dubai tomorrow
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 1
+        place: Dubai
+- say: is it true it basically never rains in the atacama desert
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: i told ravi the forecast said rain and he still didn't carry an umbrella
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: and is it going to clear up later today
+  category: followup
+  history:
+  - user: how's it in shillong
+    veda: In Shillong it's 14 degrees with light rain.
+  state:
+    tool: get_weather
+    slots:
+      place: Shillong
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 0
+        place: Shillong
+- say: should i carry a raincoat to college tomorrow or not
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 1
+- say: what is the weather of my place
+  category: stt
+  expect:
+    calls:
+    - tool: get_weather
+      args: {}
+- say: no i meant agartala
+  category: followup
+  history:
+  - user: weather in agartala
+    veda: In Agra it's 31 degrees and sunny.
+  state:
+    tool: get_weather
+    slots:
+      place: Agra
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Agartala
+- say: sunny or cloudy in amsterdam on monday
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 2
+        place: Amsterdam
+- say: so um is it gonna be cold in srinagar tomorrow morning like really cold
+  category: stt
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 1
+        place: Srinagar
+- say: what's the wind like in chennai at the moment
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Chennai
+- say: forecast for nairobi next month
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: i hate it when the weather lady on tv says partly sunny
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: what about the weekend in kolkata saturday i mean
+  category: followup
+  state:
+    tool: get_weather_forecast
+    slots:
+      place: Kolkata
+      date_offset: '1'
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 4
+        place: Kolkata
+- say: veda is it raining at my place right now i can hear something
+  category: stt
+  expect:
+    calls:
+    - tool: get_weather
+      args: {}
+- say: need a jacket for the trek in coorg on friday
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 4
+        place: Coorg
+- say: do one thing check jaipur also
+  category: followup
+  history:
+  - user: how's udaipur
+    veda: In Udaipur it's 29 degrees and clear.
+  state:
+    tool: get_weather
+    slots:
+      place: Udaipur
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Jaipur
+- say: what temperature does water boil at up in the mountains
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: give me the forecast for lisbon for wednesday
+  category: explicit
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 3
+        place: Lisbon
+- say: convert two lakh rupees into dirhams
+  category: stt
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 200000
+        to: AED
+        from: INR
+- say: what's a thousand yen in rupees
+  category: explicit
+  state:
+    tool: web_search
+    slots:
+      query: cheap
+      topic: general
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 1000
+        to: INR
+        from: JPY
+- say: um eighty euro to pound
+  category: stt
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 80
+        to: GBP
+        from: EUR
+- say: fifteen hundred singapore dollars to indian rupees please
+  category: explicit
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 1500
+        to: INR
+        from: SGD
+- say: convert three hundred dollars to euros no sorry to pounds
+  category: stt
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 300
+        to: GBP
+        from: USD
+- say: i have twenty quid left over how much is that in rupees
+  category: explicit
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 20
+        to: INR
+        from: GBP
+- say: and in dollars
+  category: followup
+  state:
+    tool: convert_currency
+    slots:
+      amount: '1000'
+      from: JPY
+      to: INR
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 1000
+        to: USD
+        from: JPY
+- say: how much is one bitcoin in rupees right now
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: convert to dollars
+  category: missing
+  expect:
+    calls: []
+    clarification: true
+- say: now convert that to dollars
+  category: clarify-twin
+  state:
+    tool: convert_currency
+    slots:
+      amount: '500'
+      from: INR
+      to: EUR
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 500
+        to: USD
+        from: INR
+- say: why does the rupee keep falling against the dollar
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: my uncle converts every price into dollars in his head it drives me nuts
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: how much is a hundred and twenty five australian dollars in rupees
+  category: explicit
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 125
+        to: INR
+        from: AUD
+- say: convert five kilos to pounds
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: convert five thousand rupees to pounds
+  category: explicit
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 5000
+        to: GBP
+        from: INR
+- say: did india win the cricket match yesterday
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: news
+- say: veda whats the latest on the chandrayaan mission
+  category: stt
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: news
+- say: who's the current chief minister of karnataka
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: any big headlines about the stock market this morning
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: news
+- say: and what about mahindra
+  category: followup
+  history:
+  - user: tata motors share price
+    veda: 'Tata Motors is trading around 712 rupees. Source: a market site.'
+  state:
+    tool: web_search
+    slots:
+      query: Tata
+      topic: general
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: when did they last change it
+  category: followup
+  history:
+  - user: what is the repo rate now
+    veda: 'The RBI repo rate is 5.5 percent. Source: a news site.'
+  state:
+    tool: web_search
+    slots:
+      query: current
+      topic: general
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: score of the india pakistan hockey game
+  category: stt
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: news
+- say: what's trending on twitter right now
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: news
+- say: who wrote the national anthem of india
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: how far is mars from the sun roughly
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: who is the president of france
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: who was the first president of france
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: how much does a tesla model three cost in india now
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: search for good vegetarian restaurants in indiranagar
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: is the airport road jammed right now
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: look up the opening hours of the national museum in delhi
+  category: explicit
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: my friend googles everything before even thinking for a second
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: tell me something interesting about octopuses
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: search that for me
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: who is he
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: veda time please
+  category: stt
+  expect:
+    calls:
+    - tool: current_time
+      args:
+        what: time
+- say: what date is it today i keep forgetting
+  category: explicit
+  expect:
+    calls:
+    - tool: current_time
+      args:
+        what: date
+- say: is today wednesday or thursday
+  category: explicit
+  expect:
+    calls:
+    - tool: current_time
+      args:
+        what: date
+- say: uh how late is it now
+  category: stt
+  expect:
+    calls:
+    - tool: current_time
+      args:
+        what: time
+- say: is it past midnight already
+  category: stt
+  expect:
+    calls:
+    - tool: current_time
+      args:
+        what: time
+- say: time flies when you're having fun right
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: what's the best season to visit kerala
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: when does my train reach secunderabad
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: hmm okay let me think about it
+  category: chat
+  state:
+    tool: convert_currency
+    slots:
+      amount: '300'
+      from: USD
+      to: GBP
+  expect:
+    calls: []
+    needs_live_data: false
+- say: what's the euro to rupee rate for ten thousand euros
+  category: explicit
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 10000
+        to: INR
+        from: EUR
+- say: what's twelve percent of eighteen hundred
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: add pick up dry cleaning to my two do list
+  category: stt
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+- say: put renew passport on my list
+  category: explicit
+  state:
+    tool: web_search
+    slots:
+      query: passport
+      topic: general
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+- say: remind me at seven thirty tonight to call amma
+  category: stt
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+        due_at: 2026-10-15T19:30
+- say: read out my pending tasks
+  category: explicit
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: list
+- say: show me all my tasks even the ones i already finished
+  category: explicit
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: list
+        include_done: true
+- say: i've paid the electricity bill
+  category: explicit
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: complete
+- say: mark book train tickets as done
+  category: explicit
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: complete
+- say: take buy diapers off the list
+  category: destructive
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: delete
+- say: delete the task about the gas cylinder
+  category: destructive
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: delete
+- say: actually delete it
+  category: destructive
+  history:
+  - user: add call the landlord to my tasks
+    veda: Added call the landlord to your tasks.
+  state:
+    tool: tasks
+    slots:
+      action: add
+      title: call
+  expect:
+    calls: []
+    clarification: true
+- say: okay i finished it
+  category: destructive
+  state:
+    tool: tasks
+    slots:
+      action: add
+      title: call
+  expect:
+    calls: []
+    clarification: true
+- say: the landlord call is done
+  category: clarify-twin
+  state:
+    tool: tasks
+    slots:
+      action: add
+      title: call
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: complete
+- say: hey veda remind me about the vet appointment
+  category: clarify-twin
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+- say: add groceries and also add call the electrician
+  category: multi
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+    - tool: tasks
+      args:
+        action: add
+- say: don't add anything to my list i'm just venting about chores
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: my sister's to do list is like three pages long
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: remind me on friday at five no make it six pm to pay the maid
+  category: stt
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+        due_at: 2026-10-16T18:00
+- say: add one more fix the leaking tap
+  category: followup
+  history:
+  - user: what's on my to do
+    veda: 'You have 2 tasks: buy rice, call the bank.'
+  state:
+    tool: tasks
+    slots:
+      action: list
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+- say: add carry umbrella to my tasks
+  category: followup
+  history:
+  - user: will it rain tomorrow
+    veda: Tomorrow at home expect showers in the afternoon and 24 degrees.
+  state:
+    tool: get_weather_forecast
+    slots:
+      date_offset: '1'
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+- say: is there anything due today on my list
+  category: explicit
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: list
+- say: remember my daughter's school bus number is fourteen
+  category: explicit
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: save
+- say: veda remember i don't eat onion or garlic on tuesdays
+  category: stt
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: save
+- say: you can forget about my shoe size now
+  category: destructive
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: forget
+- say: just forget that thing
+  category: destructive
+  expect:
+    calls: []
+    clarification: true
+- say: please forget that one
+  category: destructive
+  history:
+  - user: remember i go to the gym at six am
+    veda: Got it, I'll remember your gym timing is 6 am.
+  state:
+    tool: remember
+    slots:
+      action: save
+      topic: gym
+      value: '6'
+  expect:
+    calls: []
+    clarification: true
+- say: remember to buy bread on the way home
+  category: explicit
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+- say: remember my dog's name is biscuit
+  category: explicit
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: save
+- say: do you remember what we were talking about a while ago
+  category: conversation
+  expect:
+    calls: []
+    needs_live_data: false
+- say: i can never remember people's names any tips
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: remember this
+  category: missing
+  expect:
+    calls: []
+    clarification: true
+- say: my blood group is b positive
+  category: explicit
+  state:
+    tool: calendar_create
+    slots:
+      title: Blood
+      date_offset: '2'
+      time: '10:00'
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: save
+- say: and my cat is called pepper
+  category: followup
+  state:
+    tool: remember
+    slots:
+      action: save
+      topic: dog's
+      value: Biscuit
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: save
+- say: remember our anniversary is on the twelfth of february
+  category: explicit
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: save
+- say: order me a masala dosa from the place near office
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: how do i stop procrastinating honestly
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: yeah mark it as done now
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: can you remind me to call meera in two hours
+  category: explicit
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+        due_at: 2026-10-21T15:20
+- say: what's left on it now
+  category: followup
+  history:
+  - user: i've paid the electricity bill
+    veda: Marked electricity bill as done.
+  state:
+    tool: tasks
+    slots:
+      action: complete
+      title: electricity
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: list
+- say: good morning veda hope you slept well
+  category: followup
+  state:
+    tool: tasks
+    slots:
+      action: list
+  expect:
+    calls: []
+    needs_live_data: false
+- say: um also remind me to pick up the kids at three thirty
+  category: followup
+  state:
+    tool: tasks
+    slots:
+      action: add
+      title: buy
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+        due_at: 2026-11-06T15:30
+- say: i don't eat mushrooms please remember
+  category: explicit
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: save
+- say: my boss told me to remember the deadline as if i could forget
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: remove return the library books from my tasks
+  category: destructive
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: delete
+- say: what's still pending from my list
+  category: explicit
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: list
+- say: so uh add learn to make sambar to my list
+  category: stt
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+- say: close whatsapp
+  category: destructive
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: close
+- say: start notepad please
+  category: explicit
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: open
+- say: okay now close it
+  category: destructive
+  state:
+    tool: app_control
+    slots:
+      action: open
+      name: spotify
+  expect:
+    calls: []
+    clarification: true
+- say: and open word too
+  category: followup
+  state:
+    tool: app_control
+    slots:
+      action: open
+      name: excel
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: open
+- say: go back to the browser
+  category: explicit
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: focus
+- say: which apps are hogging my memory
+  category: explicit
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: processes
+- say: open slack and set the volume to twenty
+  category: multi
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: open
+    - tool: volume_control
+      args:
+        action: set
+        level: 20
+- say: uninstall candy crush from my laptop
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: turn on bluetooth
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: increase the screen brightness a little
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: how much storage is left on my laptop
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: how much battery is left on my laptop
+  category: refuse-twin
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: battery
+- say: unmute please i can't hear anything
+  category: explicit
+  expect:
+    calls:
+    - tool: volume_control
+      args:
+        action: unmute
+- say: set the volume
+  category: missing
+  expect:
+    calls: []
+    clarification: true
+- say: a bit higher maybe forty five
+  category: followup
+  state:
+    tool: volume_control
+    slots:
+      action: set
+      level: '30'
+  expect:
+    calls:
+    - tool: volume_control
+      args:
+        action: set
+        level: 45
+- say: volume is too much reduce it to twenty five
+  category: stt
+  expect:
+    calls:
+    - tool: volume_control
+      args:
+        action: set
+        level: 25
+- say: my neighbour's music volume is insane every single night
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: set volume to ninety no wait thirty
+  category: stt
+  expect:
+    calls:
+    - tool: volume_control
+      args:
+        action: set
+        level: 30
+- say: how much charge do i have
+  category: explicit
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: battery
+- say: my laptop is crawling what's running on it
+  category: explicit
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: processes
+- say: what's using up my cpu
+  category: explicit
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: processes
+- say: battery life on new phones is terrible these days
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: what's my wifi speed right now
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: what's the weather in bhopal
+  category: followup
+  state:
+    tool: app_control
+    slots:
+      action: open
+      name: chrome
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Bhopal
+- say: close the first one
+  category: destructive
+  history:
+  - user: what's slowing my laptop down
+    veda: The busiest apps are Chrome, Teams and Photoshop.
+  state:
+    tool: device_status
+    slots:
+      what: processes
+  expect:
+    calls: []
+    clarification: true
+- say: should i buy a mac or a windows laptop for college
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: switch to it
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: open my calendar app
+  category: explicit
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: open
+- say: also open teams
+  category: followup
+  state:
+    tool: volume_control
+    slots:
+      action: set
+      level: '20'
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: open
+- say: what does ram actually do in a computer
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: check the battery and tell me the time
+  category: multi
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: battery
+    - tool: current_time
+      args:
+        what: time
+- say: uh focus on excel
+  category: stt
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: focus
+- say: is my laptop on mute
+  category: explicit
+  expect:
+    calls:
+    - tool: volume_control
+      args:
+        action: get
+- say: got any unread mails
+  category: stt
+  expect:
+    calls:
+    - tool: gmail_search
+      args:
+        unread_only: true
+- say: did leela email me
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_search
+      args: {}
+- say: show me emails from the bank this week
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_search
+      args: {}
+- say: what did i send to sameer
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_search
+      args:
+        folder: sent
+- say: check my male please
+  category: stt
+  expect:
+    calls:
+    - tool: gmail_search
+      args:
+        unread_only: true
+- say: did i email divya today
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_search
+      args:
+        folder: sent
+- say: list the emails from karan
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_search
+      args: {}
+- say: open the mail about the electricity bill and read it out
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: read the one about the flat visit
+  category: followup
+  history:
+  - user: any mail from ravi
+    veda: 'You have 2 emails from Ravi: Flat visit, Weekend plan.'
+  state:
+    tool: gmail_search
+    slots:
+      query: from:ravi
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: email ravi that i'll be late for the standup
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: write a mail to leela@example.com saying the photos look great
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: draft an email to karan asking if he's free for lunch on friday
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: drop a mail to meera
+  category: missing
+  expect:
+    calls: []
+    clarification: true
+- say: send an email saying the meeting is postponed
+  category: missing
+  expect:
+    calls: []
+    clarification: true
+- say: send an email to sameer saying the meeting is postponed
+  category: clarify-twin
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: perfect send it off
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: karan@example.com
+      subject: Lunch
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: forward it to karan
+  category: no-tool
+  history:
+  - user: what did asha's last mail say
+    veda: Asha's email Trip budget says the hotel costs 12,000 rupees for two nights.
+  state:
+    tool: gmail_read
+    slots:
+      query: from:asha
+  expect:
+    calls: []
+    needs_live_data: true
+- say: wait don't send it yet
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: divya@example.com
+      subject: Saturday
+  expect:
+    calls: []
+    needs_live_data: false
+- say: delete all the spam emails
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: i got a weird mail from someone pretending to be my bank how do i know if it's phishing
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: how do i write a polite email asking for leave
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: email divya@example.com the wifi password is sunflower
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: what's the weather like in ooty
+  category: followup
+  state:
+    tool: gmail_search
+    slots:
+      query: from:ravi
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Ooty
+- say: reply saying thanks i'll check it tonight
+  category: followup
+  history:
+  - user: read leela's mail
+    veda: Leela's email Trip photos says she uploaded the photos to the shared folder.
+  state:
+    tool: gmail_read
+    slots:
+      query: from:leela
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: check if asha mailed me and add call asha to my tasks
+  category: multi
+  expect:
+    calls:
+    - tool: gmail_search
+      args: {}
+    - tool: tasks
+      args:
+        action: add
+- say: how many unread emails do i have
+  category: explicit
+  state:
+    tool: volume_control
+    slots:
+      action: set
+      level: '30'
+  expect:
+    calls:
+    - tool: gmail_search
+      args:
+        unread_only: true
+- say: call ravi on his mobile
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: send a whatsapp to meera saying i'm on my way
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: send an email to meera saying i'm on my way
+  category: refuse-twin
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: did hr send the offer letter yet
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_search
+      args: {}
+- say: read my last male from the school
+  category: stt
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: any mails about my courier delivery
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_search
+      args: {}
+- say: read it again
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: what does cc and bcc actually mean
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: i didn't ask you to email anyone i just wanna know how long emails take to arrive
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: hmm send
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: karan@example.com
+      subject: Tickets
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: email karan at karan@example.com that the tickets are booked
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: what was the last thing i asked you
+  category: conversation
+  expect:
+    calls: []
+    needs_live_data: false
+- say: find the mail where someone sent me the train tickets
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_search
+      args: {}
+- say: hey veda did anything come from the landlord
+  category: stt
+  expect:
+    calls:
+    - tool: gmail_search
+      args: {}
+- say: my inbox has like four thousand unread mails and i've given up
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: read sameer's latest mail to me
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: write to divya that the cake order is confirmed for saturday
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: is it rude to send an email at night
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: how packed is my week
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args:
+        date_offset: 0
+        days: 7
+- say: what's my first meeting tomorrow
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args:
+        date_offset: 1
+- say: do i have anything on the thirtieth
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args:
+        date_offset: 3
+- say: calender for saturday
+  category: stt
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args:
+        date_offset: 1
+- say: cancel my three o'clock with ravi
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: push the design review to monday
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: prepone my dentist appointment to eleven
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: what time is my dentist appointment today
+  category: refuse-twin
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args: {}
+- say: who am i meeting at four today
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args: {}
+- say: put lunch with meera on my calendar tomorrow at one
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 1
+        time: '13:00'
+- say: block an hour on friday at three for the tax filing
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 4
+        time: '15:00'
+- say: schedule a call with the architect at five thirty today
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 0
+        time: '17:30'
+- say: calendar entry for yoga class tomorrow seven am forty five minutes
+  category: stt
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 1
+        time: 07:00
+        duration_minutes: 45
+- say: set up a meeting with leela on wednesday at four no wait thursday at four pm
+  category: stt
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 3
+        time: '16:00'
+- say: put call the bank at six pm on my calendar
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 0
+        time: '18:00'
+- say: set up a meeting with karan
+  category: missing
+  expect:
+    calls: []
+    clarification: true
+- say: add a dentist visit at four pm that day
+  category: followup
+  history:
+  - user: what's on tomorrow
+    veda: Tomorrow you have Standup at 10 AM.
+  state:
+    tool: calendar_agenda
+    slots:
+      date_offset: '1'
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 1
+        time: '16:00'
+- say: actually move it to two
+  category: followup
+  history:
+  - user: put lunch with meera on my calendar tomorrow at one
+    veda: Added Lunch with Meera tomorrow at 1 PM.
+  state:
+    tool: calendar_create
+    slots:
+      title: Lunch
+      date_offset: '1'
+      time: '13:00'
+  expect:
+    calls: []
+    needs_live_data: true
+- say: block three hours for deep focus tomorrow morning at nine
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 1
+        time: 09:00
+        duration_minutes: 180
+- say: put mom's birthday dinner on friday at eight pm
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 4
+        time: '20:00'
+- say: what's on tomorrow and add a run at six am tomorrow
+  category: multi
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args:
+        date_offset: 1
+    - tool: calendar_create
+      args:
+        date_offset: 1
+        time: 06:00
+- say: i deleted the calendar app by mistake lol
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: how do people manage busy calendars without burning out
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: haan send it
+  category: followup
+  history:
+  - user: email meera that dinner on sunday is at our place
+    veda: 'Here''s the draft to meera@example.com: Hi Meera, dinner on Sunday is at our place. Send it?'
+  state:
+    tool: gmail_draft
+    slots:
+      to: meera@example.com
+      subject: Dinner
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: looks fine shoot it off
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: ravi@example.com
+      subject: Late
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: that's correct you can send it now
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: leela@example.com
+      subject: Venue
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: yep all good send
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: divya@example.com
+      subject: Cake
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: what did the landlord write
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: summarise the newest mail from divya
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: read karan's one
+  category: followup
+  history:
+  - user: any mails about the invoice
+    veda: 'You have 2 emails about invoices: Leela - March invoice, Karan - Invoice pending.'
+  state:
+    tool: gmail_search
+    slots:
+      query: invoice
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: read the mail from the travel agent
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: what about thursday
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: hmm what about thursday
+  category: clarify-twin
+  history:
+  - user: what's on my calendar tomorrow
+    veda: Tomorrow you have Client call at 3 PM.
+  state:
+    tool: calendar_agenda
+    slots:
+      date_offset: '1'
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args:
+        date_offset: 4
+- say: and put a team lunch at one that same day
+  category: followup
+  history:
+  - user: what about thursday
+    veda: On Thursday you have nothing scheduled.
+  state:
+    tool: calendar_agenda
+    slots:
+      date_offset: '4'
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 4
+        time: '13:00'
+- say: i never ask you about my calendar because i keep it all in my head
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: move all my meetings tomorrow to the afternoon
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: add pick up passport from the embassy wednesday at two pm on the calendar
+  category: explicit
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 4
+        time: '14:00'
+- say: what's the weather going to be that day
+  category: followup
+  history:
+  - user: put a picnic on the calendar day after tomorrow at eleven am
+    veda: Added Picnic on Thursday at 11 AM.
+  state:
+    tool: calendar_create
+    slots:
+      title: Picnic
+      date_offset: '2'
+      time: '11:00'
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 2
+- say: is my cab here yet
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: whats the weather in mysore and set volume to forty
+  category: multi
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Mysore
+    - tool: volume_control
+      args:
+        action: set
+        level: 40
+- say: convert ten thousand rupees to euros and also to dollars
+  category: multi
+  expect:
+    calls:
+    - tool: convert_currency
+      args:
+        amount: 10000
+        to: EUR
+        from: INR
+    - tool: convert_currency
+      args:
+        amount: 10000
+        to: USD
+        from: INR
+- say: battery status and whats eating my cpu
+  category: multi
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: battery
+    - tool: device_status
+      args:
+        what: processes
+- say: remind me at eight tonight to take my medicine and also note that i'm allergic to penicillin
+  category: multi
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: add
+        due_at: 2026-10-15T20:00
+    - tool: remember
+      args:
+        action: save
+- say: open zoom mute the volume and tell me what's on my calendar today
+  category: multi
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: open
+    - tool: volume_control
+      args:
+        action: mute
+    - tool: calendar_agenda
+      args: {}
+- say: any new emails from divya and read the latest one
+  category: multi
+  expect:
+    calls:
+    - tool: gmail_search
+      args:
+        unread_only: true
+    - tool: gmail_read
+      args: {}
+- say: what's the date today and the weather in kozhikode
+  category: multi
+  expect:
+    calls:
+    - tool: current_time
+      args:
+        what: date
+    - tool: get_weather
+      args:
+        place: Kozhikode
+- say: latest cricket score and the forecast for chennai tomorrow
+  category: multi
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: news
+    - tool: get_weather_forecast
+      args:
+        date_offset: 1
+        place: Chennai
+- say: email asha that i'll reach by seven and add buy cake to my list
+  category: multi
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+    - tool: tasks
+      args:
+        action: add
+- say: put a dentist appointment on thursday at five pm and remind me on wednesday at nine pm to book a cab
+  category: multi
+  expect:
+    calls:
+    - tool: calendar_create
+      args:
+        date_offset: 4
+        time: '17:00'
+    - tool: tasks
+      args:
+        action: add
+        due_at: 2026-11-11T21:00
+- say: is it late already and how much battery do i have left
+  category: multi
+  expect:
+    calls:
+    - tool: current_time
+      args:
+        what: time
+    - tool: device_status
+      args:
+        what: battery
+- say: weather in delhi and mumbai and bangalore
+  category: multi
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Delhi
+    - tool: get_weather
+      args:
+        place: Mumbai
+    - tool: get_weather
+      args:
+        place: Bangalore
+- say: look up who won the f one race and what's the gold price today
+  category: multi
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: news
+    - tool: web_search
+      args:
+        topic: general
+- say: remember my gym is at six thirty in the morning and add buy protein powder to my tasks
+  category: multi
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: save
+    - tool: tasks
+      args:
+        action: add
+- say: open spotify and volume fifty
+  category: multi
+  expect:
+    calls:
+    - tool: app_control
+      args:
+        action: open
+    - tool: volume_control
+      args:
+        action: set
+        level: 50
+- say: and tomorrow there plus convert hundred euros to rupees
+  category: multi
+  history:
+  - user: weather in goa
+    veda: In Goa it's 30 degrees and humid.
+  state:
+    tool: get_weather
+    slots:
+      place: Goa
+  expect:
+    calls:
+    - tool: get_weather_forecast
+      args:
+        date_offset: 1
+        place: Goa
+    - tool: convert_currency
+      args:
+        amount: 100
+        to: INR
+        from: EUR
+- say: yes please
+  category: followup
+  history:
+  - user: email asha that i'll reach by seven
+    veda: 'Here''s the draft to asha@example.com: Hi Asha, I''ll reach by seven. Shall I send it?'
+  state:
+    tool: gmail_draft
+    slots:
+      to: asha@example.com
+      subject: Reaching
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: send kar do
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: karan@example.com
+      subject: Site
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: go for it
+  category: followup
+  history:
+  - user: write to my landlord ravi that the rent is transferred
+    veda: 'Here''s the draft to ravi@example.com: Hi Ravi, the rent is transferred. Send it?'
+  state:
+    tool: gmail_draft
+    slots:
+      to: ravi@example.com
+      subject: Rent
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: alright send it to her
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: leela@example.com
+      subject: Can't
+  expect:
+    calls:
+    - tool: gmail_send
+      args: {}
+- say: mail sameer@example.com that the cab will come at six
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: write an email to my landlord ravi saying the rent is transferred
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: tell leela by email that i cant make it to the party
+  category: stt
+  expect:
+    calls:
+    - tool: gmail_draft
+      args: {}
+- say: what did the bank mail me about
+  category: explicit
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: read it
+  category: followup
+  history:
+  - user: anything from divya
+    veda: 'You have 1 email from Divya: Weekend trip.'
+  state:
+    tool: gmail_search
+    slots:
+      query: from:divya
+  expect:
+    calls:
+    - tool: gmail_read
+      args: {}
+- say: is the battery okay or should i plug in
+  category: explicit
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: battery
+- say: why is everything so slow now what's running
+  category: followup
+  state:
+    tool: app_control
+    slots:
+      action: open
+      name: photoshop
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: processes
+- say: check what programs are running
+  category: stt
+  expect:
+    calls:
+    - tool: device_status
+      args:
+        what: processes
+- say: convert fifty
+  category: missing
+  expect:
+    calls: []
+    clarification: true
+- say: email him
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: book an uber to the railway station
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: what's my train pnr status
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: how long will it take to drive to whitefield right now
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: how far is whitefield from koramangala roughly
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: nice and how about in hubli
+  category: followup
+  state:
+    tool: get_weather
+    slots:
+      place: Dharwad
+  expect:
+    calls:
+    - tool: get_weather
+      args:
+        place: Hubli
+- say: who's the coach of that team now
+  category: followup
+  history:
+  - user: how did kerala blasters do last night
+    veda: 'Kerala Blasters won 2 to 1. Source: a sports site.'
+  state:
+    tool: web_search
+    slots:
+      query: Kerala
+      topic: news
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+- say: do i have unread ones
+  category: followup
+  state:
+    tool: gmail_search
+    slots:
+      folder: sent
+  expect:
+    calls:
+    - tool: gmail_search
+      args:
+        unread_only: true
+- say: can you turn it down to ten
+  category: followup
+  history:
+  - user: how loud is it
+    veda: The volume is at 65 percent.
+  state:
+    tool: volume_control
+    slots:
+      action: get
+  expect:
+    calls:
+    - tool: volume_control
+      args:
+        action: set
+        level: 10
+- say: add that to my tasks
+  category: followup
+  history:
+  - user: when should i plant tomatoes
+    veda: 'Tomatoes are best planted after the last frost, in warm soil. Source: a gardening site.'
+  state:
+    tool: web_search
+    slots:
+      query: best
+      topic: general
+  expect:
+    calls: []
+    clarification: true
+- say: okay enough of that tell me a funny joke about engineers
+  category: followup
+  state:
+    tool: device_status
+    slots:
+      what: battery
+  expect:
+    calls: []
+    needs_live_data: false
+- say: thanks and what was the first thing i asked today
+  category: followup
+  state:
+    tool: tasks
+    slots:
+      action: list
+  expect:
+    calls: []
+    needs_live_data: false
+- say: has the delivery guy reached my building
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: oh and forget my locker code
+  category: followup
+  history:
+  - user: what do you know about me
+    veda: I remember your locker code, your blood group and your dog's name.
+  state:
+    tool: remember
+    slots:
+      action: list
+  expect:
+    calls:
+    - tool: remember
+      args:
+        action: forget
+- say: remove buy cake from the list
+  category: followup
+  state:
+    tool: tasks
+    slots:
+      action: list
+  expect:
+    calls:
+    - tool: tasks
+      args:
+        action: delete
+- say: what's on my calendar day after tomorrow and how's the weather going to be that day
+  category: multi
+  expect:
+    calls:
+    - tool: calendar_agenda
+      args:
+        date_offset: 2
+    - tool: get_weather_forecast
+      args:
+        date_offset: 2
+- say: search for the iphone seventeen price in india and convert five hundred dollars to rupees
+  category: multi
+  expect:
+    calls:
+    - tool: web_search
+      args:
+        topic: general
+    - tool: convert_currency
+      args:
+        amount: 500
+        to: INR
+        from: USD
+- say: uh pause my music i mean mute and check if karan replied
+  category: multi
+  expect:
+    calls:
+    - tool: volume_control
+      args:
+        action: mute
+    - tool: gmail_search
+      args: {}
+- say: lol you sound like a weather reporter now
+  category: mention
+  history:
+  - user: weather in pune
+    veda: In Pune it's 26 degrees with a light breeze.
+  state:
+    tool: get_weather
+    slots:
+      place: Pune
+  expect:
+    calls: []
+    needs_live_data: false
+- say: what language do people speak in brittany
+  category: followup
+  state:
+    tool: web_search
+    slots:
+      query: current
+      topic: general
+  expect:
+    calls: []
+    needs_live_data: false
+- say: why do we even have different currencies
+  category: followup
+  state:
+    tool: convert_currency
+    slots:
+      amount: '40'
+      from: EUR
+      to: INR
+  expect:
+    calls: []
+    needs_live_data: false
+- say: ugh i have so much to do i feel overwhelmed
+  category: followup
+  history:
+  - user: what's pending
+    veda: 'You have 6 tasks: pay rent, buy rice, call the bank, fix the fan, renew passport, book tickets.'
+  state:
+    tool: tasks
+    slots:
+      action: list
+  expect:
+    calls: []
+    needs_live_data: false
+- say: who came up with the calendar we use today
+  category: mention
+  state:
+    tool: calendar_agenda
+    slots:
+      date_offset: '1'
+  expect:
+    calls: []
+    needs_live_data: false
+- say: that sounds a bit rude of her doesn't it
+  category: followup
+  history:
+  - user: read leela's mail
+    veda: Leela's email Deadline says the slides must be ready by Monday, no excuses.
+  state:
+    tool: gmail_read
+    slots:
+      query: from:leela
+  expect:
+    calls: []
+    needs_live_data: false
+- say: why do you need to remember stuff about me anyway
+  category: followup
+  state:
+    tool: remember
+    slots:
+      action: save
+      topic: blood
+      value: B
+  expect:
+    calls: []
+    needs_live_data: false
+- say: is listening to loud music actually bad for your ears
+  category: followup
+  state:
+    tool: volume_control
+    slots:
+      action: set
+      level: '90'
+  expect:
+    calls: []
+    needs_live_data: false
+- say: what's a good battery health percentage for a two year old laptop
+  category: followup
+  history:
+  - user: battery
+    veda: Battery is at 81 percent and charging.
+  state:
+    tool: device_status
+    slots:
+      what: battery
+  expect:
+    calls: []
+    needs_live_data: false
+- say: recommend some old hindi songs for a rainy evening
+  category: followup
+  state:
+    tool: app_control
+    slots:
+      action: open
+      name: spotify
+  expect:
+    calls: []
+    needs_live_data: false
+- say: which city did i ask about first
+  category: conversation
+  history:
+  - user: weather in shimla
+    veda: In Shimla it's 9 degrees and clear.
+  - user: and in manali
+    veda: In Manali it's 5 degrees with light snow.
+  state:
+    tool: get_weather
+    slots:
+      place: Manali
+  expect:
+    calls: []
+    needs_live_data: false
+- say: wait why did you say thirty degrees
+  category: followup
+  history:
+  - user: goa tomorrow
+    veda: Tomorrow in Goa expect 30 degrees and sunny skies.
+  state:
+    tool: get_weather_forecast
+    slots:
+      place: Goa
+      date_offset: '1'
+  expect:
+    calls: []
+    needs_live_data: false
+- say: oh that's so sad
+  category: followup
+  history:
+  - user: any news about the landslide in wayanad
+    veda: 'Rescue teams are still searching after the landslide. Source: a news site.'
+  state:
+    tool: web_search
+    slots:
+      query: landslide
+      topic: news
+  expect:
+    calls: []
+    needs_live_data: false
+- say: never mind leave it
+  category: followup
+  state:
+    tool: gmail_draft
+    slots:
+      to: karan@example.com
+      subject: Site
+  expect:
+    calls: []
+    needs_live_data: false
+- say: no thanks i'm good
+  category: followup
+  state:
+    tool: calendar_create
+    slots:
+      title: Yoga
+      date_offset: '1'
+      time: 07:00
+  expect:
+    calls: []
+    needs_live_data: false
+- say: namaste veda
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: okay good night veda see you tomorrow
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: you're really helpful you know that
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: who wrote the mahabharata
+  category: chat
+  state:
+    tool: get_weather
+    slots:
+      place: Varanasi
+  expect:
+    calls: []
+    needs_live_data: false
+- say: why does the sky turn orange at sunset
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: is sydney the capital of australia
+  category: chat
+  state:
+    tool: current_time
+    slots:
+      what: date
+  expect:
+    calls: []
+    needs_live_data: false
+- say: how many bones does a newborn baby have
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: is it better to rent or buy a flat in bangalore
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: explain inflation to me like i'm ten
+  category: chat
+  state:
+    tool: convert_currency
+    slots:
+      amount: '1000'
+      from: INR
+      to: USD
+  expect:
+    calls: []
+    needs_live_data: false
+- say: suggest a name for my home bakery
+  category: chat
+  state:
+    tool: remember
+    slots:
+      action: list
+  expect:
+    calls: []
+    needs_live_data: false
+- say: write a short poem about chai and rain
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: what's two thousand four hundred divided by six
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: i didn't ask for the news i asked how you're doing
+  category: mention
+  state:
+    tool: web_search
+    slots:
+      query: top
+      topic: news
+  expect:
+    calls: []
+    needs_live_data: false
+- say: my brother keeps telling me to check my email more often
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: the word volume has so many meanings right
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: remind me why i even bought this laptop haha
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: i forgot to set a reminder yesterday and missed my cousin's call
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: is it weird that i talk to my assistant more than my friends
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: how do i convert celsius to fahrenheit in my head
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: can you speak tamil
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: what can i cook tonight with potatoes and paneer
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: any tips to sleep better i keep waking up at three
+  category: chat
+  expect:
+    calls: []
+    needs_live_data: false
+- say: the forecast was wrong again yesterday they always get it wrong
+  category: mention
+  expect:
+    calls: []
+    needs_live_data: false
+- say: cancel the client call
+  category: no-tool
+  history:
+  - user: what's on today
+    veda: Today you have Standup at 10 AM and Client call at 4 PM.
+  state:
+    tool: calendar_agenda
+    slots:
+      date_offset: '0'
+  expect:
+    calls: []
+    needs_live_data: true
+- say: turn off the living room lights
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: and in london
+  category: no-tool
+  history:
+  - user: what time is it
+    veda: It's 6:10 PM.
+  state:
+    tool: current_time
+    slots:
+      what: time
+  expect:
+    calls: []
+    needs_live_data: true
+- say: has flight six e two one three landed yet
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: how crowded is the metro right now
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: play the next episode on netflix
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true
+- say: check my bank balance
+  category: no-tool
+  state:
+    tool: convert_currency
+    slots:
+      amount: '200'
+      from: USD
+      to: INR
+  expect:
+    calls: []
+    needs_live_data: true
+- say: do the same for karan
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: and what about guwahati
+  category: no-state
+  expect:
+    calls: []
+    clarification: true
+- say: save that
+  category: missing
+  state:
+    tool: web_search
+    slots:
+      query: symptoms
+      topic: general
+  expect:
+    calls: []
+    clarification: true
+- say: email her the details
+  category: missing
+  history:
+  - user: any mail from meera
+    veda: 'You have 1 email from Meera: Party venue?'
+  state:
+    tool: gmail_search
+    slots:
+      query: from:meera
+  expect:
+    calls: []
+    clarification: true
+- say: set an alarm i mean a reminder for tomorrow morning
+  category: missing
+  expect:
+    calls: []
+    clarification: true
+- say: read out my latest whatsapp messages
+  category: no-tool
+  expect:
+    calls: []
+    needs_live_data: true

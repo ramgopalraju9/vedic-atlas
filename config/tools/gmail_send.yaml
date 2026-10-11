@@ -1,0 +1,21 @@
+name: gmail_send
+agent: google
+description: Send the draft just read back. No arguments; only when the user says to send it.
+reply_mode: template
+permission_level: notify    # the confirmation is the user's separate "send it" after hearing the draft; see service/mail/draft_outbox.py
+returns: value
+destructive: true           # never inherits session state, never joins a multi-call
+private: true
+requires_online: true
+hosts: [gmail.googleapis.com, oauth2.googleapis.com]
+
+params: {}
+
+examples:
+  - user: send it
+    calls: [{tool: gmail_send, args: {}}]
+  - user: yes go ahead and send the email
+    calls: [{tool: gmail_send, args: {}}]
+
+claims:
+  - '\b(i(''| ha)?ve sent|i sent|(the )?(email|mail|message) (has been|was|is) sent|sent (it|the email) to)\b'

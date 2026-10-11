@@ -4,6 +4,9 @@ agent: memory
 description: Save, list or forget lasting facts about the user - preferences, allergies, names, routines. Never one-off or temporary things.
 reply_mode: template        # the confirmation is built from what was really saved; no second model call
 permission_level: notify
+returns: value
+destructive_when: {action: [forget]}
+target_params: [topic]                 # a forget must name its target in the user's own words, or the turn asks instead
 
 params:
   action:
@@ -24,6 +27,7 @@ examples:
     calls: [{tool: remember, args: {action: save, topic: allergy, value: peanuts}}]
   - user: my dog's name is Rex
     calls: [{tool: remember, args: {action: save, topic: dog's name, value: Rex}}]
+    prompt_example: true
   - user: forget my favourite sweet
     calls: [{tool: remember, args: {action: forget, topic: favourite sweet}}]
   - user: what do you remember about me?

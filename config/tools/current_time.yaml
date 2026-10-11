@@ -1,0 +1,20 @@
+name: current_time
+agent: system
+description: The current time of day, or today's date and weekday.
+reply_mode: template        # the sentence is built from the device clock
+permission_level: auto
+returns: value
+
+params:
+  what:
+    type: string
+    enum: [time, date]
+    description: time for the time of day; date for today's date or weekday; leave out for the time
+
+examples:
+  - user: what time is it
+    calls: [{tool: current_time, args: {what: time}}]
+  - user: what's the date today
+    calls: [{tool: current_time, args: {what: date}}]
+  - user: which day is it
+    calls: [{tool: current_time, args: {what: date}}]

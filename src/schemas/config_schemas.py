@@ -49,7 +49,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class AppSectionConfig(BaseModel):
@@ -114,6 +114,12 @@ class EmbeddingConfig(BaseModel):
     cache_dir: str | None = "data/embeddings"
     top_k: int = 5
     min_score: float = 0.3  # minimum cosine similarity to inject a memory
+    margin: float | None = None  # also keep hits within this of the best one (up to top_k); None = no margin rule
+    max_hit_chars: int = 280     # each recalled memory is cut to this
+    min_score_by_source: dict[str, float] = {}  # a stricter floor for one source, e.g. exchange: short notes score higher
+    conversation_intent_soft_min: float = 0.76  # a looser match counts only instead of a clarifying question or a refusal
+    conversation_intent_min: float | None = None  # "what are we discussing" is answered from the newest conversations (None = off)
+    max_total_chars: int = 800   # and the whole recalled block to this (prompt tokens are Raspberry Pi prefill time)
     sources: list[str] = ["fact", "summary"]  # which memory sources recall searches
 
 
@@ -194,8 +200,11 @@ class AudioConfig(BaseModel):
     # Local STT model directory (faster-whisper format). No auto-download.
     stt_model: str = "base.en"
     stt_model_path: str | None = None
+    # Per-utterance spectral gate before Whisper. Best for steady room noise.
+    noise_suppression_enabled: bool = True
+    noise_suppression_strength: float = Field(default=0.75, ge=0.0, le=1.0)
 
-    tts_engine: str = "auto"  # "auto" (pyttsx3 on Windows, piper elsewhere) | "pyttsx3" | "piper"
+    tts_engine: str = "auto"  # "auto" (pyttsx3 on Windows, Piper elsewhere) | "pyttsx3" | "piper"
     tts_voice: str = "zira"
     tts_model_path: str | None = None  # required when tts_engine == "piper"
 
@@ -231,16 +240,46 @@ class SensingConfig(BaseModel):
     rate_limit_window_sec: float = 60.0
 
 
+class RemindersConfig(BaseModel):
+    """reminders: section — spoken reminders for calendar events and due tasks (no model involved)."""
+
+    enabled: bool = True
+    lead_minutes: list[int] = [15]
+    at_start: bool = True
+    skip_all_day: bool = True
+    include_tasks: bool = True
+    poll_sec: float = 300.0
+    horizon_hours: float = 24.0
+    tick_sec: float = 5.0
+    idle_settle_sec: float = 1.5
+
+    @field_validator("lead_minutes")
+    @classmethod
+    def _valid_leads(cls, v: list[int]) -> list[int]:
+        from domain.policies.reminder_policy import validate_leads
+        return list(validate_leads(v))
+
+    @field_validator("poll_sec", "horizon_hours", "tick_sec")
+    @classmethod
+    def _positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("must be > 0")
+        return v
+
+
 class OnlineConfig(BaseModel):
     """privacy.online: sub-section — the network egress allow-list."""
 
     enabled: bool = True  # False = fully offline: no online tools are registered
     allowlist: list[str] = [
         "api.open-meteo.com", "geocoding-api.open-meteo.com", "api.frankfurter.dev", "open.er-api.com",
-        "api.tavily.com",
+        "api.tavily.com", "oauth2.googleapis.com", "gmail.googleapis.com", "www.googleapis.com",
     ]
     default_place: str = "Hyderabad"  # used when the user asks for weather without naming a place
     search_api_key_env: str = "TAVILY_API_KEY"  # env var holding the Tavily key (never stored in config)
+    google_client_id_env: str = "GOOGLE_API_CLIENT_ID"   # env vars holding the Google OAuth secrets (never stored in config)
+    google_client_secret_env: str = "GOOGLE_CLIENT_SECRET"
+    google_refresh_token_env: str = "GOOGLE_REFRESH_TOKEN"
 
 
 class PrivacyConfig(BaseModel):
@@ -249,6 +288,7 @@ class PrivacyConfig(BaseModel):
     mute_switch: str = "software"  # software | keyboard | hid | gpio
     start_muted: bool = True  # boot muted; explicit opt-in required to listen
     mute_gpio_pin: int = 17
+    mute_gpio_muted_level: str = "low"  # pin level that means MUTED (low | high)
     indicator_gpio_pin: int = 27
     online: OnlineConfig = OnlineConfig()
 
@@ -329,8 +369,7 @@ class AgentsConfig(BaseModel):
     tasks: AgentEntry = AgentEntry(description="The user's to-do list: add, list, complete, delete tasks")
     lookup: AgentEntry = AgentEntry(description="Live data from the web: weather, currency rates, news, current facts")
     memory: AgentEntry = AgentEntry(description="Saves lasting facts the user states about themselves: favourites, allergies, names, routines")
-    tools_enabled: bool = False  # when true, tool-owning specialist agents (from config/tools) are registered
-    llm_routing: bool = False  # when true, messages the routing rules don't recognise are routed by a small LLM call
+    session_ttl_sec: int = 900  # session working state older than this is ignored (docs/10)
 
 
 class SkillEntry(BaseModel):
@@ -364,31 +403,29 @@ class SkillsConfig(BaseModel):
     custom_skills_dir: str = "data/custom_skills"
 
 
-class RouterModelConfig(BaseModel):
-    """routing.model: the small dedicated model that picks the specialist agent (llama.cpp, GGUF)."""
+class PromptingConfig(BaseModel):
+    """prompting: section (config/prompting.yaml). Tunable prompt budgets; a missing key keeps the dataclass default."""
 
-    # A path = a separate small model (e.g. Qwen3-0.6B) that only routes. null = the main LLM does the routing too.
-    model_path: str | None = "data/Qwen3-0.6B-Q4_K_M.gguf"
-    n_ctx: int = 2560             # the fixed router prompt (persona + ~65 examples) is ~1.6k tokens; room for history + message
-    n_threads: int | None = None
-    timeout_sec: float = 8.0      # how long the model may RUN for one routing call (queue time is not counted)
-    queue_wait_sec: float = 30.0  # how long a routing call may wait behind the main model before it is skipped
-    num_predict: int = 16         # the answer is {"agent": "<name>"}
-    prompt_cache_mb: int = 64     # the long fixed router prompt is evaluated once and reused
+    budgets: dict[str, int] = {}
+    control_history_exchanges: int = Field(default=2, ge=0, le=6)
+    turn_chars: int = Field(default=200, ge=40)
+    user_message_chars: int = Field(default=500, ge=40)
 
+    @field_validator("budgets")
+    @classmethod
+    def _known_positive_budgets(cls, budgets: dict[str, int]) -> dict[str, int]:
+        from dataclasses import fields
 
-class RoutingConfig(BaseModel):
-    """routing: section - how a message is mapped to a specialist agent.
+        from domain.policies.token_budget_policy import PromptBudgets
 
-    keyword: manifest trigger regexes + word overlap only (instant; the model is never loaded).
-    model:   the router model decides every message; keyword rules are only the fallback if it fails.
-    hybrid:  keyword rules decide when SURE (one agent's trigger matched, no correction cue); the router
-             model decides everything else (no match, a weak match, two agents claiming it, a negation).
-    """
-
-    mode: Literal["keyword", "hybrid", "model"] = "keyword"
-    on_failure: Literal["keyword", "chat"] = "keyword"  # when the router cannot answer: use the rules, or go to chat
-    model: RouterModelConfig = RouterModelConfig()
+        known = {f.name for f in fields(PromptBudgets)}
+        unknown = sorted(set(budgets) - known)
+        if unknown:
+            raise ValueError(f"unknown prompt budget(s) {unknown}; valid: {sorted(known)}")
+        bad = sorted(k for k, v in budgets.items() if v < 0)
+        if bad:
+            raise ValueError(f"prompt budget(s) must be >= 0: {bad}")
+        return budgets
 
 
 class AppConfig(BaseModel):
@@ -399,9 +436,10 @@ class AppConfig(BaseModel):
     embedding: EmbeddingConfig = EmbeddingConfig()
     audio: AudioConfig = AudioConfig()
     sensing: SensingConfig = SensingConfig()
+    reminders: RemindersConfig = RemindersConfig()
     privacy: PrivacyConfig = PrivacyConfig()
     governance: GovernanceConfig = GovernanceConfig()
     guardrails: GuardrailsConfig = GuardrailsConfig()
     agents: AgentsConfig = AgentsConfig()
-    routing: RoutingConfig = RoutingConfig()
+    prompting: PromptingConfig = PromptingConfig()
     skills: SkillsConfig = SkillsConfig()

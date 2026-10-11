@@ -1,0 +1,1 @@
+Write a short, polite draft reply to DOCUMENT that follows the user's QUESTION. Use only facts from DOCUMENT and the QUESTION; do not invent commitments, dates or numbers. This is a draft for the user to read: it is never sent from here.

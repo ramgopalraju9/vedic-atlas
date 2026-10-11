@@ -19,12 +19,14 @@ Donor: veda/voice/stt.py's WhisperSTT, read in full and adapted:
 from __future__ import annotations
 
 import sys
+import time
 import types
 from pathlib import Path
 
 from core.logging_config import logger
 from domain.value_objects.audio_window import AudioWindow
 from domain.value_objects.transcript import Transcript
+from tpa.stt.noise_suppression import SpectralNoiseSuppressor
 
 
 def allow_unavailable_av() -> bool:
@@ -60,13 +62,31 @@ def allow_unavailable_av() -> bool:
 class FasterWhisperProvider:
     """Implements STTPort via a locally cached faster-whisper model."""
 
-    def __init__(self, model_size: str = "base.en", cache_dir: str | Path | None = None):
+    def __init__(
+        self,
+        model_size: str = "base.en",
+        cache_dir: str | Path | None = None,
+        *,
+        noise_suppression_enabled: bool = True,
+        noise_suppression_strength: float = 0.75,
+    ):
         self._model_size = model_size
         self._cache_dir = str(cache_dir) if cache_dir else None
         self._model = None
+        self._noise_suppressor = (
+            SpectralNoiseSuppressor(strength=noise_suppression_strength)
+            if noise_suppression_enabled
+            else None
+        )
+        logger.info(
+            "[stt] noise suppression "
+            f"{'enabled' if self._noise_suppressor is not None else 'disabled'} "
+            f"strength={noise_suppression_strength:.2f}"
+        )
 
     def _ensure(self):
         if self._model is None:
+            started = time.perf_counter()
             allow_unavailable_av()
             from faster_whisper import WhisperModel
 
@@ -78,7 +98,16 @@ class FasterWhisperProvider:
                         f"whisper model cache not found at {self._cache_dir} — this build does "
                         "not auto-download models. Run the installer's model-fetch step first."
                     )
-            self._model = WhisperModel(self._model_size, **kwargs)
+            try:
+                self._model = WhisperModel(self._model_size, **kwargs)
+            except Exception:
+                logger.exception(f"[stt] failed to load Whisper model {self._model_size!r}")
+                raise
+            logger.info(
+                "[stt][timing] stage=model_load "
+                f"elapsed_ms={(time.perf_counter() - started) * 1000:.0f} "
+                f"model={self._model_size!r}"
+            )
         return self._model
 
     async def transcribe(self, audio: AudioWindow) -> Transcript:
@@ -86,7 +115,23 @@ class FasterWhisperProvider:
 
         def _do():
             pcm = np.frombuffer(audio.pcm, dtype=np.int16).astype(np.float32) / 32768.0
-            segments, info = self._ensure().transcribe(
+            model = self._ensure()
+            if self._noise_suppressor is not None:
+                suppression_started = time.perf_counter()
+                input_rms = float(np.sqrt(np.mean(pcm * pcm))) if pcm.size else 0.0
+                input_peak = float(np.max(np.abs(pcm))) if pcm.size else 0.0
+                pcm = self._noise_suppressor.process(pcm)
+                output_rms = float(np.sqrt(np.mean(pcm * pcm))) if pcm.size else 0.0
+                output_peak = float(np.max(np.abs(pcm))) if pcm.size else 0.0
+                logger.info(
+                    "[stt][timing] stage=noise_suppression "
+                    f"elapsed_ms={(time.perf_counter() - suppression_started) * 1000:.0f} "
+                    f"strength={self._noise_suppressor.strength:.2f} "
+                    f"input_rms={input_rms:.5f} input_peak={input_peak:.5f} "
+                    f"output_rms={output_rms:.5f} output_peak={output_peak:.5f}"
+                )
+            inference_started = time.perf_counter()
+            segments, info = model.transcribe(
                 pcm, language="en", vad_filter=True,
                 vad_parameters={"min_silence_duration_ms": 500},
                 # Whisper invents text on noise ("subscribe to our channel", "Bye. Bye. Bye..."), and
@@ -95,15 +140,49 @@ class FasterWhisperProvider:
                 condition_on_previous_text=False,
                 no_speech_threshold=0.6, log_prob_threshold=-1.0, compression_ratio_threshold=2.4,
             )
+            all_segments = list(segments)
+            inference_ms = (time.perf_counter() - inference_started) * 1000
             # Whisper's own recommended rule: a segment that is probably silence AND low confidence is noise.
             kept = [
-                seg for seg in segments
+                seg for seg in all_segments
                 if not (getattr(seg, "no_speech_prob", 0.0) > 0.6 and getattr(seg, "avg_logprob", 0.0) < -1.0)
             ]
             text = "".join(seg.text for seg in kept).strip()
-            return text, getattr(info, "language_probability", 1.0)
+            segment_quality = [
+                (
+                    max(0.0, float(getattr(seg, "end", 0.0)) - float(getattr(seg, "start", 0.0))),
+                    float(getattr(seg, "avg_logprob", 0.0)),
+                    float(getattr(seg, "no_speech_prob", 0.0)),
+                )
+                for seg in all_segments
+            ]
+            return text, getattr(info, "language_probability", 1.0), segment_quality, inference_ms
 
         import asyncio
 
-        text, confidence = await asyncio.to_thread(_do)
+        started = time.perf_counter()
+        try:
+            text, confidence, segment_quality, inference_ms = await asyncio.to_thread(_do)
+        except Exception:
+            logger.exception("[stt] Whisper transcription failed")
+            raise
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        rtf = elapsed_ms / max(audio.duration_sec * 1000, 1)
+        logger.info(
+            "[stt][timing] stage=whisper_model_inference "
+            f"elapsed_ms={inference_ms:.0f} audio_sec={audio.duration_sec:.2f} "
+            f"rtf={inference_ms / max(audio.duration_sec * 1000, 1):.2f} "
+            f"segments={len(segment_quality)} "
+            f"language=en language_probability={float(confidence):.3f}"
+        )
+        logger.info(
+            "[stt][timing] stage=stt_preprocess_and_total "
+            f"elapsed_ms={elapsed_ms:.0f} audio_sec={audio.duration_sec:.2f} rtf={rtf:.2f}"
+        )
+        if segment_quality:
+            quality = " ".join(
+                f"segment{index + 1}(sec={duration:.2f},logprob={logprob:.2f},no_speech={no_speech:.2f})"
+                for index, (duration, logprob, no_speech) in enumerate(segment_quality)
+            )
+            logger.info(f"[stt] segment diagnostics: {quality}")
         return Transcript(text=text, confidence=float(confidence), duration_sec=audio.duration_sec)

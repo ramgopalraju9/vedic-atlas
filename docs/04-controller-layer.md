@@ -12,22 +12,19 @@ runnable.
 | File | Router | Endpoints |
 |---|---|---|
 | `admin.py` | — | `POST /admin/shutdown` — sends `SIGINT` to the server's own process after a short delay (lets the response flush first; uvicorn handles `SIGINT` for clean teardown) |
-| `ambient.py` | — | `POST /ambient/publish` (test hook — builds and publishes an `AmbientEvent`); `GET /ambient/stream` (SSE — subscribes to the event bus, runs each event through `supervisor.dispatch_ambient()`, yields narration JSON, 15s keepalive) |
-| `approval.py` | — | `POST /approval/request` (blocks until resolved); `POST /approval/{id}/approve`; `POST /approval/{id}/deny`; `GET /approval/pending`; `POST /approval/yolo/on`; `POST /approval/yolo/off`; `GET /approval/yolo` |
-| `chat.py` | — | `POST /chat` — the main non-streaming chat endpoint |
+| `approval.py` | — | `POST /approval/{id}/approve`; `POST /approval/{id}/deny`; `GET /approval/pending`; `POST /approval/yolo/on`; `POST /approval/yolo/off`; `GET /approval/yolo` |
 | `config.py` | — | `GET /config/proactivity`; `POST /config/proactivity` (400 on an invalid value) |
-| `governance.py` | `prefix="/governance"` | `GET /governance/status`; `GET /governance/audit/stats`; `GET /governance/audit/entries` (filters: `event_type`, `agent`, `limit`); `GET /governance/audit/verify`; `GET /governance/health` (circuit-breaker status); `GET /governance/policies`. Duck-types via `hasattr()` since the provider can be `None` |
+| `governance.py` | `prefix="/governance"` | `GET /governance/status`; `GET /governance/audit/stats`. Duck-types via `hasattr()` since the provider can be `None` |
 | `health.py` | — | `GET /health` — duck-types `supervisor`/`event_bus`/`governance`, separately probes the DB with `SELECT 1`. Deliberately never 503s itself — it's the "what's broken" endpoint |
 | `knowledge.py` | — | `GET /knowledge`; `POST /knowledge`; `DELETE /knowledge/{index}` |
-| `lookup.py` | — | `GET /lookup/providers`; `GET /lookup/health` (live probe of geocoding, weather, currency, web search — incl. whether the API key is set); `POST /lookup/fetch` (maps `EgressDeniedError`→403, `ValueError`→404) |
-| `memory.py` | — | `GET /memory/recent`; `GET /memory/search` (returns `{"enabled": false}` if semantic recall isn't wired) |
-| `persona.py` | — | `GET /persona`; `POST /persona` — persists to `data/cli_persona.json` (flat file, not the DB); on change, calls `supervisor.set_proactivity()` to sync |
+| `lookup.py` | — | `GET /lookup/health` (live probe of geocoding, weather, currency, web search — incl. whether the API key is set) |
+| `persona.py` | — | `GET /persona`; `POST /persona` — persists to `data/cli_persona.json` (flat file, not the DB); on change, calls `ambient_dispatcher.set_proactivity()` to sync |
 | `privacy.py` | — | `GET /privacy/status`; `POST /privacy/mute`; `POST /privacy/mute/toggle` |
+| `speakers.py` | — | `GET /speakers`; `POST /speakers/enroll/start|feed|finish|cancel`; `DELETE /speakers/{name}` — speaker enrolment (no CLI command yet) |
 | `stream.py` | — | `POST /stream` — SSE chat streaming via `supervisor.execute_stream()` |
-| `system.py` | — | `GET /system` — active window title via `win32gui`/`win32process`/`psutil` in a thread, `ImportError`-degrades on non-Windows |
-| `tasks.py` | — | `GET /tasks`; `POST /tasks`; `POST /tasks/{id}/complete`; `DELETE /tasks/{id}` |
+| `tasks.py` | — | `GET /tasks`; `POST /tasks`; `POST /tasks/{id}/complete` |
 | `trace.py` | — | `GET /trace?limit=N` — recent tool turns: what was asked, every tool call with its real result, guard decisions, stage timings, prompt tokens |
-| `voice.py` | — | `GET /voice/config`; `GET /voice/status`; `POST /voice/start`; `POST /voice/stop`; `POST /voice/say`. Mute control deliberately lives under `/privacy`, not here |
+| `voice.py` | — | `GET /voice/status` (read-only). Mute control lives under `/privacy`; the voice session starts and stops with the server |
 
 ## Dependency injection (`dependencies/providers.py`)
 
@@ -41,12 +38,11 @@ def _require(request: Request, attr: str, label: str):
     return obj
 ```
 
-`get_supervisor`, `get_event_bus`, `get_approval_broker`,
-`get_knowledge_base`, `get_memory`, `get_lookup_service`, `get_task_service`
-are all required (503 if missing). `get_governance` and
-`get_semantic_recall` are optional — they return `None` without a 503, and
-the calling route must handle that case (both are allowed to be disabled
-by config). Note that `privacy.py` and `voice.py` don't use this module —
+`get_supervisor`, `get_ambient_dispatcher`, `get_approval_broker`, `get_knowledge_base`,
+`get_trace_repo`, `get_lookup_health`, `get_task_service` and
+`get_speaker_enrollment_service` are required (503 if missing).
+`get_governance` is optional — it returns `None` without a 503, and the
+calling route must handle that case (governance can be disabled by config). Note that `privacy.py` and `voice.py` don't use this module —
 they define their own local `_require`-style dependency inline, reading
 `app.state.capture_gate`/`app.state.voice_session` directly.
 
@@ -93,15 +89,17 @@ same as any other client would.
   text. Bare positional text → one-shot streaming chat.
 - **`client.py` — `VedaClient`**: sync `httpx.Client` wrapper, base URL
   from `VEDA_SERVER_URL` env var (default `http://127.0.0.1:8000`).
-  `ensure_up(allow_spawn=True)` auto-spawns the server as a subprocess
-  (`python -m uvicorn server:app`, with `PYTHONPATH` set to `src/`) if
-  it's unreachable, then polls until ready. `ensure_up(restart=True)` first calls
-  `stop_server()`, which finds the process listening on the port (psutil), refuses to
-  touch anything that isn't recognisably a Veda server, tries `POST /api/admin/shutdown`
-  (clean voice/mic teardown), then terminates and, if needed, kills it. The REPL start
-  (bare `veda`) uses `restart=True` so a stale server is never reused; opt out with
-  `--no-restart` or `VEDA_RESTART_ON_START=0`. One-shot commands (`veda task`,
-  `veda doctor`, `veda "prompt"`) attach to a running server without restarting it. Wraps essentially every route
+  `ensure_up()` makes sure a server answers and says what it did in `client.how`:
+  **reused** (already running: left alone), **waited** (an earlier `veda` spawned one that is still loading the model:
+  wait for it, never start a second; its pid is kept in `data/veda-server-<port>.pid`), **started** (spawned
+  `python -m uvicorn server:app` with `PYTHONPATH` set to `src/` and Uvicorn access logs disabled) or **restarted**.
+  The server answers only after the model is loaded and warmed (about a minute on a laptop, more on a Pi), so the wait is
+  240 s (`VEDA_START_TIMEOUT`),
+  progress is logged every 15 s, and if the server process dies the last lines of `data/veda-server.log` are shown at once.
+  Bare `veda` continues a running server; `veda --restart` (or `VEDA_RESTART_ON_START=1`) first calls `stop_server()` for a
+  fresh one (psutil finds the listener, refuses anything that is not recognisably a Veda server, tries
+  `POST /api/admin/shutdown`, then terminates, then kills). One-shot commands (`veda task`, `veda doctor`,
+  `veda "prompt"`) attach to a running server the same way. Wraps essentially every route
   above (`stream_chat`, `chat_one_shot`, persona/approval/task/status
   helpers).
 - **`commands.py`**: `cmd_approve` (interactive y/n/skip loop, or `--id`/
@@ -176,12 +174,12 @@ adapter and the FastAPI app gets built. `_IS_WINDOWS = platform.system()
     stack; build guardrails + skills and register `TasksSkill` plus (when online) `GetWeatherSkill`,
     `ConvertCurrencySkill`, `WebSearchSkill`. With online disabled, manifests marked
     `requires_online` are dropped
-12. Build `SystemControlPort`, `AgentRegistry`, `ToolUseGuard`, `PromptComposer`,
-    `ToolTurnRunner`, `SqliteTraceRepository`; build `ResponderAgent` (plain chat),
-    `SystemAgent`; register both; if `agents.tools_enabled`, register one `ToolAgent` per owner
-    named in the manifests (`tasks`, `lookup`)
-13. Build `SupervisorAgent` with every dependency above; register it too →
-    `app.state.agent_registry`, `app.state.supervisor`
+12. Build `SystemControlPort` and register the device skills (`app_control`, `volume_control`, `device_status`),
+    `AgentRegistry`, `ToolUseGuard`, `PromptComposer`, `SqliteTraceRepository`, `SessionStateService`; build
+    `ResponderAgent` (plain chat, with the claims reply veto) and register it
+13. Build `ControlDecoder` + `AssistantOrchestrator` (`app.state.orchestrator`), then `SupervisorAgent(orchestrator)`;
+    register it too → `app.state.agent_registry`, `app.state.supervisor`; build `AmbientDispatcher` →
+    `app.state.ambient_dispatcher` (proactivity + ambient-event narration)
 14. `app.state.lookup_service` / `lookup_health` (set in step 11), `app.state.trace_repo`,
     `app.state.notifier`, `app.state.egress_allow_list`
 15. **Privacy chain**: build `mute_switch`, `audio_capture`, then
@@ -215,9 +213,9 @@ app = FastAPI(title=PROJECT_NAME, version=VERSION, lifespan=lifespan)
 register_exception_handlers(app)
 app.middleware("http")(request_context)
 
-for _mod in (admin, ambient, approval, chat, config_route, governance_route,
-             health, knowledge, lookup, memory_route, persona, privacy,
-             stream, system, tasks_route, voice):
+for _mod in (admin, approval, config_route, governance_route,
+             health, knowledge, lookup, persona, privacy, speakers,
+             stream, tasks_route, trace_route, voice):
     app.include_router(_mod.router, prefix="/api")
 ```
 

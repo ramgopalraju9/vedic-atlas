@@ -34,6 +34,20 @@ def _is_tty() -> bool:
         return False
 
 
+def _print_final(c: Console, full: str) -> None:
+    """Print the finished answer. Veda's replies are plain spoken sentences, so a one-line reply is printed as plain text:
+    Markdown reads a bare "2." or "10." (an answer to a sum) as an EMPTY numbered-list item and shows nothing at all.
+    Multi-line or fenced replies still get Markdown (code, lists), and if that renders to nothing the plain text is shown."""
+    text = full.strip()
+    if "\n" in text or "```" in text:
+        with c.capture() as captured:
+            c.print(Markdown(full))
+        if captured.get().strip():
+            c.print(Markdown(full))
+            return
+    c.print(Text(text))
+
+
 def stream_to_terminal(tokens: Iterable[str], *, console: Console | None = None) -> str:
     """Render an SSE token stream live, then re-render as markdown.
 
@@ -63,8 +77,8 @@ def stream_to_terminal(tokens: Iterable[str], *, console: Console | None = None)
             live.update(text)
 
     if full.strip():
-        c.print(Markdown(full))
+        _print_final(c, full)
     else:
-        c.print(f"[yellow]{_EMPTY_HINT}[/yellow]")
+        c.print(Text(_EMPTY_HINT, style="yellow"))   # not markup: the hint starts with "[" and Rich would swallow it
     c.print()
     return full

@@ -15,4 +15,7 @@ DEFAULT_ALLOW_LIST: frozenset[str] = frozenset({
     "api.frankfurter.dev",      # fx (ECB reference rates)
     "open.er-api.com",          # fx fallback (166 currencies)
     "gdeltproject.org",         # news
+    "oauth2.googleapis.com",    # Google token refresh
+    "gmail.googleapis.com",     # Gmail
+    "www.googleapis.com",       # Google Calendar
 })

@@ -79,29 +79,28 @@ decisions. Recurring porting patterns worth knowing about:
   fetching it — this was a deliberate correction from the donor's behavior
   in at least one case (`FasterWhisperProvider`'s docstring calls out that
   the donor silently downloaded on first use).
-- **Two independent agent-routing subsystems were ported in parallel** and
-  both still exist: `SupervisorAgent`'s LLM/keyword routing between named
-  agents, and `service/approval/approval_broker.py`'s separate UI-facing
-  approval flow (distinct from `guardrails/permissions.py`'s skill-level
-  approval gate). See [03-service-layer.md](03-service-layer.md) for both.
+- **Two independent approval mechanisms exist in parallel**: `service/approval/approval_broker.py`'s UI-facing
+  approval flow, distinct from `guardrails/permissions.py`'s skill-level approval gate. See
+  [03-service-layer.md](03-service-layer.md) for both. (Agent routing no longer exists: every turn is decided by
+  the one `AssistantOrchestrator` control decode.)
 
 ## Request flow, traced end to end
 
-A `POST /api/chat` call touches almost every layer, so it's the best
+A `POST /api/stream` call touches almost every layer, so it's the best
 single example to hold in your head:
 
 1. **`request_context` middleware** stamps an 8-char request ID into a
    `ContextVar` (so concurrent requests' log lines don't interleave
    confusingly) — see [04-controller-layer.md](04-controller-layer.md).
-2. **`controller/routes/chat.py`** builds a `domain.entities.agent_context.AgentContext`
+2. **`controller/routes/stream.py`** builds a `domain.entities.agent_context.AgentContext`
    from the request body and pulls `SupervisorAgent` via
    `Depends(get_supervisor)` (from `controller/dependencies/providers.py`,
    reading `request.app.state.supervisor`).
-3. **`SupervisorAgent.execute(ctx)`** (`service/agent/supervisor.py`) picks
-   a target agent — keyword match first, LLM fallback second, last-known-
-   routing third — optionally consults `GovernanceProvider.check_action()`,
-   records the decision to memory, and delegates.
-4. **`ResponderAgent.execute(ctx)`** (`service/agent/responder.py`) builds a
+3. **`SupervisorAgent.execute_stream(ctx)`** (`service/agent/supervisor.py`) hands the turn to the
+   **`AssistantOrchestrator`**, which makes ONE grammar-constrained control decision (which tools, if any, with
+   what arguments — seeing the recent conversation and the session state), runs the chosen tools through
+   `SkillRunner`, and replies from the tool's own sentence; only a turn that needs no tool reaches the chat model.
+4. For a chat turn, **`ResponderAgent.execute(ctx)`** (`service/agent/responder.py`) builds a
    cache-friendly prompt (persona block first, since it's byte-identical
    every turn and keeps the inference backend's KV-cache warm) and calls
    `InferencePort.complete(...)`.
@@ -111,8 +110,8 @@ single example to hold in your head:
    in `server.py` at boot. `SingleFlight` serializes concurrent calls (CPU-
    bound local inference doesn't parallelize usefully); `GracefulDegradation`
    retries once and can fall back to a secondary backend.
-6. The response bubbles back up through `AgentResult` →
-   `schemas.chat.ChatResponse` → FastAPI serializes it.
+6. The reply streams back chunk by chunk through `execute_stream` →
+   SSE frames (`controller/sse/`) → the CLI.
 7. Any unhandled exception anywhere in 2–6 is caught by the global handlers
    in `exceptions/handlers.py` and normalized into the house `AppResponse`
    envelope — see [05-exception-handling.md](05-exception-handling.md).

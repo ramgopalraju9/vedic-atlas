@@ -10,15 +10,42 @@ model_path: data/bge-small-en-v1.5
 # Cache/download location used by FastEmbed when model_path is not set.
 cache_dir: data/embeddings
 
-# Number of semantically relevant facts to inject into context once retrieval is enabled.
-# Measured on real summaries with BGE-small: the right memory ranks first (0.53-0.72), but long multi-topic
-# summaries also score 0.45-0.60 for unrelated questions, so keep this small to limit prompt size.
-top_k: 3
+# Memories considered per question. The right one is often second, a few hundredths behind the best (top-1 was right
+# for only 9 of 12 test questions), so several are looked at and the margin below decides how many are shown.
+top_k: 4
 
-# Minimum cosine similarity (0..1) for a memory to be injected.
-min_score: 0.5
+# Minimum cosine similarity (0..1) for a memory to be injected. Measured against the stored summaries with BGE-small
+# (scores are compressed into 0.45-0.85): questions about the past score >= 0.66, ordinary questions have a median
+# of 0.56, so 0.62 keeps memory out of "what is 2 plus 2". The old 0.5 let 15 of 16 ordinary questions through.
+min_score: 0.62
+
+# A stricter floor for one source. Short question-and-answer notes score higher than summaries for the same query: at the
+# summary floor (0.62) 10 of 16 ordinary questions pulled in an old exchange. Measured on the real exchanges, questions
+# about a specific detail score >= 0.70 and ordinary non-repeat questions <= 0.70 (genuine repeats of an earlier question
+# score 0.8+, which is a correct match).
+min_score_by_source:
+  exchange: 0.70
+
+# Besides the best hit, keep every hit within this of it (up to top_k).
+margin: 0.05
+
+# A question that is nearly "what have we been talking about" is about the conversation itself, so it is answered from the
+# newest earlier conversations (by date) instead of whichever summaries are most similar. Measured with BGE-small: unseen
+# paraphrases score 0.82-1.0, specific questions ("what did we say about Barcelona") <= 0.82, ordinary ones <= 0.77.
+# Remove this line to turn the mode off.
+conversation_intent_min: 0.82
+# A looser match (a typo, a polite wrapper such as "can you tell me what are we discussing lately") counts too, but only when
+# the router would otherwise ask a clarifying question or refuse: a typo'd "discusing" scored 0.795. Not lowered for every
+# route because "what did we talk about regarding Barcelona" (0.815) must stay a topic search.
+conversation_intent_soft_min: 0.76
+
+# Prompt budget for the recalled block (each hit, then the whole block). Every token is prefill time on a Pi.
+max_hit_chars: 280
+max_total_chars: 800
 
 # Memory sources semantic recall searches. Saved facts (the `remember` tool) are always in the prompt, so
-# only conversation summaries are searched.
+# only conversation memory is searched: session summaries, and each question-and-answer on its own ("exchange"),
+# which finds details a whole-session summary loses.
 sources:
   - summary
+  - exchange
